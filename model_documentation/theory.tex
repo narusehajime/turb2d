@@ -1,0 +1,39 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+
+\title{Formulation of 2D shallow water model of turbidity currents}
+\author{Hajime NARUSE}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{equation}
+\frac{\partial h}{\partial t} + U \frac{\partial h}{\partial x} + V \frac{\partial h}{\partial y} = e_w \sqrt{U^2 + V^2} - h \left( \frac{\partial U}{\partial x} + \frac{\partial V}{\partial y}  \right)
+\label{eq flow_continuity}
+\end{equation}
+
+\begin{equation}
+\frac{\partial U}{\partial t} + U \frac{\partial U}{\partial x} + V \frac{\partial U}{\partial y} = - R g C \frac{\partial \eta}{\partial x} - \frac{1}{2} R g h \frac{\partial C}{\partial x} - R g C \frac{\partial h}{\partial x} - \frac{u_{*}^2}{h} - \frac{e_w U \sqrt{U^2 + V^2}}{h} + \nu_t \left(\frac{\partial^2 U}{\partial x^2} + \frac{\partial^2 V}{\partial y^2} \right)
+\label{eq flow_momentum_x}
+\end{equation}
+
+\begin{equation}
+\frac{\partial V}{\partial t} + U \frac{\partial V}{\partial x} + V \frac{\partial V}{\partial y} = - R g C \frac{\partial \eta}{\partial y} - \frac{1}{2} R g h \frac{\partial C}{\partial y} - R g C \frac{\partial h}{\partial y} - \frac{v_{*}^2}{h} - \frac{e_w V \sqrt{U^2 + V^2}}{h} + \nu_t \left(\frac{\partial^2 U}{\partial x^2} + \frac{\partial^2 V}{\partial y^2} \right)
+\label{eq flow_momentum_y}
+\end{equation}
+
+\begin{equation}
+\frac{\partial C}{\partial t} + U \frac{\partial C}{\partial x} + V \frac{\partial C}{\partial y} = \frac{w_s (e_s - r_0 C)}{h} - \frac{e_w C \sqrt{U^2 + V^2}}{h}
+\label{eq sediment_continuity}
+\end{equation}
+
+\begin{equation}
+ \frac{d \eta}{d t} = \frac{w_s (r_0 C - e_s)}{1 - \lambda_p}
+\label{eq exner}
+\end{equation}
+
+
+
+\end{document}

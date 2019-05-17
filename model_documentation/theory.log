@@ -1,0 +1,142 @@
+This is e-upTeX, Version 3.14159265-p3.7.1-u1.22-161114-2.6 (utf8.uptex) (TeX Live 2017/Debian) (preloaded format=uplatex 2018.10.13)  17 MAY 2019 19:41
+entering extended mode
+ restricted \write18 enabled.
+ %&-line parsing enabled.
+**theory.tex
+(./theory.tex
+pLaTeX2e <2017/10/28u01>+4 (based on LaTeX2e <2017-04-15>)
+Babel <3.18> and hyphenation patterns for 26 language(s) loaded.
+(/usr/share/texlive/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2014/09/29 v1.4h Standard LaTeX document class
+(/usr/share/texlive/texmf-dist/tex/latex/base/size12.clo
+File: size12.clo 2014/09/29 v1.4h Standard LaTeX file (size option)
+LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
+(Font)              scaled to size 11.54663pt on input line 54.
+LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
+(Font)              scaled to size 11.54663pt on input line 54.
+)
+\c@part=\count82
+\c@section=\count83
+\c@subsection=\count84
+\c@subsubsection=\count85
+\c@paragraph=\count86
+\c@subparagraph=\count87
+\c@figure=\count88
+\c@table=\count89
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen118
+)
+(/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsmath.sty
+Package: amsmath 2017/09/02 v2.17a AMS math features
+\@mathmargin=\skip43
+
+For additional information on amsmath, use the `?' option.
+(/usr/share/texlive/texmf-dist/tex/latex/amsmath/amstext.sty
+Package: amstext 2000/06/29 v2.01 AMS text
+
+(/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0 generic functions
+\@emptytoks=\toks15
+\ex@=\dimen119
+))
+(/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsbsy.sty
+Package: amsbsy 1999/11/29 v1.2d Bold Symbols
+\pmbraise@=\dimen120
+)
+(/usr/share/texlive/texmf-dist/tex/latex/amsmath/amsopn.sty
+Package: amsopn 2016/03/08 v2.02 operator names
+)
+\inf@bad=\count90
+LaTeX Info: Redefining \frac on input line 213.
+\uproot@=\count91
+\leftroot@=\count92
+LaTeX Info: Redefining \overline on input line 375.
+\classnum@=\count93
+\DOTSCASE@=\count94
+LaTeX Info: Redefining \ldots on input line 472.
+LaTeX Info: Redefining \dots on input line 475.
+LaTeX Info: Redefining \cdots on input line 596.
+\Mathstrutbox@=\box42
+\strutbox@=\box43
+\big@size=\dimen121
+LaTeX Font Info:    Redeclaring font encoding OML on input line 712.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 713.
+\macc@depth=\count95
+\c@MaxMatrixCols=\count96
+\dotsspace@=\muskip10
+\c@parentequation=\count97
+\dspbrk@lvl=\count98
+\tag@help=\toks16
+\row@=\count99
+\column@=\count100
+\maxfields@=\count101
+\andhelp@=\toks17
+\eqnshift@=\dimen122
+\alignsep@=\dimen123
+\tagshift@=\dimen124
+\tagwidth@=\dimen125
+\totwidth@=\dimen126
+\lineht@=\dimen127
+\@envbody=\toks18
+\multlinegap=\skip44
+\multlinetaggap=\skip45
+\mathdisplay@stack=\toks19
+LaTeX Info: Redefining \[ on input line 2817.
+LaTeX Info: Redefining \] on input line 2818.
+) (./theory.aux)
+\openout1 = `theory.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for JY2/mc/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Checking defaults for JT2/mc/m/n on input line 8.
+LaTeX Font Info:    ... okay on input line 8.
+LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
+(Font)              scaled to size 19.95642pt on input line 10.
+LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
+(Font)              scaled to size 19.95642pt on input line 10.
+LaTeX Font Info:    Font shape `JT2/mc/m/n' will be
+(Font)              scaled to size 13.85594pt on input line 10.
+LaTeX Font Info:    Font shape `JY2/mc/m/n' will be
+(Font)              scaled to size 13.85594pt on input line 10.
+
+Overfull \hbox (84.01611pt too wide) detected at line 20
+[] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 U[] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 V[
+] \OT1/cmr/m/n/12 = \OMS/cmsy/m/n/12 ^^@\OML/cmm/m/it/12 RgC[] \OMS/cmsy/m/n/12
+ ^^@ []\OML/cmm/m/it/12 Rgh[] \OMS/cmsy/m/n/12 ^^@ \OML/cmm/m/it/12 RgC[] \OMS/
+cmsy/m/n/12 ^^@ [] ^^@ [] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 ^^W[] []
+ []
+
+
+Overfull \hbox (83.90033pt too wide) detected at line 25
+[] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 U[] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 V[
+] \OT1/cmr/m/n/12 = \OMS/cmsy/m/n/12 ^^@\OML/cmm/m/it/12 RgC[] \OMS/cmsy/m/n/12
+ ^^@ []\OML/cmm/m/it/12 Rgh[] \OMS/cmsy/m/n/12 ^^@ \OML/cmm/m/it/12 RgC[] \OMS/
+cmsy/m/n/12 ^^@ [] ^^@ [] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 ^^W[] []
+ []
+
+[1
+
+] (./theory.aux) ) 
+Here is how much of TeX's memory you used:
+ 847 strings out of 494731
+ 9464 string characters out of 6176319
+ 71634 words of memory out of 5000000
+ 4414 multiletter control sequences out of 15000+600000
+ 11610 words of font info for 53 fonts, out of 8000000 for 9000
+ 264 hyphenation exceptions out of 8191
+ 27i,7n,20p,388b,230s stack positions out of 5000i,500n,10000p,200000b,80000s
+
+Output written on theory.dvi (1 page, 3592 bytes).

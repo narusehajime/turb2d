@@ -1,0 +1,24 @@
+# -*- coding: utf-8 -*-
+
+from setuptools import setup, find_packages
+
+
+with open('README.rst') as f:
+    readme = f.read()
+
+with open('LICENSE') as f:
+    license = f.read()
+
+setup(
+    name='marslobes',
+    version='0.1.0',
+    description='Inverse model for Martian lobate deposits',
+    long_description=readme,
+    author='Hajime Naruse and Kyohei Noumura',
+    author_email='naruse@kueps.kyoto-u.ac.jp',
+    url='https://github.com/narusehajime/marslobes',
+    license=license,
+    install_requires=['numpy','landlab', ],
+    packages=find_packages(exclude=('tests', 'docs'))
+)
+
