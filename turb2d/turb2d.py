@@ -1,7 +1,7 @@
 """A component of landlab that simulates a turbidity current on 2D grids
 
 This component simulates turbidity currents using the 2-D numerical model of
-shallow-water equations over topography on the basis of 3 equation model of 
+shallow-water equations over topography on the basis of 3 equation model of
 Parker et al. (1986). This component is based on the landlab component
  overland_flow that was written by Jordan Adams.
 
@@ -132,7 +132,7 @@ class TurbidityCurrent2D(Component):
                  g=9.81,
                  R=1.65,
                  Ds=100 * 10**-6,
-                 nu_t=100.0,
+                 nu_t=0.01,
                  flow_type='3eq',
                  **kwds):
         """Create a debris-flow component.
@@ -193,6 +193,7 @@ class TurbidityCurrent2D(Component):
             self.v = grid.add_zeros(
                 'flow__vertical_velocity',
                 at='link',
+                units=self._var_units['flow__vertical_velocity'])
             self.C = grid.add_zeros(
                 'flow__sediment_concentration',
                 at='link',
@@ -228,7 +229,7 @@ class TurbidityCurrent2D(Component):
                 'flow_vertical_velocity__vertical_gradient', at='link')
             self.dCdx = grid.add_zeros(
                 'flow_sediment_concentration__horizontal_gradient', at='node')
-            self.dvdy = grid.add_zeros(
+            self.dCdy = grid.add_zeros(
                 'flow_sediment_concentration__vertical_gradient', at='node')
 
             self.eta_grad = grid.add_zeros(
@@ -323,12 +324,11 @@ class TurbidityCurrent2D(Component):
     def calc_time_step(self):
         """Calculate time step
         """
-
         sqrt_RCgh = np.sqrt(self.R * self.C * self.g * self.h)
 
         dt_local = self.alpha * self._grid.dx \
             / np.amax(np.array([np.amax(self.u_node + sqrt_RCgh),
-                                np.amax(self.v + sqrt_RCgh), 1.0]))
+                                np.amax(self.v_node + sqrt_RCgh), 1.0]))
 
         return dt_local
 
@@ -411,6 +411,7 @@ class TurbidityCurrent2D(Component):
             self.eta_link[self.link_north][self.vertical_active_links] - self.
             eta_link[self.link_south][self.vertical_active_links]) / (2 * dx)
 
+        # continue calculation until the prescribed time elapsed
         while local_elapsed_time < dt:
             # set local time step
             dt_local = self.calc_time_step()
@@ -507,15 +508,14 @@ class TurbidityCurrent2D(Component):
                 out_dfdy=self.dCdy_temp)
 
             # update values
-            self.update_variables_from_temp()
-
             # map node values to links, and link values to nodes.
+            self.update_values()
             self.map_values()
             self.update_up_down_links_and_nodes()
 
             # calculate non-advection terms
             self.calc_nonadvection_terms()
-            
+
             self.cip_2d_nonadvection(
                 self.h,
                 self.dhdx,
@@ -588,36 +588,43 @@ class TurbidityCurrent2D(Component):
                 out_dfdx=self.dCdx,
                 out_dfdy=self.dCdy)
 
-
-            # self.cip_2d_diffusion(
-            #     self.u,
-            #     self.v,
-            #     self.nu_t,
-            #     self.horizontal_active_links,
-            #     self.vertical_active_links,
-            #     self.link_north,
-            #     self.link_south,
-            #     self.link_east,
-            #     self.link_west,
-            #     dx,
-            #     self.dt_local,
-            #     out_u=self.u,
-            #     out_v=self.v)
+            self.cip_2d_diffusion(
+                self.u,
+                self.v,
+                self.nu_t,
+                self.horizontal_active_links,
+                self.vertical_active_links,
+                self.link_north,
+                self.link_south,
+                self.link_east,
+                self.link_west,
+                dx,
+                self.dt_local,
+                out_u=self.u,
+                out_v=self.v)
 
             # Reset our field values with the newest flow depth and
             # discharge.
-            self.grid.at_node['flow__depth'] = self.h
-            self.grid.at_link['flow__horizontal_velocity'] = self.u
-            self.grid.at_link['flow__vertical_velocity'] = self.v
-            self.grid.at_node['flow__sediment_concentration'] = self.C
-            
+            self.copy_values_to_grid()
+            self.map_values()
+            self.update_up_down_links_and_nodes()
+
             # Calculation is terminated if global dt is not specified.
             if dt is np.inf:
                 break
             local_elapsed_time += self.dt_local
 
-    def update_variables_from_temp(self):
-        """Update variables from temporally variables
+    def copy_values_to_grid(self):
+        """Copy flow parameters to grid
+        """
+        self.grid.at_node['flow__depth'] = self.h
+        self.grid.at_link['flow__horizontal_velocity'] = self.u
+        self.grid.at_link['flow__vertical_velocity'] = self.v
+        self.grid.at_node['flow__sediment_concentration'] = self.C
+
+    def update_values(self):
+        """Update variables from temporally variables and
+           apply boundary conditions
         """
 
         self.h[:] = self.h_temp[:]
@@ -636,7 +643,7 @@ class TurbidityCurrent2D(Component):
         self.h[np.where(self.h < self.h_init)] = self.h_init
         self.C[np.where(self.C < 0)] = 0
 
-
+        self.copy_values_to_grid()
 
     def update_up_down_links_and_nodes(self):
         """update location of upcurrent and downcurrent
@@ -707,51 +714,63 @@ class TurbidityCurrent2D(Component):
         v = self.v[self.vertical_active_links]
         v_on_horiz = self.v[self.horizontal_active_links]
         v_node = self.v_node
-        h_on_horiz = self.h_link[self.horizontal_active_links]
-        h_on_vert = self.h_link[self.vertical_active_links]
-        C_on_horiz = self.C_link[self.horizontal_active_links]
-        C_on_vert = self.C_link[self.vertical_active_links]
+        h = self.h
+        h_link = self.h_link
+        C = self.C
+        C_link = self.C_link
         eta_grad_x = self.eta_grad[self.horizontal_active_links]
         eta_grad_y = self.eta_grad[self.vertical_active_links]
         Cf = self.Cf
-        g = self.g
-        Rg = self.R * g
+        Rg = self.R * self.g
         ws = self.ws
         core_nodes = self.core_nodes
         node_north = self.node_north[self.core_nodes]
         node_south = self.node_south[self.core_nodes]
         node_east = self.node_east[self.core_nodes]
         node_west = self.node_west[self.core_nodes]
-        link_north = self.link_north[self.vertical_active_links]
-        link_south = self.link_south[self.vertical_active_links]
-        link_east = self.link_east[self.horizontal_active_links]
-        link_west = self.link_west[self.horizontal_active_links]
+        link_horiz = self.horizontal_active_links
+        link_vert = self.vertical_active_links
+        link_north = self.link_north
+        link_south = self.link_south
+        link_east = self.link_east
+        link_west = self.link_west
 
         # Calculate shear stress
         if self.flow_type == '3eq':
             u_star_2 = Cf * u * np.sqrt(u**2 + v_on_horiz**2)
             v_star_2 = Cf * v * np.sqrt(u_on_vert**2 + v**2)
+            u_star_2_on_node = Cf * (u_node**2 + v_node**2)
 
         # Calculate entrainment rates of water and sediment
         ew = 0
         es = 0
+        r0 = 0
 
-            # Calculate non-advection terms
-        self.G_h[core_nodes] = ew * np.sqrt(u_node[core_nodes])  -self.h[self.core_nodes] * (
-            (v_node[node_north] -
-             v_node[node_south]) / (2 * dx) +
-            (self.u_node[self.node_east[self.core_nodes]] -
-             self.u_node[self.node_west[self.core_nodes]]) / (2 * dx))
+        # Calculate non-advection terms
+        self.G_h[core_nodes] = ew * np.sqrt(
+            u_node[core_nodes]**2 + v_node[core_nodes]**2) - h[core_nodes] * (
+                (v_node[node_north] - v_node[node_south]) / (2 * dx) +
+                (u_node[node_east] - u_node[node_west]) / (2 * dx))
 
-        self.G_u[self.horizontal_active_links] = -g * (
-            self.h_link[self.link_east][self.horizontal_active_links] -
-            self.h_link[self.link_west][self.horizontal_active_links]) / (
-                2 * dx) - g * eta_grad_x - tau_x_over_rho / h_x
+        self.G_u[
+            link_horiz] = -Rg * C_link[link_horiz] * eta_grad_x \
+            - 0.5 * Rg * h_link[link_horiz] * (
+                C_link[link_east][link_horiz] - C_link[link_west][link_horiz]
+        ) / (2 * dx) - Rg * C_link[link_horiz] * (
+                h_link[link_east][link_horiz] - h_link[link_west][link_horiz]
+        ) / (2 * dx) - u_star_2 / h_link[link_horiz] - ew * u * np.sqrt(u**2 + v_on_horiz**2) / h_link[link_horiz]
 
-        self.G_v[self.vertical_active_links] = -g * (
-            self.h_link[self.link_north[self.vertical_active_links]] -
-            self.h_link[self.link_south[self.vertical_active_links]]) / (
-                2 * dx) - g * eta_grad_y - tau_y_over_rho / h_y
+        self.G_v[
+            link_vert] = -Rg * C_link[link_vert] * eta_grad_y \
+            - 0.5 * Rg * h_link[link_vert] * (
+                C_link[link_north][link_vert] - C_link[link_south][link_vert]
+        ) / (2 * dx) - Rg * C_link[link_vert] * (
+                h_link[link_north][link_vert] - h_link[link_south][link_vert]
+        ) / (2 * dx) - v_star_2 / h_link[link_vert] - ew * v * np.sqrt(u_on_vert**2 + v**2) / h_link[link_vert]
+
+        self.G_C[core_nodes] = (
+            ws * (es - r0 * C[core_nodes]) - ew * C[core_nodes] * np.sqrt(
+                u_node[core_nodes]**2 + v_node[core_nodes]**2)) / h[core_nodes]
 
     def map_values(self):
         """map parameters at nodes to links, and those at links to nodes
@@ -763,8 +782,10 @@ class TurbidityCurrent2D(Component):
         np.mean(self.u[grid.links_at_node], axis=1, out=self.u_node)
         np.mean(self.v[grid.links_at_node], axis=1, out=self.v_node)
 
-        # map node values (h, eta) to links
+        # map node values (h, C, eta) to links
         grid.map_mean_of_link_nodes_to_link('flow__depth', out=self.h_link)
+        grid.map_mean_of_link_nodes_to_link(
+            'flow__sediment_concentration', out=self.C_link)
         grid.map_mean_of_link_nodes_to_link(
             'topographic__elevation', out=self.eta_link)
 
@@ -963,7 +984,10 @@ class TurbidityCurrent2D(Component):
             cmap='PuBu',
             grid_units=('coordinates', 'coordinates'),
             var_name='flow depth',
-            var_units='m')
+            var_units='m',
+            vmin=0,
+            vmax=5,
+        )
 
         z = self.grid.at_node['topographic__elevation']
         elev = self.grid.node_vector_to_raster(z)
@@ -981,37 +1005,31 @@ class TurbidityCurrent2D(Component):
 
 
 if __name__ == '__main__':
-    grid = RasterModelGrid((200, 100), spacing=10.0)
+    grid = RasterModelGrid((300, 200), spacing=10.0)
     grid.add_zeros('flow__depth', at='node')
     grid.add_zeros('topographic__elevation', at='node')
     grid.add_zeros('flow__horizontal_velocity', at='link')
     grid.add_zeros('flow__vertical_velocity', at='link')
-    initial_flow_region = (grid.node_x > 400.) & (grid.node_x < 600.) & (
-        grid.node_y > 1400.) & (grid.node_y < 1600.)
+    grid.add_zeros('flow__sediment_concentration', at='node')
+    initial_flow_region = (grid.node_x > 800.) & (grid.node_x < 1200.) & (
+        grid.node_y > 2400.) & (grid.node_y < 2600.)
 
-    grid.at_node['flow__depth'][initial_flow_region] = 20.0
+    grid.at_node['flow__depth'][initial_flow_region] = 50.0
+    grid.at_node['flow__sediment_concentration'][initial_flow_region] = 0.01
     grid.at_node['topographic__elevation'][
-        grid.node_y > 1000] = (grid.node_y[grid.node_y > 1000] - 1000) * 0.15
+        grid.node_y > 1500] = (grid.node_y[grid.node_y > 1500] - 1500) * 0.05
 
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
-    dflow = DebrisFlow(
+    tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        h_init=0.01,
-        alpha=0.1,
-        # flow_type='Voellmy',
-        flow_type='water',
-        basal_friction_angle=0.0875,
+        alpha=0.2,
     )
     t = time.time()
-    last = 20
+    last = 100
     for i in range(last):
-        dflow.run_one_step(dt=10.0)
-        dflow.plot_result('dflow{:04d}.png'.format(i))
-        # plt.clf()
-        # imshow_grid(grid, 'flow__depth', cmap='Blues')
-        # plt.savefig('test3/dflow{:04d}.png'.format(i))
-        # ipdb.set_trace()
+        tc.run_one_step(dt=100.0)
+        tc.plot_result('tc{:04d}.png'.format(i))
         print("", end="\r")
         print("{:.1f}% finished".format((i + 1) / (last) * 100), end='\r')
     print('elapsed time: {} sec.'.format(time.time() - t))
