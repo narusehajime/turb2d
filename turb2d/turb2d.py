@@ -139,6 +139,7 @@ class TurbidityCurrent2D(Component):
                  g=9.81,
                  R=1.65,
                  Ds=100 * 10**-6,
+                 nu=1.010 * 10**-6,
                  nu_t=0.01,
                  flow_type='3eq',
                  **kwds):
@@ -163,6 +164,8 @@ class TurbidityCurrent2D(Component):
             Submerged specific density (rho_s/rho_f - 1) (1)
         Ds : float, optional
             Sediment diameter
+        nu : float, optional
+            Kinematic viscosity of water (at 293K)
         nu_t: float, optional
             Eddy viscosity for horizontal velocity components
         flow_type : str, optional
@@ -187,6 +190,7 @@ class TurbidityCurrent2D(Component):
         self.Ds = Ds
         self.flow_type = flow_type
         self.h_w = h_w
+        self.nu = nu
 
         # Now setting up fields at nodes and links
         try:
@@ -328,7 +332,7 @@ class TurbidityCurrent2D(Component):
             grid.number_of_links, dtype=np.int64)
 
         # Calculate subordinate parameters
-        self.ws = 0
+        self.ws = self.get_ws()
 
         # Start time of simulation is at 0 s
         self.elapsed_time = 0
@@ -422,13 +426,14 @@ class TurbidityCurrent2D(Component):
         # copy class attributes to local variables
         dx = self.grid.dx
 
-        # Calculate topographic gradient
-        self.eta_grad[self.horizontal_active_links] = (
-            self.eta_link[self.link_east][self.horizontal_active_links] - self.
-            eta_link[self.link_west][self.horizontal_active_links]) / (2 * dx)
-        self.eta_grad[self.vertical_active_links] = (
-            self.eta_link[self.link_north][self.vertical_active_links] - self.
-            eta_link[self.link_south][self.vertical_active_links]) / (2 * dx)
+        # In case another component has added data to the fields, we just
+        # reset our water depths, topographic elevations and water
+        # velocity variables to the fields.
+        self.h = self.grid['node']['flow__depth']
+        self.eta = self.grid['node']['topographic__elevation']
+        self.u = self.grid['link']['flow__horizontal_velocity']
+        self.v = self.grid['link']['flow__vertical_velocity']
+        self.C = self.grid['node']['flow__sediment_concentration']
 
         # continue calculation until the prescribed time elapsed
         while local_elapsed_time < dt:
@@ -440,15 +445,6 @@ class TurbidityCurrent2D(Component):
             if local_elapsed_time + dt_local > dt:
                 dt_local = dt - local_elapsed_time
             self.dt_local = dt_local
-
-            # In case another component has added data to the fields, we just
-            # reset our water depths, topographic elevations and water
-            # velocity variables to the fields.
-            self.h = self.grid['node']['flow__depth']
-            self.eta = self.grid['node']['topographic__elevation']
-            self.u = self.grid['link']['flow__horizontal_velocity']
-            self.v = self.grid['link']['flow__vertical_velocity']
-            self.C = self.grid['node']['flow__sediment_concentration']
 
             self.h[np.where(self.h <= self.h_init)] = self.h_init
 
@@ -625,9 +621,9 @@ class TurbidityCurrent2D(Component):
 
             # Reset our field values with the newest flow depth and
             # discharge.
-            self.copy_values_to_grid()
             self.map_values()
             self.update_up_down_links_and_nodes()
+            self.copy_values_to_grid()
 
             # Calculation is terminated if global dt is not specified.
             if dt is np.inf:
@@ -659,11 +655,6 @@ class TurbidityCurrent2D(Component):
         self.C[:] = self.C_temp[:]
         self.dCdx[:] = self.dCdx_temp[:]
         self.dCdy[:] = self.dCdy_temp[:]
-
-        self.h[np.where(self.h < self.h_init)] = self.h_init
-        self.C[np.where(self.C < 0)] = 0
-
-        self.copy_values_to_grid()
 
     def update_up_down_links_and_nodes(self):
         """update location of upcurrent and downcurrent
@@ -698,8 +689,17 @@ class TurbidityCurrent2D(Component):
         U_link = np.sqrt(self.u**2 + self.v**2)
         self.get_ew(U_node, self.h, self.C, out=self.ew_node)
         self.get_ew(U_link, self.h_link, self.C_link, out=self.ew_link)
-        self.es = 0
+        self.get_es(U_node, es=self.es)
         self.r0 = 1.5
+
+        # Calculate topographic gradient
+        dx = self.grid.dx
+        self.eta_grad[self.horizontal_active_links] = (
+            self.eta_link[self.link_east][self.horizontal_active_links] - self.
+            eta_link[self.link_west][self.horizontal_active_links]) / (2 * dx)
+        self.eta_grad[self.vertical_active_links] = (
+            self.eta_link[self.link_north][self.vertical_active_links] - self.
+            eta_link[self.link_south][self.vertical_active_links]) / (2 * dx)
 
     def cip_2d_diffusion(self,
                          u,
@@ -774,6 +774,75 @@ class TurbidityCurrent2D(Component):
 
         return out
 
+    def get_ws(self):
+        """ Calculate settling velocity of sediment particles
+            on the basis of Ferguson and Church (1982)
+
+        Return
+        ------------------
+        ws : settling velocity of sediment particles [m/s]
+
+        """
+
+        # copy parameters to local variables
+        R = self.R
+        g = self.g
+        Ds = self.Ds
+        nu = self.nu
+
+        # Coefficients for natural sands
+        C_1 = 18.
+        C_2 = 1.0
+
+        ws = R * g * Ds**2 / (C_1 * nu + (0.75 * C_2 * R * g * Ds**3)**0.5)
+
+        return ws
+
+    def get_es(self, U, es=None):
+        """ Calculate entrainment rate of basal sediment to suspension
+            Based on Garcia and Parker (1991)
+
+            Parameters
+            --------------
+            U : ndarray
+                flow velocity
+            es : ndarray
+                Outputs (entrainment rate of basal sediment)
+
+            Returns
+            ---------------
+            es : ndarray
+                dimensionless entrainment rate of basal sediment into
+                suspension
+        """
+
+        if es is None:
+            es = np.zeros(U.shape)
+
+        # basic parameters
+        R = self.R
+        g = self.g
+        Ds = self.Ds
+        nu = self.nu
+        ws = self.ws
+        Cf = self.Cf
+
+        # calculate subordinate parameters
+        Rp = np.sqrt(R * g * Ds) * Ds / nu
+        u_star = Cf * U**2
+        sus_index = u_star / ws
+
+        # coefficients for calculation
+        a = 7.8 * 10**-7
+        alpha = 0.6
+        p = 1.0
+
+        # calculate entrainemnt rate
+        Z = sus_index * Rp**alpha
+        es = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
+
+        return es
+
     def calc_nonadvection_terms(self):
         """calculate non-advection terms
         """
@@ -843,8 +912,8 @@ class TurbidityCurrent2D(Component):
             u_on_vert**2 + v**2) / h_link[link_vert]
 
         self.G_C[core_nodes] = (
-            ws * (
-                es - r0 * C[core_nodes]) - ew_node[core_nodes] * C[core_nodes]
+            ws * (es[core_nodes] - r0 * C[core_nodes])
+            - ew_node[core_nodes] * C[core_nodes]
             * np.sqrt(u_node[core_nodes]**2 + v_node[core_nodes]**2)) \
             / h[core_nodes]
 
@@ -853,6 +922,10 @@ class TurbidityCurrent2D(Component):
         """
 
         grid = self.grid
+
+        # adjust illeagal values
+        self.h[np.where(self.h < self.h_init)] = self.h_init
+        self.C[np.where(self.C < 0)] = 0
 
         # map link values (u, v) to nodes
         np.mean(self.u[grid.links_at_node], axis=1, out=self.u_node)
@@ -1056,13 +1129,14 @@ class TurbidityCurrent2D(Component):
 
         imshow_grid(
             self.grid,
-            'flow__depth',
+            # 'flow__depth',
+            'flow__sediment_concentration',
             cmap='PuBu',
             grid_units=('m', 'm'),
             var_name='flow depth',
             var_units='m',
             vmin=0,
-            vmax=5,
+            vmax=0.01,
         )
 
         z = self.grid.at_node['topographic__elevation']
