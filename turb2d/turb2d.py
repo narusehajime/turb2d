@@ -1,3 +1,10 @@
+import numpy as np
+from landlab import Component, FieldError, RasterModelGrid
+from landlab.utils.decorators import use_file_name_or_kwds
+from landlab.grid.structured_quad import links
+from landlab.io.native_landlab import load_grid, save_grid
+import time
+import ipdb
 """A component of landlab that simulates a turbidity current on 2D grids
 
 This component simulates turbidity currents using the 2-D numerical model of
@@ -47,17 +54,6 @@ dflow = DebrisFlow(
 
 
 """
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import numpy as np
-from landlab import Component, FieldError, RasterModelGrid
-from landlab.plot.imshow import imshow_grid
-from landlab.utils.decorators import use_file_name_or_kwds
-from landlab.grid.structured_quad import links
-import time
-import ipdb
-import matplotlib.pylab as plb
 
 
 class TurbidityCurrent2D(Component):
@@ -1142,40 +1138,9 @@ class TurbidityCurrent2D(Component):
 
         return out_up, out_down
 
-    def plot_result(self, filename):
-        """Plot calculation results with topography
-        """
-
-        plt.clf()
-
-        imshow_grid(
-            self.grid,
-            # 'flow__depth',
-            'bed__thickness',
-            cmap='PuBu',
-            grid_units=('m', 'm'),
-            var_name='bed thickness',
-            var_units='m',
-            # vmin=0,
-            # vmax=0.01,
-        )
-
-        z = self.grid.at_node['topographic__elevation']
-        elev = self.grid.node_vector_to_raster(z)
-
-        cs = plb.contour(
-            elev,
-            np.arange(min(z), max(z), 10),
-            colors='dimgray',
-            extent=[
-                0, self.grid.grid_xdimension, 0, self.grid.grid_ydimension
-            ])
-        cs.clabel(inline=True, fmt='%1i', fontsize=10)
-
-        plt.savefig(filename)
-
 
 if __name__ == '__main__':
+
     grid = RasterModelGrid((300, 200), spacing=10.0)
     grid.add_zeros('flow__depth', at='node')
     grid.add_zeros('topographic__elevation', at='node')
@@ -1190,6 +1155,13 @@ if __name__ == '__main__':
     grid.at_node['flow__sediment_concentration'][initial_flow_region] = 0.01
     grid.at_node['topographic__elevation'][
         grid.node_y > 1500] = (grid.node_y[grid.node_y > 1500] - 1500) * 0.05
+    grid.at_node['topographic__elevation'][
+        (grid.node_y > 1500) & ((grid.node_x < 600)) | (grid.node_x > 1400)
+    ] += 100
+    canyon = (grid.node_y > 1500) & ((grid.node_x >= 600)
+                                     & (grid.node_x <= 1400))
+    grid.at_node['topographic__elevation'][canyon] += np.abs(
+        (grid.node_x[canyon] - 1000)) * 100 / (1000 - 600)
 
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
     tc = TurbidityCurrent2D(
@@ -1201,7 +1173,7 @@ if __name__ == '__main__':
     last = 10
     for i in range(last):
         tc.run_one_step(dt=100.0)
-        tc.plot_result('tc{:04d}.png'.format(i))
+        save_grid(grid, 'tc{:04d}.grid'.format(i))
         print("", end="\r")
         print("{:.1f}% finished".format((i + 1) / (last) * 100), end='\r')
     print('elapsed time: {} sec.'.format(time.time() - t))
