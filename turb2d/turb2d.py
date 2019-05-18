@@ -139,6 +139,7 @@ class TurbidityCurrent2D(Component):
                  g=9.81,
                  R=1.65,
                  Ds=100 * 10**-6,
+                 lambda_p=0.4,
                  nu=1.010 * 10**-6,
                  nu_t=0.01,
                  flow_type='3eq',
@@ -163,7 +164,9 @@ class TurbidityCurrent2D(Component):
         R : float, optional
             Submerged specific density (rho_s/rho_f - 1) (1)
         Ds : float, optional
-            Sediment diameter
+            Sediment diameter (m)
+        lambda_p : float, optional
+            Bed sediment porosity (1)
         nu : float, optional
             Kinematic viscosity of water (at 293K)
         nu_t: float, optional
@@ -191,6 +194,7 @@ class TurbidityCurrent2D(Component):
         self.flow_type = flow_type
         self.h_w = h_w
         self.nu = nu
+        self.lambda_p = lambda_p
 
         # Now setting up fields at nodes and links
         try:
@@ -301,6 +305,7 @@ class TurbidityCurrent2D(Component):
         self.G_u = np.zeros(grid.number_of_links)
         self.G_v = np.zeros(grid.number_of_links)
         self.G_C = np.zeros(grid.number_of_nodes)
+        self.G_eta = np.zeros(grid.number_of_nodes)
 
         self.h_temp = np.zeros(grid.number_of_nodes)
         self.dhdx_temp = np.zeros(grid.number_of_nodes)
@@ -333,6 +338,9 @@ class TurbidityCurrent2D(Component):
 
         # Calculate subordinate parameters
         self.ws = self.get_ws()
+
+        # Record initial topography
+        self.eta_init = self.eta
 
         # Start time of simulation is at 0 s
         self.elapsed_time = 0
@@ -522,7 +530,7 @@ class TurbidityCurrent2D(Component):
                 out_dfdx=self.dCdx_temp,
                 out_dfdy=self.dCdy_temp)
 
-            # update values
+            # update values after calculating advection terms
             # map node values to links, and link values to nodes.
             self.update_values()
             self.map_values()
@@ -604,6 +612,10 @@ class TurbidityCurrent2D(Component):
                 out_dfdx=self.dCdx,
                 out_dfdy=self.dCdy)
 
+            # Calculate deposition/erosion
+            self.eta = self.eta + self.dt_local * self.G_eta
+
+            # Calculate diffusion term of momentum
             self.cip_2d_diffusion(
                 self.u,
                 self.v,
@@ -623,12 +635,15 @@ class TurbidityCurrent2D(Component):
             # discharge.
             self.map_values()
             self.update_up_down_links_and_nodes()
-            self.copy_values_to_grid()
 
             # Calculation is terminated if global dt is not specified.
             if dt is np.inf:
                 break
             local_elapsed_time += self.dt_local
+
+        # Update bed thickness and record results in the grid
+        self.bed_thick = self.eta - self.eta_init
+        self.copy_values_to_grid()
 
     def copy_values_to_grid(self):
         """Copy flow parameters to grid
@@ -637,6 +652,8 @@ class TurbidityCurrent2D(Component):
         self.grid.at_link['flow__horizontal_velocity'] = self.u
         self.grid.at_link['flow__vertical_velocity'] = self.v
         self.grid.at_node['flow__sediment_concentration'] = self.C
+        self.grid.at_node['topographic__elevation'] = self.eta
+        self.grid.at_node['bed__thickness'] = self.bed_thick
 
     def update_values(self):
         """Update variables from temporally variables and
@@ -911,11 +928,15 @@ class TurbidityCurrent2D(Component):
             - ew_link[link_vert] * v * np.sqrt(
             u_on_vert**2 + v**2) / h_link[link_vert]
 
+        sedimentation_rate = ws * (r0 * C[core_nodes] - es[core_nodes])
+
         self.G_C[core_nodes] = (
-            ws * (es[core_nodes] - r0 * C[core_nodes])
+            - sedimentation_rate
             - ew_node[core_nodes] * C[core_nodes]
             * np.sqrt(u_node[core_nodes]**2 + v_node[core_nodes]**2)) \
             / h[core_nodes]
+
+        self.G_eta[core_nodes] = sedimentation_rate / (1 - self.lambda_p)
 
     def map_values(self):
         """map parameters at nodes to links, and those at links to nodes
@@ -1130,13 +1151,13 @@ class TurbidityCurrent2D(Component):
         imshow_grid(
             self.grid,
             # 'flow__depth',
-            'flow__sediment_concentration',
+            'bed__thickness',
             cmap='PuBu',
             grid_units=('m', 'm'),
-            var_name='flow depth',
+            var_name='bed thickness',
             var_units='m',
-            vmin=0,
-            vmax=0.01,
+            # vmin=0,
+            # vmax=0.01,
         )
 
         z = self.grid.at_node['topographic__elevation']
