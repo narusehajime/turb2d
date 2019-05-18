@@ -83,6 +83,7 @@ class TurbidityCurrent2D(Component):
         'flow__vertical_velocity',
         'flow__sediment_concentration',
         'topographic__elevation',
+        'bed__thickness',
     )
 
     _output_var_names = (
@@ -91,6 +92,7 @@ class TurbidityCurrent2D(Component):
         'flow__vertical_velocity',
         'flow__sediment_concentration',
         'topographic__elevation',
+        'bed__thickness',
     )
 
     _var_units = {
@@ -99,6 +101,7 @@ class TurbidityCurrent2D(Component):
         'flow__vertical_velocity': 'm/s',
         'flow__sediment_concentration': '1',
         'topographic__elevation': 'm',
+        'bed__thickness': 'm',
     }
 
     _var_mapping = {
@@ -107,6 +110,7 @@ class TurbidityCurrent2D(Component):
         'flow__vertical_velocity': 'link',
         'flow__sediment_concentration': 'node',
         'topographic__elevation': 'node',
+        'bed__thickness': 'node',
     }
 
     _var_doc = {
@@ -120,13 +124,16 @@ class TurbidityCurrent2D(Component):
         'Sediment concentration in flow',
         'topographic__elevation':
         'The land surface elevation.',
+        'bed__thickness':
+        'The bed thickness',
     }
 
     @use_file_name_or_kwds
     def __init__(self,
                  grid,
                  default_fixed_links=False,
-                 h_init=0.001,
+                 h_init=0.0001,
+                 h_w=0.001,
                  alpha=0.1,
                  Cf=0.004,
                  g=9.81,
@@ -144,6 +151,8 @@ class TurbidityCurrent2D(Component):
         h_init : float, optional
             Thickness of initial thin layer of flow to prevent divide by zero
             errors (m).
+        h_w : float, optional
+            Thickness of flow to judge "wet" nodes and links (m).
         alpha : float, optional
             Time step coefficient
         Cf : float, optional
@@ -157,8 +166,8 @@ class TurbidityCurrent2D(Component):
         nu_t: float, optional
             Eddy viscosity for horizontal velocity components
         flow_type : str, optional
-            '3eq' for three equation model
-            '4eq' for four equation model (not implemented)
+            '3eq' for the three equation model
+            '4eq' for the four equation model (not implemented)
         """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
 
@@ -177,6 +186,7 @@ class TurbidityCurrent2D(Component):
         self.R = R
         self.Ds = Ds
         self.flow_type = flow_type
+        self.h_w = h_w
 
         # Now setting up fields at nodes and links
         try:
@@ -184,6 +194,10 @@ class TurbidityCurrent2D(Component):
                 'topographic__elevation',
                 at='node',
                 units=self._var_units['topographic__elevation'])
+            self.bed_thick = grid.add_zeros(
+                'bed__thickness',
+                at='node',
+                units=self._var_units['bed__thickness'])
             self.h = grid.add_zeros(
                 'flow__depth', at='node', units=self._var_units['flow__depth'])
             self.u = grid.add_zeros(
@@ -206,6 +220,7 @@ class TurbidityCurrent2D(Component):
             self.h = grid.at_node['flow__depth']
             self.C = grid.at_node['flow__sediment_concentration']
             self.eta = self._grid.at_node['topographic__elevation']
+            self.bed_thick = self._grid.at_node['bed__thickness']
 
         self.h += self.h_init
 
@@ -273,6 +288,10 @@ class TurbidityCurrent2D(Component):
         self.h_link = np.zeros(grid.number_of_links)
         self.C_link = np.zeros(grid.number_of_links)
         self.eta_link = np.zeros(grid.number_of_links)
+
+        self.ew_node = np.zeros(grid.number_of_nodes)
+        self.ew_link = np.zeros(grid.number_of_links)
+        self.es = np.zeros(grid.number_of_nodes)
 
         self.G_h = np.zeros(grid.number_of_nodes)
         self.G_u = np.zeros(grid.number_of_links)
@@ -514,6 +533,7 @@ class TurbidityCurrent2D(Component):
             self.update_up_down_links_and_nodes()
 
             # calculate non-advection terms
+            self.calc_closure_functions()
             self.calc_nonadvection_terms()
 
             self.cip_2d_nonadvection(
@@ -669,6 +689,18 @@ class TurbidityCurrent2D(Component):
             out_up=self.vertical_up_links,
             out_down=self.vertical_down_links)
 
+    def calc_closure_functions(self):
+        """Calculate closure functions for non-advection terms
+        """
+
+        # Calculate entrainment rates of water and sediment
+        U_node = np.sqrt(self.u_node**2 + self.v_node**2)
+        U_link = np.sqrt(self.u**2 + self.v**2)
+        self.get_ew(U_node, self.h, self.C, out=self.ew_node)
+        self.get_ew(U_link, self.h_link, self.C_link, out=self.ew_link)
+        self.es = 0
+        self.r0 = 1.5
+
     def cip_2d_diffusion(self,
                          u,
                          v,
@@ -690,17 +722,57 @@ class TurbidityCurrent2D(Component):
         if out_v is None:
             out_v = np.zeros(v.shape)
 
-        out_u[h_active] = u[h_active] + nu_t * dt * \
-            ((u[east][h_active] - 2 * u[h_active] + u[west][h_active]) + (
-                u[north][h_active] - 2 * u[h_active] + u[south][h_active]))\
-            / dx ** 2
+        out_u[h_active] = u[h_active] \
+            + nu_t * dt * ((u[east][h_active] - 2 * u[h_active]
+                            + u[west][h_active])
+                           + (u[north][h_active] - 2 * u[h_active]
+                              + u[south][h_active])) / dx ** 2
 
-        out_v[v_active] = v[v_active] + nu_t * dt * \
-            ((v[east][v_active] - 2 * v[v_active] + v[west][v_active]) + (
-                v[north][v_active] - 2 * v[v_active] + v[south][v_active]))\
-            / dx ** 2
+        out_v[v_active] = v[v_active] \
+            + nu_t * dt * ((v[east][v_active] - 2 * v[v_active]
+                            + v[west][v_active])
+                           + (v[north][v_active] - 2 * v[v_active]
+                              + v[south][v_active])) / dx ** 2
 
         return out_u, out_v
+
+    def get_ew(self, U, h, C, out=None):
+        """ calculate entrainemnt coefficient of ambient water to a turbidity
+            current layer
+
+            Parameters
+            ----------
+            U : ndarray
+               Flow velocities of ambient water and a turbidity current.
+               Row 0 is for an ambient water, and Row 1 is for a turbidity
+               current.
+            h : ndarray
+               Flow heights of ambient water and a turbidity current. Row 0
+               is an ambient water, and Row 1 is a turbidity current.
+            C : ndarray
+               Sediment concentration
+            out : ndarray
+               Outputs
+
+            Returns
+            ---------
+            e_w : ndarray
+               Entrainment coefficient of ambient water
+
+        """
+        if out is None:
+            out = np.zeros(U.shape)
+
+        Ri = np.zeros(U.shape)
+
+        flow_exist = np.where((h[:] > self.h_w) & (U > 0.01))
+
+        Ri[flow_exist] = self.R * self.g * C[flow_exist] * \
+            h[flow_exist] / U[flow_exist] ** 2
+        out[flow_exist] = 0.075 / \
+            np.sqrt(1 + 718. + Ri[flow_exist] ** 2.4)  # Parker et al. (1987)
+
+        return out
 
     def calc_nonadvection_terms(self):
         """calculate non-advection terms
@@ -718,6 +790,10 @@ class TurbidityCurrent2D(Component):
         h_link = self.h_link
         C = self.C
         C_link = self.C_link
+        ew_node = self.ew_node
+        ew_link = self.ew_link
+        es = self.es
+        r0 = self.r0
         eta_grad_x = self.eta_grad[self.horizontal_active_links]
         eta_grad_y = self.eta_grad[self.vertical_active_links]
         Cf = self.Cf
@@ -739,15 +815,9 @@ class TurbidityCurrent2D(Component):
         if self.flow_type == '3eq':
             u_star_2 = Cf * u * np.sqrt(u**2 + v_on_horiz**2)
             v_star_2 = Cf * v * np.sqrt(u_on_vert**2 + v**2)
-            u_star_2_on_node = Cf * (u_node**2 + v_node**2)
-
-        # Calculate entrainment rates of water and sediment
-        ew = 0
-        es = 0
-        r0 = 0
 
         # Calculate non-advection terms
-        self.G_h[core_nodes] = ew * np.sqrt(
+        self.G_h[core_nodes] = ew_node[core_nodes] * np.sqrt(
             u_node[core_nodes]**2 + v_node[core_nodes]**2) - h[core_nodes] * (
                 (v_node[node_north] - v_node[node_south]) / (2 * dx) +
                 (u_node[node_east] - u_node[node_west]) / (2 * dx))
@@ -758,7 +828,9 @@ class TurbidityCurrent2D(Component):
                 C_link[link_east][link_horiz] - C_link[link_west][link_horiz]
         ) / (2 * dx) - Rg * C_link[link_horiz] * (
                 h_link[link_east][link_horiz] - h_link[link_west][link_horiz]
-        ) / (2 * dx) - u_star_2 / h_link[link_horiz] - ew * u * np.sqrt(u**2 + v_on_horiz**2) / h_link[link_horiz]
+        ) / (2 * dx) - u_star_2 / h_link[link_horiz] \
+            - ew_link[link_horiz] * u * np.sqrt(
+            u**2 + v_on_horiz**2) / h_link[link_horiz]
 
         self.G_v[
             link_vert] = -Rg * C_link[link_vert] * eta_grad_y \
@@ -766,11 +838,15 @@ class TurbidityCurrent2D(Component):
                 C_link[link_north][link_vert] - C_link[link_south][link_vert]
         ) / (2 * dx) - Rg * C_link[link_vert] * (
                 h_link[link_north][link_vert] - h_link[link_south][link_vert]
-        ) / (2 * dx) - v_star_2 / h_link[link_vert] - ew * v * np.sqrt(u_on_vert**2 + v**2) / h_link[link_vert]
+        ) / (2 * dx) - v_star_2 / h_link[link_vert] \
+            - ew_link[link_vert] * v * np.sqrt(
+            u_on_vert**2 + v**2) / h_link[link_vert]
 
         self.G_C[core_nodes] = (
-            ws * (es - r0 * C[core_nodes]) - ew * C[core_nodes] * np.sqrt(
-                u_node[core_nodes]**2 + v_node[core_nodes]**2)) / h[core_nodes]
+            ws * (
+                es - r0 * C[core_nodes]) - ew_node[core_nodes] * C[core_nodes]
+            * np.sqrt(u_node[core_nodes]**2 + v_node[core_nodes]**2)) \
+            / h[core_nodes]
 
     def map_values(self):
         """map parameters at nodes to links, and those at links to nodes
@@ -982,7 +1058,7 @@ class TurbidityCurrent2D(Component):
             self.grid,
             'flow__depth',
             cmap='PuBu',
-            grid_units=('coordinates', 'coordinates'),
+            grid_units=('m', 'm'),
             var_name='flow depth',
             var_units='m',
             vmin=0,
@@ -1011,7 +1087,8 @@ if __name__ == '__main__':
     grid.add_zeros('flow__horizontal_velocity', at='link')
     grid.add_zeros('flow__vertical_velocity', at='link')
     grid.add_zeros('flow__sediment_concentration', at='node')
-    initial_flow_region = (grid.node_x > 800.) & (grid.node_x < 1200.) & (
+    grid.add_zeros('bed__thickness', at='node')
+    initial_flow_region = (grid.node_x > 900.) & (grid.node_x < 1100.) & (
         grid.node_y > 2400.) & (grid.node_y < 2600.)
 
     grid.at_node['flow__depth'][initial_flow_region] = 50.0
@@ -1026,7 +1103,7 @@ if __name__ == '__main__':
         alpha=0.2,
     )
     t = time.time()
-    last = 100
+    last = 10
     for i in range(last):
         tc.run_one_step(dt=100.0)
         tc.plot_result('tc{:04d}.png'.format(i))
