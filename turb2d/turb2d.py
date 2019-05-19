@@ -1156,7 +1156,7 @@ if __name__ == '__main__':
     initial_flow_region = (
         (grid.node_x - initial_region_center[0])**2 +
         (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
-    grid.at_node['flow__depth'][initial_flow_region] = 50.0
+    grid.at_node['flow__depth'][initial_flow_region] = 25.0
     grid.at_node['flow__sediment_concentration'][initial_flow_region] = 0.01
 
     # making topography
@@ -1185,7 +1185,7 @@ if __name__ == '__main__':
 
     # start calculation
     t = time.time()
-    last = 5
+    last = 10
     for i in range(last):
         tc.run_one_step(dt=100.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i))
