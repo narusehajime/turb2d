@@ -52,7 +52,11 @@ def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
 
 if __name__ == '__main__':
 
-    for i in range(5):
+    for i in range(51):
         grid = load_grid('tc{:04d}.grid'.format(i))
         plot_result(
-            grid, 'tc{:04d}.png'.format(i), 'flow__depth', vmin=0.0, vmax=20.0)
+            grid,
+            'tc{:04d}.png'.format(i),
+            'flow__sediment_concentration',
+            vmin=0.0,
+            vmax=0.005)

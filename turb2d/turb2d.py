@@ -614,22 +614,22 @@ class TurbidityCurrent2D(Component):
             self.eta = self.eta + self.dt_local * self.G_eta
 
             # Calculate diffusion term of momentum
-            self.cip_2d_diffusion(
-                self.u,
-                self.v,
-                self.nu_t,
-                self.horizontal_active_links,
-                self.vertical_active_links,
-                self.link_north,
-                self.link_south,
-                self.link_east,
-                self.link_west,
-                dx,
-                self.dt_local,
-                out_u=self.u,
-                out_v=self.v)
+            # self.cip_2d_diffusion(
+            #     self.u,
+            #     self.v,
+            #     self.nu_t,
+            #     self.horizontal_active_links,
+            #     self.vertical_active_links,
+            #     self.link_north,
+            #     self.link_south,
+            #     self.link_east,
+            #     self.link_west,
+            #     dx,
+            #     self.dt_local,
+            #     out_u=self.u,
+            #     out_v=self.v)
 
-            # apply the shock dissipation scheme
+            # # apply the shock dissipation scheme
             self.shock_dissipation(
                 self.h,
                 self.h,
@@ -638,8 +638,8 @@ class TurbidityCurrent2D(Component):
                 self.node_south,
                 self.node_east,
                 self.node_west,
-                self.dt_local
-            )
+                self.dt_local,
+                out=self.h_temp)
 
             self.shock_dissipation(
                 self.C,
@@ -649,11 +649,34 @@ class TurbidityCurrent2D(Component):
                 self.node_south,
                 self.node_east,
                 self.node_west,
-                self.dt_local
-            )
+                self.dt_local,
+                out=self.C_temp)
+
+            self.shock_dissipation(
+                self.u,
+                self.h_link,
+                self.horizontal_active_links,
+                self.link_north,
+                self.link_south,
+                self.link_east,
+                self.link_west,
+                self.dt_local,
+                out=self.u_temp)
+
+            self.shock_dissipation(
+                self.v,
+                self.h_link,
+                self.vertical_active_links,
+                self.link_north,
+                self.link_south,
+                self.link_east,
+                self.link_west,
+                self.dt_local,
+                out=self.v_temp)
 
             # Reset our field values with the newest flow depth and
             # discharge.
+            # self.update_values()
             self.map_values()
             self.update_up_down_links_and_nodes()
 
@@ -761,29 +784,31 @@ class TurbidityCurrent2D(Component):
             out_v = np.zeros(v.shape)
 
         out_u[h_active] = u[h_active]
-        + nu_t * dt * ((u[east][h_active] - 2 * u[h_active]
-                        + u[west][h_active])
-                       + (u[north][h_active] - 2 * u[h_active]
-                          + u[south][h_active])) / dx ** 2
+        +nu_t * dt * (
+            (u[east][h_active] - 2 * u[h_active] + u[west][h_active]) +
+            (u[north][h_active] - 2 * u[h_active] + u[south][h_active])
+        ) / dx**2
 
         out_v[v_active] = v[v_active]
-        + nu_t * dt * ((v[east][v_active] - 2 * v[v_active]
-                        + v[west][v_active])
-                       + (v[north][v_active] - 2 * v[v_active]
-                          + v[south][v_active])) / dx ** 2
+        +nu_t * dt * (
+            (v[east][v_active] - 2 * v[v_active] + v[west][v_active]) +
+            (v[north][v_active] - 2 * v[v_active] + v[south][v_active])
+        ) / dx**2
 
         return out_u, out_v
 
-    def shock_dissipation(self,
-                          f,
-                          h,
-                          core,
-                          north_id,
-                          south_id,
-                          east_id,
-                          west_id,
-                          dt,
-                          ):
+    def shock_dissipation(
+            self,
+            f,
+            h,
+            core,
+            north_id,
+            south_id,
+            east_id,
+            west_id,
+            dt,
+            out=None,
+    ):
         """ adding artificial viscosity for numerical stability
 
             Parameters            ------------------
@@ -802,6 +827,8 @@ class TurbidityCurrent2D(Component):
             west_id : ndarray, int
                 indeces of nodes or links that locate west of core
         """
+        if out is None:
+            out = np.zeros(f.shape)
 
         kappa = self.kappa  # artificial viscosity
         dx = self.grid.dx
@@ -816,16 +843,16 @@ class TurbidityCurrent2D(Component):
         eps_i[core] = kappa * dx * np.abs(h[east] - 2 * h[core] + h[west]) / \
             (h[east] + 2 * h[core] + h[west]) / dt
         eps_i_half[core] = np.max([eps_i[east], eps_i[core]], axis=0)
-        f[core] = f[core] + eps_i_half[core] * (f[east] - f[core]) - \
+        out[core] = f[core] + eps_i_half[core] * (f[east] - f[core]) - \
             eps_i_half[west] * (f[core] - f[west])
 
         # Next, artificial diffusion is applied to north-south direction
-        eps_i[core] = kappa * dx * np.abs(
-            h[north] - 2 * h[core] + h[south]) / (
-                h[north] + 2 * h[core] + h[south]) / dt
+        eps_i[core] = kappa * dx * np.abs(h[north] - 2 * h[core] +
+                                          h[south]) / (h[north] + 2 * h[core] +
+                                                       h[south]) / dt
         eps_i_half[core] = np.max([eps_i[north], eps_i[core]], axis=0)
-        f[core] = f[core] + eps_i_half[core] * (f[north] - f[core]) \
-            - eps_i_half[south] * (f[core] - f[south])
+        out[core] = out[core] + eps_i_half[core] * (out[north] - out[core]) \
+            - eps_i_half[south] * (out[core] - out[south])
 
     def get_ew(self, U, h, C, out=None):
         """ calculate entrainemnt coefficient of ambient water to a turbidity
@@ -859,7 +886,7 @@ class TurbidityCurrent2D(Component):
         Ri[flow_exist] = self.R * self.g * C[flow_exist] \
             * h[flow_exist] / U[flow_exist] ** 2
         out[flow_exist] = 0.075 / np.sqrt(
-            1 + 718. + Ri[flow_exist] ** 2.4)  # Parker et al. (1987)
+            1 + 718. + Ri[flow_exist]**2.4)  # Parker et al. (1987)
 
         return out
 
@@ -924,7 +951,7 @@ class TurbidityCurrent2D(Component):
         # coefficients for calculation
         a = 7.8 * 10**-7
         alpha = 0.6
-        p = 1.0
+        p = 0.1
 
         # calculate entrainemnt rate
         Z = sus_index * Rp**alpha
@@ -980,33 +1007,30 @@ class TurbidityCurrent2D(Component):
                 (v_node[node_north] - v_node[node_south]) / (2 * dx) +
                 (u_node[node_east] - u_node[node_west]) / (2 * dx))
 
-        self.G_u[
-            link_horiz] = -Rg * C_link[link_horiz] * eta_grad_x
-        - 0.5 * Rg * h_link[link_horiz] * (
+        self.G_u[link_horiz] = -Rg * C_link[link_horiz] * eta_grad_x
+        -0.5 * Rg * h_link[link_horiz] * (
             C_link[link_east][link_horiz] - C_link[link_west][link_horiz]
         ) / (2 * dx) - Rg * C_link[link_horiz] * (
-            h_link[link_east][link_horiz] - h_link[link_west][link_horiz]
-        ) / (2 * dx) - u_star_2 / h_link[link_horiz]
-        - ew_link[link_horiz] * u * np.sqrt(
-            u**2 + v_on_horiz**2) / h_link[link_horiz]
+            h_link[link_east][link_horiz] - h_link[link_west][link_horiz]) / (
+                2 * dx) - u_star_2 / h_link[link_horiz]
+        -ew_link[link_horiz] * u * np.sqrt(u**2 +
+                                           v_on_horiz**2) / h_link[link_horiz]
 
-        self.G_v[
-            link_vert] = -Rg * C_link[link_vert] * eta_grad_y
-        - 0.5 * Rg * h_link[link_vert] * (
+        self.G_v[link_vert] = -Rg * C_link[link_vert] * eta_grad_y
+        -0.5 * Rg * h_link[link_vert] * (
             C_link[link_north][link_vert] - C_link[link_south][link_vert]
         ) / (2 * dx) - Rg * C_link[link_vert] * (
-            h_link[link_north][link_vert] - h_link[link_south][link_vert]
-        ) / (2 * dx) - v_star_2 / h_link[link_vert]
-        - ew_link[link_vert] * v * np.sqrt(
-            u_on_vert**2 + v**2) / h_link[link_vert]
+            h_link[link_north][link_vert] - h_link[link_south][link_vert]) / (
+                2 * dx) - v_star_2 / h_link[link_vert]
+        -ew_link[link_vert] * v * np.sqrt(u_on_vert**2 +
+                                          v**2) / h_link[link_vert]
 
         sedimentation_rate = ws * (r0 * C[core_nodes] - es[core_nodes])
 
         self.G_C[core_nodes] = (
-            - sedimentation_rate
-            - ew_node[core_nodes] * C[core_nodes]
-            * np.sqrt(
-                u_node[core_nodes]**2 + v_node[core_nodes]**2)) / h[core_nodes]
+            -sedimentation_rate - ew_node[core_nodes] * C[core_nodes] *
+            np.sqrt(u_node[core_nodes]**2 + v_node[core_nodes]**2)
+        ) / h[core_nodes]
 
         self.G_eta[core_nodes] = sedimentation_rate / (1 - self.lambda_p)
 
@@ -1139,9 +1163,9 @@ class TurbidityCurrent2D(Component):
             (xi_x[h_down] - xi_x[h_up]) / (2 * D_x[core])
 
         out_dfdy[core] = dfdy[core]
-        + ((out_f[v_down] - f[v_down]) -
-           (out_f[v_up] - f[v_up])) / (-2 * D_y[core]) - dfdy[core] * (
-            xi_y[v_down] - xi_y[v_up]) / (2 * D_y[core])
+        +((out_f[v_down] - f[v_down]) -
+          (out_f[v_up] - f[v_up])) / (-2 * D_y[core]) - dfdy[core] * (
+              xi_y[v_down] - xi_y[v_up]) / (2 * D_y[core])
 
         return out_f, out_dfdx, out_dfdy
 
@@ -1218,7 +1242,7 @@ class TurbidityCurrent2D(Component):
 if __name__ == '__main__':
     # making grid
     # size of calculation domain is 4 x 8 km with dx = 20 m
-    grid = RasterModelGrid((400, 200), spacing=10.0)
+    grid = RasterModelGrid((400, 100), spacing=10.0)
     grid.add_zeros('flow__depth', at='node')
     grid.add_zeros('topographic__elevation', at='node')
     grid.add_zeros('flow__horizontal_velocity', at='link')
@@ -1226,47 +1250,52 @@ if __name__ == '__main__':
     grid.add_zeros('flow__sediment_concentration', at='node')
     grid.add_zeros('bed__thickness', at='node')
 
-    # making initial flow region
-    initial_region_radius = 100
-    initial_region_center = [1000, 3500]
-    initial_flow_region = (
-        (grid.node_x - initial_region_center[0])**2 +
-        (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
-    grid.at_node['flow__depth'][initial_flow_region] = 25.0
-    grid.at_node['flow__sediment_concentration'][initial_flow_region] = 0.01
-
     # making topography
-    slope = 0.05
+    # set the slope
+    slope = 0.1
     slope_basin_break = 1000
-    canyon_center = 1000
-    canyon_half_width = 200
-    canyon_depth = 50
     grid.at_node['topographic__elevation'] = (
         grid.node_y - slope_basin_break) * slope
+
+    # set canyon
+    canyon_center = 500
+    canyon_half_width = 200
+    canyon_depth = 50
     canyon = ((grid.node_x >= canyon_center - canyon_half_width) &
               (grid.node_x <= canyon_center + canyon_half_width))
     grid.at_node['topographic__elevation'][canyon] -= canyon_depth - np.abs(
         (grid.node_x[canyon] -
          canyon_center)) * canyon_depth / canyon_half_width
+
+    # set basin
     basin_region = grid.at_node['topographic__elevation'] < 0
     grid.at_node['topographic__elevation'][basin_region] = 0
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
+
+    # making initial flow region
+    initial_region_radius = 100
+    initial_region_center = [500, 3500]
+    initial_flow_region = (
+        (grid.node_x - initial_region_center[0])**2 +
+        (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
+    grid.at_node['flow__depth'][initial_flow_region] = 50.0
+    grid.at_node['flow__sediment_concentration'][initial_flow_region] = 0.02
 
     # making turbidity current object
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.2,
-        Ds=80*10**-6,
+        alpha=0.5,
+        Ds=80 * 10**-6,
     )
 
     # start calculation
     t = time.time()
-    save_grid(grid, 'tc{:04d}.grid'.format(0))
-    last = 5
+    save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
+    last = 100
     for i in range(1, last + 1):
-        tc.run_one_step(dt=100.0)
-        save_grid(grid, 'tc{:04d}.grid'.format(i))
+        tc.run_one_step(dt=10.0)
+        save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
-        print("{:.1f}% finished".format((i + 1) / (last) * 100), end='\r')
+        print("{:.1f}% finished".format(i / last * 100), end='\r')
     print('elapsed time: {} sec.'.format(time.time() - t))
