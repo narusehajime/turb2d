@@ -52,7 +52,7 @@ def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
 
 if __name__ == '__main__':
 
-    for i in range(10):
+    for i in range(5):
         grid = load_grid('tc{:04d}.grid'.format(i))
         plot_result(
             grid, 'tc{:04d}.png'.format(i), 'flow__depth', vmin=0.0, vmax=20.0)
