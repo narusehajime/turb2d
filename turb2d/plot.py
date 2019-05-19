@@ -37,25 +37,28 @@ def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
     z = grid.at_node['topographic__elevation']
 
     elev = grid.node_vector_to_raster(z)
+    X = grid.node_vector_to_raster(grid.node_x)
+    Y = grid.node_vector_to_raster(grid.node_y)
+    plt.contour(X, Y, elev)
 
-    cs = plb.contour(
-        elev,
-        np.arange(min(z), max(z), 10),
-        colors='dimgray',
-        extent=[0, grid.grid_xdimension, 0, grid.grid_ydimension])
+    # cs = plb.contour(
+    #     elev,
+    #     np.arange(min(z), max(z), 10),
+    #     colors='dimgray',
+    #     extent=[0, grid.grid_xdimension, 0, grid.grid_ydimension])
 
-    cs.clabel(inline=True, fmt='%1i', fontsize=10)
+    # cs.clabel(inline=True, fmt='%1i', fontsize=10)
 
     plt.savefig(filename)
 
 
 if __name__ == '__main__':
 
-    for i in range(10):
+    for i in range(1):
         grid = load_grid('tc{:04d}.grid'.format(i))
         plot_result(
             grid,
             'tc{:04d}.png'.format(i),
             'flow__sediment_concentration',
             vmin=0.0,
-            vmax=0.01)
+            vmax=0.005)

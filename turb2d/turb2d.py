@@ -1140,37 +1140,52 @@ class TurbidityCurrent2D(Component):
 
 
 if __name__ == '__main__':
-
-    grid = RasterModelGrid((300, 200), spacing=10.0)
+    # making grid
+    # size of calculation domain is 4 x 8 km with dx = 20 m
+    grid = RasterModelGrid((400, 200), spacing=10.0)
     grid.add_zeros('flow__depth', at='node')
     grid.add_zeros('topographic__elevation', at='node')
     grid.add_zeros('flow__horizontal_velocity', at='link')
     grid.add_zeros('flow__vertical_velocity', at='link')
     grid.add_zeros('flow__sediment_concentration', at='node')
     grid.add_zeros('bed__thickness', at='node')
-    initial_flow_region = (grid.node_x > 900.) & (grid.node_x < 1100.) & (
-        grid.node_y > 2400.) & (grid.node_y < 2600.)
 
+    # making initial flow region
+    initial_region_radius = 100
+    initial_region_center = [1000, 3500]
+    initial_flow_region = (
+        (grid.node_x - initial_region_center[0])**2 +
+        (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
     grid.at_node['flow__depth'][initial_flow_region] = 50.0
     grid.at_node['flow__sediment_concentration'][initial_flow_region] = 0.01
-    grid.at_node['topographic__elevation'][
-        grid.node_y > 1500] = (grid.node_y[grid.node_y > 1500] - 1500) * 0.05
-    grid.at_node['topographic__elevation'][
-        (grid.node_y > 1500) & ((grid.node_x < 600)) | (grid.node_x > 1400)
-    ] += 100
-    canyon = (grid.node_y > 1500) & ((grid.node_x >= 600)
-                                     & (grid.node_x <= 1400))
-    grid.at_node['topographic__elevation'][canyon] += np.abs(
-        (grid.node_x[canyon] - 1000)) * 100 / (1000 - 600)
 
+    # making topography
+    slope = 0.05
+    slope_basin_break = 2000
+    canyon_center = 1000
+    canyon_half_width = 200
+    canyon_depth = 50
+    grid.at_node['topographic__elevation'] = (grid.node_y - slope_basin_break
+                                              ) * 0.05
+    canyon = ((grid.node_x >= canyon_center - canyon_half_width) &
+              (grid.node_x <= canyon_center + canyon_half_width))
+    grid.at_node['topographic__elevation'][canyon] -= canyon_depth - np.abs(
+        (grid.node_x[canyon] -
+         canyon_center)) * canyon_depth / canyon_half_width
+    basin_region = grid.at_node['topographic__elevation'] < 0
+    grid.at_node['topographic__elevation'][basin_region] = 0
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
+
+    # making turbidity current object
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
         alpha=0.2,
     )
+
+    # start calculation
     t = time.time()
-    last = 10
+    last = 5
     for i in range(last):
         tc.run_one_step(dt=100.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i))
