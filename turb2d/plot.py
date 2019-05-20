@@ -57,8 +57,8 @@ if __name__ == '__main__':
         plot_result(
             grid,
             'tc{:04d}.png'.format(i),
-            'flow__depth',
+            'flow__sediment_concentration',
             vmin=0.0,
             #     vmax=0.005,
             # )
-            vmax=np.max(grid.at_node['flow__depth']))
+            vmax=np.max(grid.at_node['flow__sediment_concentration']))
