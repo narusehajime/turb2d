@@ -359,6 +359,8 @@ class TurbidityCurrent2D(Component):
         dt_local = self.alpha * self._grid.dx \
             / np.amax(np.array([np.amax(self.u_node + sqrt_RCgh),
                                 np.amax(self.v_node + sqrt_RCgh), 1.0]))
+        # if dt_local > 0.1:
+        #     dt_local = 0.1
 
         return dt_local
 
@@ -443,7 +445,8 @@ class TurbidityCurrent2D(Component):
         self.C = self.grid['node']['flow__sediment_concentration']
 
         # map node values to links, and link values to nodes.
-        self.map_values()
+        self.map_values(self.h, self.u, self.v, self.C, self.eta, self.h_link,
+                        self.u_node, self.v_node, self.C_link, self.eta_link)
         self.update_up_down_links_and_nodes()
 
         # continue calculation until the prescribed time elapsed
@@ -563,7 +566,9 @@ class TurbidityCurrent2D(Component):
             # update values after calculating advection terms
             # map node values to links, and link values to nodes.
             self.update_values()
-            self.map_values()
+            self.map_values(self.h, self.u, self.v, self.C, self.eta,
+                            self.h_link, self.u_node, self.v_node, self.C_link,
+                            self.eta_link)
             self.update_up_down_links_and_nodes()
 
             # calculate non-advection terms
@@ -715,7 +720,9 @@ class TurbidityCurrent2D(Component):
             # Reset our field values with the newest flow depth and
             # discharge.
             self.update_values()
-            self.map_values()
+            self.map_values(self.h, self.u, self.v, self.C, self.eta,
+                            self.h_link, self.u_node, self.v_node, self.C_link,
+                            self.eta_link)
             self.update_up_down_links_and_nodes()
 
             # Calculation is terminated if global dt is not specified.
@@ -840,8 +847,8 @@ class TurbidityCurrent2D(Component):
         U_node = np.sqrt(self.u_node**2 + self.v_node**2)
         U_link = np.sqrt(self.u**2 + self.v**2)
         u_star_node = np.sqrt(self.Cf) * U_node
-        self.get_ew(U_node, self.h, self.C, out=self.ew_node)
-        self.get_ew(U_link, self.h_link, self.C_link, out=self.ew_link)
+        self.ew_node = self.get_ew(U_node, self.h, self.C)
+        self.ew_link = self.get_ew(U_link, self.h_link, self.C_link)
         self.es = self.get_es(u_star_node)
         self.r0[:] = 1.5
 
@@ -965,7 +972,7 @@ class TurbidityCurrent2D(Component):
             out = np.zeros(U.shape)
 
         Ri = np.zeros(U.shape)
-        flow_exist = np.where((h[:] > self.h_w) & (U > 0.01))
+        flow_exist = np.where((h[:] > self.h_w) & (U > 0.1))
         Ri[flow_exist] = self.R * self.g * C[flow_exist] \
             * h[flow_exist] / U[flow_exist] ** 2
         out[flow_exist] = 0.075 / np.sqrt(
@@ -1122,38 +1129,61 @@ class TurbidityCurrent2D(Component):
 
         self.G_eta[core_nodes] = sedimentation_rate / (1 - self.lambda_p)
 
-    def map_values(self):
+    def map_values(self, h, u, v, C, eta, h_link, u_node, v_node, C_link,
+                   eta_link):
         """map parameters at nodes to links, and those at links to nodes
+        
+           Parameters
+           --------------
+           h : ndarray, float
+               flow depth at node
+           u : ndarray, float
+               flow horizontal velocity at link
+           v : ndarray, float
+               flow horizontal velocity at link
+           C : ndarray, float
+               flow sediment concentration at node
+           eta : ndarray, float
+               bed elevation at node
+           h_link : ndarray, float
+               flow depth at link
+           u_node : ndarray, float
+               flow horizontal velocity at node
+           v_node : ndarray, float
+               flow horizontal velocity at node
+           C_link : ndarray, float
+               flow sediment concentration at link
+           eta_link : ndarray, float
+               bed elevation at link
+
         """
 
         grid = self.grid
 
         # adjust illeagal values
-        self.h[np.where(self.h < self.h_init)] = self.h_init
-        self.C[np.where(self.C < 0)] = 0
+        h[np.where(h < self.h_init)] = self.h_init
+        C[np.where(C < 0)] = 0
 
         # map link values (u, v) to nodes
-        np.mean(self.u[grid.links_at_node], axis=1, out=self.u_node)
-        np.mean(self.v[grid.links_at_node], axis=1, out=self.v_node)
+        # np.mean(self.u[grid.links_at_node], axis=1, out=self.u_node)
+        # np.mean(self.v[grid.links_at_node], axis=1, out=self.v_node)
+        grid.map_mean_of_links_to_node(u, out=u_node)
+        grid.map_mean_of_links_to_node(v, out=v_node)
 
         # map node values (h, C, eta) to links
-        grid.map_mean_of_link_nodes_to_link('flow__depth', out=self.h_link)
-        grid.map_mean_of_link_nodes_to_link(
-            'flow__sediment_concentration', out=self.C_link)
-        grid.map_mean_of_link_nodes_to_link(
-            'topographic__elevation', out=self.eta_link)
+        grid.map_mean_of_link_nodes_to_link(h, out=h_link)
+        grid.map_mean_of_link_nodes_to_link(C, out=C_link)
+        grid.map_mean_of_link_nodes_to_link(eta, out=eta_link)
 
         # Map values of horizontal links to vertical links, and
         # values of vertical links to horizontal links.
         # Horizontal velocity is only updated at horizontal links,
         # and vertical velocity is updated at vertical links during
         # CIP procedures. Therefore we need to map those values each other.
-        self.v[self.
-               horizontal_active_links] = grid.map_mean_of_link_nodes_to_link(
-                   self.v_node)[self.horizontal_active_links]
-        self.u[self.
-               vertical_active_links] = grid.map_mean_of_link_nodes_to_link(
-                   self.u_node)[self.vertical_active_links]
+        v[self.horizontal_active_links] = grid.map_mean_of_link_nodes_to_link(
+            v_node)[self.horizontal_active_links]
+        u[self.vertical_active_links] = grid.map_mean_of_link_nodes_to_link(
+            u_node)[self.vertical_active_links]
 
     def cip_2d_M_advection(self,
                            f,
@@ -1246,7 +1276,8 @@ class TurbidityCurrent2D(Component):
 
         # non-advection term
         out_f[core] = f[core] + G[core] * dt
-        out_dfdx[core] = dfdx[core] + ((out_f[h_down] - f[h_down]) - (out_f[h_up] - f[h_up])) / \
+        out_dfdx[core] = dfdx[core] + (
+            (out_f[h_down] - f[h_down]) - (out_f[h_up] - f[h_up])) / \
             (-2 * D_x[core]) - dfdx[core] * \
             (xi_x[h_down] - xi_x[h_up]) / (2 * D_x[core])
 
@@ -1376,8 +1407,8 @@ if __name__ == '__main__':
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.2,
-        kappa=0.001,
+        alpha=0.1,
+        kappa=0.01,
         Ds=80 * 10**-6,
     )
 
