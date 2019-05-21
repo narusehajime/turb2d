@@ -1,11 +1,9 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from landlab import Component, FieldError, RasterModelGrid
 from landlab.plot.imshow import imshow_grid
-from matplotlib import pylab as plb
 import numpy as np
-from landlab.io.native_landlab import load_grid, save_grid
+from landlab.io.native_landlab import load_grid
 
 
 def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
@@ -58,7 +56,7 @@ if __name__ == '__main__':
             grid,
             'tc{:04d}.png'.format(i),
             'flow__depth',
-            vmin=0.0,
+            vmin=np.min(grid.at_node['flow__depth']),
             #     vmax=0.005,
             # )
             vmax=np.max(grid.at_node['flow__depth']))
