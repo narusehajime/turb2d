@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from landlab.plot.imshow import imshow_grid
 import numpy as np
 from landlab.io.native_landlab import load_grid
+import sys
 
 
 def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
@@ -50,13 +51,15 @@ def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
 
 if __name__ == '__main__':
 
+    variable_name = sys.argv[1]
+
     for i in range(101):
         grid = load_grid('tc{:04d}.grid'.format(i))
         plot_result(
             grid,
             'tc{:04d}.png'.format(i),
-            'flow__depth',
-            vmin=np.min(grid.at_node['flow__depth']),
+            variable_name,
+            vmin=np.min(grid.at_node[variable_name]),
             #     vmax=0.005,
             # )
-            vmax=np.max(grid.at_node['flow__depth']))
+            vmax=np.max(grid.at_node[variable_name]))
