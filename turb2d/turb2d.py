@@ -16,42 +16,69 @@ Parker et al. (1986). This component is based on the landlab component
 
 Examples
 ---------
-from landlab.io.esri_ascii import read_esri_ascii
-import matplotlib.pyplot as plt
-import numpy as np
-from landlab import Component, FieldError, RasterModelGrid
-from landlab.plot.imshow import imshow_grid
+    # making grid
+    # size of calculation domain is 4 x 8 km with dx = 20 m
+    grid = RasterModelGrid((400, 100), spacing=10.0)
+    grid.add_zeros('flow__depth', at='node')
+    grid.add_zeros('topographic__elevation', at='node')
+    grid.add_zeros('flow__horizontal_velocity', at='link')
+    grid.add_zeros('flow__vertical_velocity', at='link')
+    grid.add_zeros('flow__sediment_concentration', at='node')
+    grid.add_zeros('bed__thickness', at='node')
 
-grid = RasterModelGrid((200, 100), spacing=10.0)
-grid.add_zeros('flow__depth', at='node')
-grid.add_zeros('topographic__elevation', at='node')
-grid.add_zeros('flow__horizontal_velocity', at='link')
-grid.add_zeros('flow__vertical_velocity', at='link')
-initial_flow_region = (grid.node_x > 400.) & (grid.node_x < 600.) & (
-    grid.node_y > 1400.) & (grid.node_y < 1600.)
+    # making topography
+    # set the slope
+    slope = 0.1
+    slope_basin_break = 1000
+    grid.at_node['topographic__elevation'] = (
+        grid.node_y - slope_basin_break) * slope
 
-grid.at_node['flow__depth'][initial_flow_region] = 20.0
-grid.at_node['topographic__elevation'][
-    grid.node_y > 1000] = (grid.node_y[grid.node_y > 1000] - 1000) * 0.15
+    # set canyon
+    canyon_center = 500
+    canyon_half_width = 400
+    canyon_depth = 50
+    canyon = ((grid.node_x >= canyon_center - canyon_half_width) &
+              (grid.node_x <= canyon_center + canyon_half_width))
+    grid.at_node['topographic__elevation'][canyon] -= canyon_depth - np.abs(
+        (grid.node_x[canyon] -
+         canyon_center)) * canyon_depth / canyon_half_width
 
-dflow = DebrisFlow(
-    grid,
-    h_init=0.01,
-    alpha=0.1, # Change this for stability of calculation
-    flow_type='Voellmy', # choose 'water' or 'Voellmy'.
-    Cf=0.004, # friction
-    basal_friction_angle=0.0875, # kind of yield strength
+    # set basin
+    basin_region = grid.at_node['topographic__elevation'] < 0
+    grid.at_node['topographic__elevation'][basin_region] = 0
+    grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
+
+    # making initial flow region
+    initial_flow_concentration = 0.02
+    initial_flow_thickness = 100
+    initial_region_radius = 100
+    initial_region_center = [500, 3500]
+    initial_flow_region = (
+        (grid.node_x - initial_region_center[0])**2 +
+        (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
+    grid.at_node['flow__depth'][initial_flow_region] = initial_flow_thickness
+    grid.at_node['flow__sediment_concentration'][
+        initial_flow_region] = initial_flow_concentration
+
+    # making turbidity current object
+    tc = TurbidityCurrent2D(
+        grid,
+        Cf=0.004,
+        alpha=0.2,
+        kappa=0.001,
+        Ds=80 * 10**-6,
     )
 
-    last = 20
-    for i in range(last):
-        dflow.run_one_step(dt=10.0)
-        plt.clf()
-        imshow_grid(grid, 'flow__depth', cmap='Blues')
-        plt.savefig('dflow{:04d}.png'.format(i))
+    # start calculation
+    t = time.time()
+    save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
+    last = 100
+    for i in range(1, last + 1):
+        tc.run_one_step(dt=100.0)
+        save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
-        print("{:.1f}% finished".format((i + 1) / (last) * 100), end='\r')
-
+        print("{:.1f}% finished".format(i / last * 100), end='\r')
+    print('elapsed time: {} sec.'.format(time.time() - t))
 
 """
 
@@ -140,6 +167,7 @@ class TurbidityCurrent2D(Component):
                  nu_t=0.01,
                  kappa=0.001,
                  flow_type='3eq',
+                 implicit_num=50,
                  **kwds):
         """Create a debris-flow component.
 
@@ -193,6 +221,7 @@ class TurbidityCurrent2D(Component):
         self.nu = nu
         self.kappa = kappa
         self.lambda_p = lambda_p
+        self.implicit_num = implicit_num
 
         # Now setting up fields at nodes and links
         try:
@@ -647,15 +676,40 @@ class TurbidityCurrent2D(Component):
                             self.h_link, self.u_node, self.v_node, self.C_link)
             self.update_up_down_links_and_nodes()
 
+            # Calculate diffusion term of momentum
+            self.cip_2d_diffusion(
+                self.u,
+                self.v,
+                self.nu_t,
+                self.horizontal_active_links,
+                self.vertical_active_links,
+                self.link_north,
+                self.link_south,
+                self.link_east,
+                self.link_west,
+                dx,
+                self.dt_local,
+                out_u=self.u_temp,
+                out_v=self.v_temp)
+
+            # update values
+            self.update_values()
+
             # calculate non-advection terms
             self.copy_values_to_temp()
-            for i in range(5):
+            u_prev = self.u_temp.copy()
+            v_prev = self.v_temp.copy()
+            converge = 10.0
+            count = 0
+            # while ((converge > 1.0 * 10**-15) and (count < self.implicit_num)):
+            for i in range(1):
+
+                # calculate non-advection terms on wet grids
                 self.map_values(self.h_temp, self.u_temp, self.v_temp,
                                 self.C_temp, self.eta_temp, self.h_link_temp,
                                 self.u_node_temp, self.v_node_temp,
                                 self.C_link_temp)
 
-                # calculate non-advection terms on wet grids
                 self.calc_nonadvection_terms(
                     self.h_temp, self.u_temp, self.v_temp, self.C_temp,
                     self.eta_temp, self.h_link_temp, self.u_node_temp,
@@ -781,24 +835,20 @@ class TurbidityCurrent2D(Component):
                 # Calculate deposition/erosion
                 self.eta_temp = self.eta + self.dt_local * self.G_eta
 
-            # update values
-            self.update_values()
-
-            # Calculate diffusion term of momentum
-            self.cip_2d_diffusion(
-                self.u,
-                self.v,
-                self.nu_t,
-                self.horizontal_active_links,
-                self.vertical_active_links,
-                self.link_north,
-                self.link_south,
-                self.link_east,
-                self.link_west,
-                dx,
-                self.dt_local,
-                out_u=self.u_temp,
-                out_v=self.v_temp)
+                # judge convergence of implicit scheme
+                converge = (np.sum((self.u_temp[wet_horizontal_links] -
+                                    u_prev[wet_horizontal_links])**2) + np.sum(
+                                        (self.v_temp[wet_vertical_links] -
+                                         v_prev[wet_vertical_links])**2)) / (
+                                             wet_horizontal_links.shape[0] +
+                                             wet_vertical_links[0])
+                max_vel = (np.max(self.u[wet_horizontal_links]**2) + np.max(
+                    self.v[wet_vertical_links]**2))
+                if max_vel > 0:
+                    converge /= max_vel
+                u_prev = self.u_temp.copy()
+                v_prev = self.v_temp.copy()
+                count += 1
 
             # update values
             self.update_values()
@@ -815,27 +865,27 @@ class TurbidityCurrent2D(Component):
                 self.dt_local,
                 out=self.C_temp)
 
-            self.shock_dissipation(
-                self.u,
-                self.h_link,
-                wet_horizontal_links,
-                self.link_north,
-                self.link_south,
-                self.link_east,
-                self.link_west,
-                self.dt_local,
-                out=self.u_temp)
+            # self.shock_dissipation(
+            #     self.u,
+            #     self.h_link,
+            #     wet_horizontal_links,
+            #     self.link_north,
+            #     self.link_south,
+            #     self.link_east,
+            #     self.link_west,
+            #     self.dt_local,
+            #     out=self.u_temp)
 
-            self.shock_dissipation(
-                self.v,
-                self.h_link,
-                wet_vertical_links,
-                self.link_north,
-                self.link_south,
-                self.link_east,
-                self.link_west,
-                self.dt_local,
-                out=self.v_temp)
+            # self.shock_dissipation(
+            #     self.v,
+            #     self.h_link,
+            #     wet_vertical_links,
+            #     self.link_north,
+            #     self.link_south,
+            #     self.link_east,
+            #     self.link_west,
+            #     self.dt_local,
+            #     out=self.v_temp)
 
             self.shock_dissipation(
                 self.h,
@@ -1284,10 +1334,14 @@ class TurbidityCurrent2D(Component):
         vel_at_node = np.sqrt(u_node**2 + v_node**2)
         vel_at_link = np.sqrt(U**2 + V**2)
         u_star_at_node = np.sqrt(self.Cf) * vel_at_node
-        ew_node = self.get_ew(vel_at_node, h, C)
-        ew_link = self.get_ew(vel_at_link, h_link, C_link)
-        es = self.get_es(u_star_at_node)
-        r0[:] = 1.5
+        # ew_node = self.get_ew(vel_at_node, h, C)
+        # ew_link = self.get_ew(vel_at_link, h_link, C_link)
+        # es = self.get_es(u_star_at_node)
+        ew_node = np.zeros(vel_at_node.shape)
+        ew_link = np.zeros(vel_at_link.shape)
+        es = np.zeros(u_star_at_node.shape)
+        # r0[:] = 1.5
+        r0[:] = 0.0
 
         # Calculate topographic gradient
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
@@ -1571,7 +1625,7 @@ if __name__ == '__main__':
 
     # making initial flow region
     initial_flow_concentration = 0.02
-    initial_flow_thickness = 100
+    initial_flow_thickness = 25
     initial_region_radius = 100
     initial_region_center = [500, 3500]
     initial_flow_region = (
@@ -1585,9 +1639,10 @@ if __name__ == '__main__':
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.2,
-        kappa=0.0001,
-        Ds=80 * 10**-6,
+        alpha=0.1,
+        kappa=0.001,
+        Ds=100 * 10**-6,
+        nu_t=0.5,
     )
 
     # start calculation
