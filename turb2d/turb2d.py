@@ -168,6 +168,7 @@ class TurbidityCurrent2D(Component):
                  kappa=0.001,
                  flow_type='3eq',
                  implicit_num=50,
+                 C_init=0.00001,
                  **kwds):
         """Create a debris-flow component.
 
@@ -222,6 +223,7 @@ class TurbidityCurrent2D(Component):
         self.kappa = kappa
         self.lambda_p = lambda_p
         self.implicit_num = implicit_num
+        self.C_init = C_init
 
         # Now setting up fields at nodes and links
         try:
@@ -258,6 +260,7 @@ class TurbidityCurrent2D(Component):
             self.bed_thick = self._grid.at_node['bed__thickness']
 
         self.h += self.h_init
+        self.C += self.C_init
 
         # For gradient of parameters at nodes and links
         try:
@@ -392,8 +395,8 @@ class TurbidityCurrent2D(Component):
         sqrt_gh = np.sqrt(self.g * self.h)
 
         dt_local = self.alpha * self._grid.dx \
-            / np.amax(np.array([np.amax(self.u_node + sqrt_gh),
-                                np.amax(self.v_node + sqrt_gh), 1.0]))
+            / np.amax(np.array([np.amax(np.abs(self.u_node) + sqrt_gh),
+                                np.amax(np.abs(self.v_node) + sqrt_gh), 1.0]))
 
         return dt_local
 
@@ -510,8 +513,8 @@ class TurbidityCurrent2D(Component):
         self.update_up_down_links_and_nodes()
 
         # continue calculation until the prescribed time elapsed
+        # ipdb.set_trace()
         while local_elapsed_time < dt:
-
             # set local time step
             dt_local = self.calc_time_step()
             # Can really get into trouble if nothing happens but we still run:
@@ -520,26 +523,7 @@ class TurbidityCurrent2D(Component):
             if local_elapsed_time + dt_local > dt:
                 dt_local = dt - local_elapsed_time
             self.dt_local = dt_local
-
-            # find wet nodes and links
-            wet_nodes, partial_wet_nodes = self.find_wet_grids(
-                self.h, self.core_nodes, self.node_north, self.node_south,
-                self.node_east, self.node_west)
-            wet_horizontal_links, partial_wet_horizontal_links \
-                = self.find_wet_grids(
-                    self.h_link, self.horizontal_active_links,
-                    self.link_north,
-                    self.link_south,
-                    self.link_east,
-                    self.link_west)
-            wet_vertical_links, partial_wet_vertical_links \
-                = self.find_wet_grids(
-                    self.h_link, self.vertical_active_links,
-                    self.link_north,
-                    self.link_south,
-                    self.link_east,
-                    self.link_west)
-
+            ipdb.set_trace()
             # calculation of advecton terms in continuum (h) and
             # momentum (u and v) equations by CIP method
             self.cip_2d_M_advection(
@@ -548,11 +532,11 @@ class TurbidityCurrent2D(Component):
                 self.dhdy,
                 self.u_node,
                 self.v_node,
-                wet_nodes,
-                self.horizontal_up_nodes[wet_nodes],
-                self.horizontal_down_nodes[wet_nodes],
-                self.vertical_up_nodes[wet_nodes],
-                self.vertical_down_nodes[wet_nodes],
+                self.core_nodes,
+                self.horizontal_up_nodes[self.core_nodes],
+                self.horizontal_down_nodes[self.core_nodes],
+                self.vertical_up_nodes[self.core_nodes],
+                self.vertical_down_nodes[self.core_nodes],
                 dx,
                 self.dt_local,
                 out_f=self.h_temp,
@@ -565,11 +549,11 @@ class TurbidityCurrent2D(Component):
                 self.dudy,
                 self.u,
                 self.v,
-                wet_horizontal_links,
-                self.horizontal_up_links[wet_horizontal_links],
-                self.horizontal_down_links[wet_horizontal_links],
-                self.vertical_up_links[wet_horizontal_links],
-                self.vertical_down_links[wet_horizontal_links],
+                self.horizontal_active_links,
+                self.horizontal_up_links[self.horizontal_active_links],
+                self.horizontal_down_links[self.horizontal_active_links],
+                self.vertical_up_links[self.horizontal_active_links],
+                self.vertical_down_links[self.horizontal_active_links],
                 dx,
                 self.dt_local,
                 out_f=self.u_temp,
@@ -582,11 +566,11 @@ class TurbidityCurrent2D(Component):
                 self.dvdy,
                 self.u,
                 self.v,
-                wet_vertical_links,
-                self.horizontal_up_links[wet_vertical_links],
-                self.horizontal_down_links[wet_vertical_links],
-                self.vertical_up_links[wet_vertical_links],
-                self.vertical_down_links[wet_vertical_links],
+                self.vertical_active_links,
+                self.horizontal_up_links[self.vertical_active_links],
+                self.horizontal_down_links[self.vertical_active_links],
+                self.vertical_up_links[self.vertical_active_links],
+                self.vertical_down_links[self.vertical_active_links],
                 dx,
                 self.dt_local,
                 out_f=self.v_temp,
@@ -599,70 +583,11 @@ class TurbidityCurrent2D(Component):
                 self.dCdy,
                 self.u_node,
                 self.v_node,
-                wet_nodes,
-                self.horizontal_up_nodes[wet_nodes],
-                self.horizontal_down_nodes[wet_nodes],
-                self.vertical_up_nodes[wet_nodes],
-                self.vertical_down_nodes[wet_nodes],
-                dx,
-                self.dt_local,
-                out_f=self.C_temp,
-                out_dfdx=self.dCdx_temp,
-                out_dfdy=self.dCdy_temp)
-
-            # applying slipping condition to velocities at partial wet links
-            self.update_values()
-            self.map_values(self.h, self.u, self.v, self.C, self.eta,
-                            self.h_link, self.u_node, self.v_node, self.C_link)
-            self.slip_condition_at_head(
-                self.u_node,
-                self.h,
-                partial_wet_nodes,
-                self.node_north[partial_wet_nodes],
-                self.node_south[partial_wet_nodes],
-                self.node_east[partial_wet_nodes],
-                self.node_west[partial_wet_nodes],
-                out=self.u_node_temp)
-            self.slip_condition_at_head(
-                self.v_node,
-                self.h,
-                partial_wet_nodes,
-                self.node_north[partial_wet_nodes],
-                self.node_south[partial_wet_nodes],
-                self.node_east[partial_wet_nodes],
-                self.node_west[partial_wet_nodes],
-                out=self.v_node_temp)
-
-            self.update_up_down_links_and_nodes()
-
-            self.cip_2d_M_advection(
-                self.h,
-                self.dhdx,
-                self.dhdy,
-                self.u_node_temp,
-                self.v_node_temp,
-                partial_wet_nodes,
-                self.horizontal_up_nodes[partial_wet_nodes],
-                self.horizontal_down_nodes[partial_wet_nodes],
-                self.vertical_up_nodes[partial_wet_nodes],
-                self.vertical_down_nodes[partial_wet_nodes],
-                dx,
-                self.dt_local,
-                out_f=self.h_temp,
-                out_dfdx=self.dhdx_temp,
-                out_dfdy=self.dhdy_temp)
-
-            self.cip_2d_M_advection(
-                self.C,
-                self.dCdx,
-                self.dCdy,
-                self.u_node_temp,
-                self.v_node_temp,
-                partial_wet_nodes,
-                self.horizontal_up_nodes[partial_wet_nodes],
-                self.horizontal_down_nodes[partial_wet_nodes],
-                self.vertical_up_nodes[partial_wet_nodes],
-                self.vertical_down_nodes[partial_wet_nodes],
+                self.core_nodes,
+                self.horizontal_up_nodes[self.core_nodes],
+                self.horizontal_down_nodes[self.core_nodes],
+                self.vertical_up_nodes[self.core_nodes],
+                self.vertical_down_nodes[self.core_nodes],
                 dx,
                 self.dt_local,
                 out_f=self.C_temp,
@@ -675,6 +600,125 @@ class TurbidityCurrent2D(Component):
             self.map_values(self.h, self.u, self.v, self.C, self.eta,
                             self.h_link, self.u_node, self.v_node, self.C_link)
             self.update_up_down_links_and_nodes()
+
+            # calculate non-advection terms
+            self.copy_values_to_temp()
+            h_prev = self.h_temp.copy()
+            C_prev = self.C_temp.copy()
+            converge = 10.0
+            count = 0
+            while ((converge > 1.0 * 10**-35) and (count < self.implicit_num)):
+                # for i in range(1):
+                # calculate non-advection terms on wet grids
+                self.map_values(self.h_temp, self.u_temp, self.v_temp,
+                                self.C_temp, self.eta_temp, self.h_link_temp,
+                                self.u_node_temp, self.v_node_temp,
+                                self.C_link_temp)
+
+                self.calc_G_u(self.h_link_temp, self.u_temp, self.v_temp,
+                              self.C_link_temp, self.eta_temp)
+                self.calc_G_v(self.h_link_temp, self.u_temp, self.v_temp,
+                              self.C_link_temp, self.eta_temp)
+
+                self.cip_2d_nonadvection(
+                    self.u,
+                    self.dudx,
+                    self.dudy,
+                    self.G_u,
+                    self.u,
+                    self.v,
+                    self.horizontal_active_links,
+                    self.horizontal_up_links[self.horizontal_active_links],
+                    self.horizontal_down_links[self.horizontal_active_links],
+                    self.vertical_up_links[self.horizontal_active_links],
+                    self.vertical_down_links[self.horizontal_active_links],
+                    dx,
+                    self.dt_local,
+                    out_f=self.u_temp,
+                    out_dfdx=self.dudx_temp,
+                    out_dfdy=self.dudy_temp)
+
+                self.cip_2d_nonadvection(
+                    self.v,
+                    self.dvdx,
+                    self.dvdy,
+                    self.G_v,
+                    self.u,
+                    self.v,
+                    self.vertical_active_links,
+                    self.horizontal_up_links[self.vertical_active_links],
+                    self.horizontal_down_links[self.vertical_active_links],
+                    self.vertical_up_links[self.vertical_active_links],
+                    self.vertical_down_links[self.vertical_active_links],
+                    dx,
+                    self.dt_local,
+                    out_f=self.v_temp,
+                    out_dfdx=self.dvdx_temp,
+                    out_dfdy=self.dvdy_temp)
+
+                self.map_values(self.h_temp, self.u_temp, self.v_temp,
+                                self.C_temp, self.eta_temp, self.h_link_temp,
+                                self.u_node_temp, self.v_node_temp,
+                                self.C_link_temp)
+                self.calc_G_h(self.h_temp, self.u_node_temp, self.v_node_temp,
+                              self.C_temp)
+                self.calc_G_C(self.h_temp, self.u_node_temp, self.v_node_temp,
+                              self.C_temp)
+
+                self.cip_2d_nonadvection(
+                    self.h,
+                    self.dhdx,
+                    self.dhdy,
+                    self.G_h,
+                    self.u_node_temp,
+                    self.v_node_temp,
+                    self.core_nodes,
+                    self.horizontal_up_nodes[self.core_nodes],
+                    self.horizontal_down_nodes[self.core_nodes],
+                    self.vertical_up_nodes[self.core_nodes],
+                    self.vertical_down_nodes[self.core_nodes],
+                    dx,
+                    self.dt_local,
+                    out_f=self.h_temp,
+                    out_dfdx=self.dhdx_temp,
+                    out_dfdy=self.dhdy_temp)
+
+                self.cip_2d_nonadvection(
+                    self.C,
+                    self.dCdx,
+                    self.dCdy,
+                    self.G_C,
+                    self.u_node_temp,
+                    self.v_node_temp,
+                    self.core_nodes,
+                    self.horizontal_up_nodes[self.core_nodes],
+                    self.horizontal_down_nodes[self.core_nodes],
+                    self.vertical_up_nodes[self.core_nodes],
+                    self.vertical_down_nodes[self.core_nodes],
+                    dx,
+                    self.dt_local,
+                    out_f=self.C_temp,
+                    out_dfdx=self.dCdx_temp,
+                    out_dfdy=self.dCdy_temp)
+
+                # Calculate deposition/erosion
+                self.calc_G_eta(self.h_temp, self.u_node_temp, self.C_temp,
+                                self.eta_temp)
+                self.eta_temp = self.eta + self.dt_local * self.G_eta
+
+                # judge convergence of implicit scheme
+                converge = (np.sum(
+                    ((self.h_temp[self.core_nodes] - h_prev[self.core_nodes]) /
+                     self.h_temp[self.core_nodes])**2) + np.sum(
+                         ((self.C_temp[self.core_nodes] - C_prev[
+                             self.core_nodes]) / self.C_temp[self.core_nodes])
+                         **2)) / self.grid.number_of_core_nodes
+                h_prev[:] = self.h_temp[:]
+                C_prev[:] = self.C_temp[:]
+                count += 1
+
+            # update values
+            self.update_values()
 
             # Calculate diffusion term of momentum
             self.cip_2d_diffusion(
@@ -695,169 +739,11 @@ class TurbidityCurrent2D(Component):
             # update values
             self.update_values()
 
-            # calculate non-advection terms
-            self.copy_values_to_temp()
-            u_prev = self.u_temp.copy()
-            v_prev = self.v_temp.copy()
-            converge = 10.0
-            count = 0
-            # while ((converge > 1.0 * 10**-15) and (count < self.implicit_num)):
-            for i in range(1):
-
-                # calculate non-advection terms on wet grids
-                self.map_values(self.h_temp, self.u_temp, self.v_temp,
-                                self.C_temp, self.eta_temp, self.h_link_temp,
-                                self.u_node_temp, self.v_node_temp,
-                                self.C_link_temp)
-
-                self.calc_nonadvection_terms(
-                    self.h_temp, self.u_temp, self.v_temp, self.C_temp,
-                    self.eta_temp, self.h_link_temp, self.u_node_temp,
-                    self.v_node_temp, self.C_link_temp, wet_nodes,
-                    wet_horizontal_links, wet_vertical_links)
-
-                self.cip_2d_nonadvection(
-                    self.h,
-                    self.dhdx,
-                    self.dhdy,
-                    self.G_h,
-                    self.u_node,
-                    self.v_node,
-                    wet_nodes,
-                    self.horizontal_up_nodes[wet_nodes],
-                    self.horizontal_down_nodes[wet_nodes],
-                    self.vertical_up_nodes[wet_nodes],
-                    self.vertical_down_nodes[wet_nodes],
-                    dx,
-                    self.dt_local,
-                    out_f=self.h_temp,
-                    out_dfdx=self.dhdx_temp,
-                    out_dfdy=self.dhdy_temp)
-
-                self.cip_2d_nonadvection(
-                    self.u,
-                    self.dudx,
-                    self.dudy,
-                    self.G_u,
-                    self.u,
-                    self.v,
-                    wet_horizontal_links,
-                    self.horizontal_up_links[wet_horizontal_links],
-                    self.horizontal_down_links[wet_horizontal_links],
-                    self.vertical_up_links[wet_horizontal_links],
-                    self.vertical_down_links[wet_horizontal_links],
-                    dx,
-                    self.dt_local,
-                    out_f=self.u_temp,
-                    out_dfdx=self.dudx_temp,
-                    out_dfdy=self.dudy_temp)
-
-                self.cip_2d_nonadvection(
-                    self.v,
-                    self.dvdx,
-                    self.dvdy,
-                    self.G_v,
-                    self.u,
-                    self.v,
-                    wet_vertical_links,
-                    self.horizontal_up_links[wet_vertical_links],
-                    self.horizontal_down_links[wet_vertical_links],
-                    self.vertical_up_links[wet_vertical_links],
-                    self.vertical_down_links[wet_vertical_links],
-                    dx,
-                    self.dt_local,
-                    out_f=self.v_temp,
-                    out_dfdx=self.dvdx_temp,
-                    out_dfdy=self.dvdy_temp)
-
-                self.cip_2d_nonadvection(
-                    self.C,
-                    self.dCdx,
-                    self.dCdy,
-                    self.G_C,
-                    self.u_node,
-                    self.v_node,
-                    wet_nodes,
-                    self.horizontal_up_nodes[wet_nodes],
-                    self.horizontal_down_nodes[wet_nodes],
-                    self.vertical_up_nodes[wet_nodes],
-                    self.vertical_down_nodes[wet_nodes],
-                    dx,
-                    self.dt_local,
-                    out_f=self.C_temp,
-                    out_dfdx=self.dCdx_temp,
-                    out_dfdy=self.dCdy_temp)
-
-                # only h and C are calculated on partial wet grids
-                # calculate non-advection terms on wet grids
-                self.calc_nonadvection_terms(
-                    self.h_temp, self.u_temp, self.v_temp, self.C_temp,
-                    self.eta_temp, self.h_link_temp, self.u_node_temp,
-                    self.v_node_temp, self.C_link_temp, partial_wet_nodes,
-                    partial_wet_horizontal_links, partial_wet_vertical_links)
-
-                self.cip_2d_nonadvection(
-                    self.h,
-                    self.dhdx,
-                    self.dhdy,
-                    self.G_h,
-                    self.u_node,
-                    self.v_node,
-                    partial_wet_nodes,
-                    self.horizontal_up_nodes[partial_wet_nodes],
-                    self.horizontal_down_nodes[partial_wet_nodes],
-                    self.vertical_up_nodes[partial_wet_nodes],
-                    self.vertical_down_nodes[partial_wet_nodes],
-                    dx,
-                    self.dt_local,
-                    out_f=self.h_temp,
-                    out_dfdx=self.dhdx_temp,
-                    out_dfdy=self.dhdy_temp)
-
-                self.cip_2d_nonadvection(
-                    self.C,
-                    self.dCdx,
-                    self.dCdy,
-                    self.G_C,
-                    self.u_node,
-                    self.v_node,
-                    partial_wet_nodes,
-                    self.horizontal_up_nodes[partial_wet_nodes],
-                    self.horizontal_down_nodes[partial_wet_nodes],
-                    self.vertical_up_nodes[partial_wet_nodes],
-                    self.vertical_down_nodes[partial_wet_nodes],
-                    dx,
-                    self.dt_local,
-                    out_f=self.C_temp,
-                    out_dfdx=self.dCdx_temp,
-                    out_dfdy=self.dCdy_temp)
-
-                # Calculate deposition/erosion
-                self.eta_temp = self.eta + self.dt_local * self.G_eta
-
-                # judge convergence of implicit scheme
-                converge = (np.sum((self.u_temp[wet_horizontal_links] -
-                                    u_prev[wet_horizontal_links])**2) + np.sum(
-                                        (self.v_temp[wet_vertical_links] -
-                                         v_prev[wet_vertical_links])**2)) / (
-                                             wet_horizontal_links.shape[0] +
-                                             wet_vertical_links[0])
-                max_vel = (np.max(self.u[wet_horizontal_links]**2) + np.max(
-                    self.v[wet_vertical_links]**2))
-                if max_vel > 0:
-                    converge /= max_vel
-                u_prev = self.u_temp.copy()
-                v_prev = self.v_temp.copy()
-                count += 1
-
-            # update values
-            self.update_values()
-
             # apply the shock dissipation scheme
             self.shock_dissipation(
                 self.C,
                 self.h,
-                wet_nodes,
+                self.core_nodes,
                 self.node_north,
                 self.node_south,
                 self.node_east,
@@ -865,32 +751,32 @@ class TurbidityCurrent2D(Component):
                 self.dt_local,
                 out=self.C_temp)
 
-            # self.shock_dissipation(
-            #     self.u,
-            #     self.h_link,
-            #     wet_horizontal_links,
-            #     self.link_north,
-            #     self.link_south,
-            #     self.link_east,
-            #     self.link_west,
-            #     self.dt_local,
-            #     out=self.u_temp)
+            self.shock_dissipation(
+                self.u,
+                self.h_link,
+                self.horizontal_active_links,
+                self.link_north,
+                self.link_south,
+                self.link_east,
+                self.link_west,
+                self.dt_local,
+                out=self.u_temp)
 
-            # self.shock_dissipation(
-            #     self.v,
-            #     self.h_link,
-            #     wet_vertical_links,
-            #     self.link_north,
-            #     self.link_south,
-            #     self.link_east,
-            #     self.link_west,
-            #     self.dt_local,
-            #     out=self.v_temp)
+            self.shock_dissipation(
+                self.v,
+                self.h_link,
+                self.vertical_active_links,
+                self.link_north,
+                self.link_south,
+                self.link_east,
+                self.link_west,
+                self.dt_local,
+                out=self.v_temp)
 
             self.shock_dissipation(
                 self.h,
                 self.h,
-                wet_nodes,
+                self.core_nodes,
                 self.node_north,
                 self.node_south,
                 self.node_east,
@@ -1080,11 +966,11 @@ class TurbidityCurrent2D(Component):
         # wet_check = (h[core] > self.h_w) | (h[horizontal_up][core] >
         #                                     self.h_w) | (h[vertical_up][core] >
         #                                                  self.h_w)
-        # wet_check = np.where((h[core] > self.h_w) | (h[north][core] > self.h_w)
-        #                      | (h[south][core] > self.h_w)
-        #                      | (h[east][core] > self.h_w)
-        #                      | (h[west][core] > self.h_w))
-        wet_check = np.where(h[core] > self.h_w)
+        wet_check = np.where((h[core] > self.h_w) | (h[north][core] > self.h_w)
+                             | (h[south][core] > self.h_w)
+                             | (h[east][core] > self.h_w)
+                             | (h[west][core] > self.h_w))
+        # wet_check = np.where(h[core] > self.h_w)
         out_wet = core[wet_check]
         partial_wet_check = np.where((h[core] < self.h_w) & (
             (h[north][core] > self.h_w)
@@ -1387,6 +1273,110 @@ class TurbidityCurrent2D(Component):
 
         self.G_eta[core_nodes] = sedimentation_rate / (1 - self.lambda_p)
 
+    def calc_G_h(self, h, u_node, v_node, C):
+        """Calculate non-advection term for h
+        """
+
+        core_nodes = self.core_nodes
+        node_north = self.node_north[core_nodes]
+        node_south = self.node_south[core_nodes]
+        node_east = self.node_east[core_nodes]
+        node_west = self.node_west[core_nodes]
+        dx = self.grid.dx
+
+        # ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
+        # es = self.get_es(u_star_at_node)
+        ew_node = np.zeros(h.shape)
+
+        self.G_h[core_nodes] = ew_node[core_nodes] * np.sqrt(
+            u_node[core_nodes]**2 + v_node[core_nodes]**2) - h[core_nodes] * (
+                (v_node[node_north] - v_node[node_south]) / (2 * dx) +
+                (u_node[node_east] - u_node[node_west]) / (2 * dx))
+
+    def calc_G_C(self, h, u_node, v_node, C):
+        """Calculate non-advection term for C
+        """
+
+        core_nodes = self.core_nodes
+        ws = self.ws
+
+        # ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
+        # es = self.get_es(u_star_at_node)
+        ew_node = np.zeros(h.shape)
+        es = np.zeros(h.shape)
+        r0 = 0.0
+
+        self.G_C[core_nodes] = (
+            ws * (es[core_nodes] - r0 * C[core_nodes]) -
+            ew_node[core_nodes] * C[core_nodes] * np.sqrt(
+                u_node[core_nodes]**2 + v_node[core_nodes]**2)) / h[core_nodes]
+
+    def calc_G_u(self, h_link, u, v, C_link, eta):
+        """Calculate non-advection term for u
+        """
+
+        link_horiz = self.horizontal_active_links
+        link_east = self.link_east
+        link_west = self.link_west
+        dx = self.grid.dx
+        v_on_horiz = v[link_horiz]
+
+        Rg = self.R * self.g
+        eta_grad_at_link = self.grid.calc_grad_at_link(eta)
+        eta_grad_x = eta_grad_at_link[link_horiz]
+        ew_link = self.get_ew(np.sqrt(u**2 + v**2), h_link, C_link)
+        u_star_2 = self.Cf * u[link_horiz] * np.sqrt(u[link_horiz]**2 +
+                                                     v_on_horiz**2)
+
+        self.G_u[link_horiz] = -Rg * C_link[
+            link_horiz] * eta_grad_x - 0.5 * Rg * h_link[link_horiz] * (
+                C_link[link_east][link_horiz] - C_link[link_west][link_horiz]
+            ) / (2 * dx) - Rg * C_link[link_horiz] * (
+                h_link[link_east][link_horiz] - h_link[link_west][link_horiz]
+            ) / (2 * dx) - u_star_2 / h_link[link_horiz] - ew_link[
+                link_horiz] * u[link_horiz] * np.sqrt(
+                    u[link_horiz]**2 + v_on_horiz**2) / h_link[link_horiz]
+
+    def calc_G_v(self, h_link, u, v, C_link, eta):
+        """Calculate non-advection term for v
+        """
+
+        link_vert = self.vertical_active_links
+        link_north = self.link_north
+        link_south = self.link_south
+        dx = self.grid.dx
+        u_on_vert = u[link_vert]
+
+        Rg = self.R * self.g
+        eta_grad_at_link = self.grid.calc_grad_at_link(eta)
+        eta_grad_y = eta_grad_at_link[link_vert]
+        ew_link = self.get_ew(np.sqrt(u**2 + v**2), h_link, C_link)
+        v_star_2 = self.Cf * v[link_vert] * np.sqrt(u_on_vert**2 +
+                                                    v[link_vert]**2)
+
+        self.G_v[link_vert] = -Rg * C_link[
+            link_vert] * eta_grad_y - 0.5 * Rg * h_link[link_vert] * (
+                C_link[link_north][link_vert] - C_link[link_south][link_vert]
+            ) / (2 * dx) - Rg * C_link[link_vert] * (
+                h_link[link_north][link_vert] -
+                h_link[link_south][link_vert]) / (2 * dx) - v_star_2 / h_link[
+                    link_vert] - ew_link[link_vert] * u[link_vert] * np.sqrt(
+                        u_on_vert**2 + v[link_vert]**2) / h_link[link_vert]
+
+    def calc_G_eta(self, h, u_node, v_node, C):
+        """Calculate non-advection term for eta
+        """
+
+        core_nodes = self.core_nodes
+        ws = self.ws
+        r0 = 0.0
+        # u_star_at_node = self.Cf * (u_node ** 2 + v_node ** 2)
+        # es = self.get_es(u_star_at_node)
+        es = np.zeros(h.shape)
+
+        self.G_eta[core_nodes] = ws * (r0 * C[core_nodes] - es[core_nodes]) / (
+            1 - self.lambda_p)
+
     def map_values(self, h, u, v, C, eta, h_link, u_node, v_node, C_link):
         """map parameters at nodes to links, and those at links to nodes
         """
@@ -1407,7 +1397,7 @@ class TurbidityCurrent2D(Component):
 
         # adjust illeagal values
         h[np.where(h < self.h_init)] = self.h_init
-        C[np.where(C < 0)] = 0.0
+        C[np.where(C <= 0)] = self.C_init
 
         # map link values (u, v) to nodes
         grid.map_mean_of_links_to_node(u, out=u_node)
@@ -1625,7 +1615,7 @@ if __name__ == '__main__':
 
     # making initial flow region
     initial_flow_concentration = 0.02
-    initial_flow_thickness = 25
+    initial_flow_thickness = 100
     initial_region_radius = 100
     initial_region_center = [500, 3500]
     initial_flow_region = (
@@ -1639,10 +1629,10 @@ if __name__ == '__main__':
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.1,
+        alpha=0.2,
         kappa=0.001,
         Ds=100 * 10**-6,
-        nu_t=0.5,
+        nu_t=0.01,
     )
 
     # start calculation
