@@ -523,7 +523,7 @@ class TurbidityCurrent2D(Component):
             if local_elapsed_time + dt_local > dt:
                 dt_local = dt - local_elapsed_time
             self.dt_local = dt_local
-            ipdb.set_trace()
+
             # calculation of advecton terms in continuum (h) and
             # momentum (u and v) equations by CIP method
             self.cip_2d_M_advection(
@@ -1388,12 +1388,12 @@ class TurbidityCurrent2D(Component):
         # Horizontal velocity is only updated at horizontal links,
         # and vertical velocity is updated at vertical links during
         # CIP procedures. Therefore we need to map those values each other.
-        u[self.vertical_active_links] = (
-            u[self.horizontal_link_NE] + u[self.horizontal_link_SE] +
-            u[self.horizontal_link_NW] + u[self.horizontal_link_SW]) / 4.0
-        v[self.horizontal_active_links] = (
-            v[self.vertical_link_NE] + v[self.vertical_link_SE] +
-            v[self.vertical_link_NW] + v[self.vertical_link_SW]) / 4.0
+        self.v[self.
+               horizontal_active_links] = grid.map_mean_of_link_nodes_to_link(
+                   self.v_node)[self.horizontal_active_links]
+        self.u[self.
+               vertical_active_links] = grid.map_mean_of_link_nodes_to_link(
+                   self.u_node)[self.vertical_active_links]
 
         # adjust illeagal values
         h[np.where(h < self.h_init)] = self.h_init
