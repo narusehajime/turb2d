@@ -391,12 +391,12 @@ class TurbidityCurrent2D(Component):
     def calc_time_step(self):
         """Calculate time step
         """
-        # sqrt_RCgh = np.sqrt(self.R * self.C * self.g * self.h)
-        sqrt_gh = np.sqrt(self.g * self.h)
+        sqrt_RCgh = np.sqrt(self.R * self.C * self.g * self.h)
+        # sqrt_gh = np.sqrt(self.g * self.h)
 
         dt_local = self.alpha * self._grid.dx \
-            / np.amax(np.array([np.amax(np.abs(self.u_node) + sqrt_gh),
-                                np.amax(np.abs(self.v_node) + sqrt_gh), 1.0]))
+            / np.amax(np.array([np.amax(np.abs(self.u_node) + sqrt_RCgh),
+                                np.amax(np.abs(self.v_node) + sqrt_RCgh), 1.0]))
 
         return dt_local
 
@@ -607,7 +607,7 @@ class TurbidityCurrent2D(Component):
             C_prev = self.C_temp.copy()
             converge = 10.0
             count = 0
-            while ((converge > 1.0 * 10**-35) and (count < self.implicit_num)):
+            while ((converge > 1.0 * 10**-20) and (count < self.implicit_num)):
                 # for i in range(1):
                 # calculate non-advection terms on wet grids
                 self.map_values(self.h_temp, self.u_temp, self.v_temp,
@@ -1220,14 +1220,14 @@ class TurbidityCurrent2D(Component):
         vel_at_node = np.sqrt(u_node**2 + v_node**2)
         vel_at_link = np.sqrt(U**2 + V**2)
         u_star_at_node = np.sqrt(self.Cf) * vel_at_node
-        # ew_node = self.get_ew(vel_at_node, h, C)
-        # ew_link = self.get_ew(vel_at_link, h_link, C_link)
-        # es = self.get_es(u_star_at_node)
-        ew_node = np.zeros(vel_at_node.shape)
-        ew_link = np.zeros(vel_at_link.shape)
-        es = np.zeros(u_star_at_node.shape)
-        # r0[:] = 1.5
-        r0[:] = 0.0
+        ew_node = self.get_ew(vel_at_node, h, C)
+        ew_link = self.get_ew(vel_at_link, h_link, C_link)
+        es = self.get_es(u_star_at_node)
+        # ew_node = np.zeros(vel_at_node.shape)
+        # ew_link = np.zeros(vel_at_link.shape)
+        # es = np.zeros(u_star_at_node.shape)
+        r0[:] = 1.5
+        # r0[:] = 0.0
 
         # Calculate topographic gradient
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
@@ -1284,9 +1284,9 @@ class TurbidityCurrent2D(Component):
         node_west = self.node_west[core_nodes]
         dx = self.grid.dx
 
-        # ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
-        # es = self.get_es(u_star_at_node)
-        ew_node = np.zeros(h.shape)
+        ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
+        es = self.get_es(u_star_at_node)
+        # ew_node = np.zeros(h.shape)
 
         self.G_h[core_nodes] = ew_node[core_nodes] * np.sqrt(
             u_node[core_nodes]**2 + v_node[core_nodes]**2) - h[core_nodes] * (
@@ -1370,9 +1370,9 @@ class TurbidityCurrent2D(Component):
         core_nodes = self.core_nodes
         ws = self.ws
         r0 = 0.0
-        # u_star_at_node = self.Cf * (u_node ** 2 + v_node ** 2)
-        # es = self.get_es(u_star_at_node)
-        es = np.zeros(h.shape)
+        u_star_at_node = self.Cf * (u_node**2 + v_node**2)
+        es = self.get_es(u_star_at_node)
+        # es = np.zeros(h.shape)
 
         self.G_eta[core_nodes] = ws * (r0 * C[core_nodes] - es[core_nodes]) / (
             1 - self.lambda_p)
@@ -1633,12 +1633,13 @@ if __name__ == '__main__':
         kappa=0.001,
         Ds=100 * 10**-6,
         nu_t=0.01,
+        implicit_num=10,
     )
 
     # start calculation
     t = time.time()
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
-    last = 100
+    last = 50
     for i in range(1, last + 1):
         tc.run_one_step(dt=100.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
