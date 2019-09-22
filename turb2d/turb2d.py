@@ -751,27 +751,27 @@ class TurbidityCurrent2D(Component):
                 self.dt_local,
                 out=self.C_temp)
 
-            self.shock_dissipation(
-                self.u,
-                self.h_link,
-                self.horizontal_active_links,
-                self.link_north,
-                self.link_south,
-                self.link_east,
-                self.link_west,
-                self.dt_local,
-                out=self.u_temp)
+            # self.shock_dissipation(
+            #     self.u,
+            #     self.h_link,
+            #     self.horizontal_active_links,
+            #     self.link_north,
+            #     self.link_south,
+            #     self.link_east,
+            #     self.link_west,
+            #     self.dt_local,
+            #     out=self.u_temp)
 
-            self.shock_dissipation(
-                self.v,
-                self.h_link,
-                self.vertical_active_links,
-                self.link_north,
-                self.link_south,
-                self.link_east,
-                self.link_west,
-                self.dt_local,
-                out=self.v_temp)
+            # self.shock_dissipation(
+            #     self.v,
+            #     self.h_link,
+            #     self.vertical_active_links,
+            #     self.link_north,
+            #     self.link_south,
+            #     self.link_east,
+            #     self.link_west,
+            #     self.dt_local,
+            #     out=self.v_temp)
 
             self.shock_dissipation(
                 self.h,
@@ -1285,7 +1285,6 @@ class TurbidityCurrent2D(Component):
         dx = self.grid.dx
 
         ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
-        es = self.get_es(u_star_at_node)
         # ew_node = np.zeros(h.shape)
 
         self.G_h[core_nodes] = ew_node[core_nodes] * np.sqrt(
@@ -1300,11 +1299,13 @@ class TurbidityCurrent2D(Component):
         core_nodes = self.core_nodes
         ws = self.ws
 
-        # ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
-        # es = self.get_es(u_star_at_node)
-        ew_node = np.zeros(h.shape)
-        es = np.zeros(h.shape)
-        r0 = 0.0
+        ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
+        U_node = np.sqrt(u_node**2 + v_node**2)
+        u_star_node = np.sqrt(self.Cf) * U_node
+        es = self.get_es(u_star_node)
+        # ew_node = np.zeros(h.shape)
+        # es = np.zeros(h.shape)
+        r0 = 1.5
 
         self.G_C[core_nodes] = (
             ws * (es[core_nodes] - r0 * C[core_nodes]) -
@@ -1369,7 +1370,7 @@ class TurbidityCurrent2D(Component):
 
         core_nodes = self.core_nodes
         ws = self.ws
-        r0 = 0.0
+        r0 = 1.5
         u_star_at_node = self.Cf * (u_node**2 + v_node**2)
         es = self.get_es(u_star_at_node)
         # es = np.zeros(h.shape)
@@ -1388,12 +1389,20 @@ class TurbidityCurrent2D(Component):
         # Horizontal velocity is only updated at horizontal links,
         # and vertical velocity is updated at vertical links during
         # CIP procedures. Therefore we need to map those values each other.
-        self.v[self.
-               horizontal_active_links] = grid.map_mean_of_link_nodes_to_link(
-                   self.v_node)[self.horizontal_active_links]
-        self.u[self.
-               vertical_active_links] = grid.map_mean_of_link_nodes_to_link(
-                   self.u_node)[self.vertical_active_links]
+        # self.v[self.
+        #        horizontal_active_links] = grid.map_mean_of_link_nodes_to_link(
+        #            self.v_node)[self.horizontal_active_links]
+        # self.u[self.
+        #        vertical_active_links] = grid.map_mean_of_link_nodes_to_link(
+        #            self.u_node)[self.vertical_active_links]
+        self.u[self.vertical_active_links] = (
+            self.u[self.horizontal_link_NE] + self.u[self.horizontal_link_NW] +
+            self.u[self.horizontal_link_SE] +
+            self.u[self.horizontal_link_SW]) / 4.0
+        self.v[self.horizontal_active_links] = (
+            self.v[self.vertical_link_NE] + self.v[self.vertical_link_NW] +
+            self.v[self.vertical_link_SE] +
+            self.v[self.vertical_link_SW]) / 4.0
 
         # adjust illeagal values
         h[np.where(h < self.h_init)] = self.h_init
@@ -1633,7 +1642,7 @@ if __name__ == '__main__':
         kappa=0.001,
         Ds=100 * 10**-6,
         nu_t=0.01,
-        implicit_num=10,
+        implicit_num=5,
     )
 
     # start calculation
