@@ -1,0 +1,70 @@
+def get_es(self, u_star, out=None):
+    """ Calculate entrainment rate of basal sediment to suspension
+
+        Based on Garcia and Parker (1991)
+
+
+
+        Parameters
+
+        --------------
+
+        u_star : ndarray
+
+            flow shear velocity
+
+        out : ndarray
+
+            Outputs (entrainment rate of basal sediment)
+
+
+
+        Returns
+
+        ---------------
+
+        out : ndarray
+
+            dimensionless entrainment rate of basal sediment into
+
+            suspension
+
+    """
+
+    if out is None:
+
+        out = np.zeros(u_star.shape)
+
+    # basic parameters
+
+    R = self.R
+
+    g = self.g
+
+    Ds = self.Ds
+
+    nu = self.nu
+
+    ws = self.ws
+
+    # calculate subordinate parameters
+
+    Rp = np.sqrt(R * g * Ds) * Ds / nu
+
+    sus_index = u_star / ws
+
+    # coefficients for calculation
+
+    a = 7.8 * 10**-7
+
+    alpha = 0.6
+
+    p = 0.1
+
+    # calculate entrainemnt rate
+
+    Z = sus_index * Rp**alpha
+
+    out[:] = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
+
+    return out
