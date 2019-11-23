@@ -4,6 +4,7 @@ from landlab.utils.decorators import use_file_name_or_kwds
 from landlab.grid.structured_quad import links
 from landlab.io.native_landlab import save_grid
 from cip import cip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
+from sediment_func import get_es, get_ew, get_ws
 import time
 import ipdb
 """A component of landlab that simulates a turbidity current on 2D grids
@@ -370,7 +371,7 @@ class TurbidityCurrent2D(Component):
                                             dtype=np.int64)
 
         # Calculate subordinate parameters
-        self.ws = self.get_ws()
+        self.ws = get_ws(self.R, self.g, self.Ds, self.nu)
 
         # Record initial topography
         self.eta_init = self.eta
@@ -912,10 +913,12 @@ class TurbidityCurrent2D(Component):
             self,
             h,
             core,
-            north,
-            south,
-            east,
-            west,
+            # north,
+            # south,
+            # east,
+            # west,
+            horizontal_up,
+            vertical_up,
     ):
         """Find wet and partial wet nodes or links
            In this model, "dry" nodes or links are not subject to calculate
@@ -955,33 +958,22 @@ class TurbidityCurrent2D(Component):
         # wet_check = (h[core] > self.h_w) | (h[horizontal_up][core] >
         #                                     self.h_w) | (h[vertical_up][core] >
         #                                                  self.h_w)
-        wet_check = np.where((h[core] > self.h_w) | (h[north][core] > self.h_w)
-                             | (h[south][core] > self.h_w)
-                             | (h[east][core] > self.h_w)
-                             | (h[west][core] > self.h_w))
-        # wet_check = np.where(h[core] > self.h_w)
+        # wet_check = np.where((h[core] > self.h_w) | (h[north][core] > self.h_w)
+        #                      | (h[south][core] > self.h_w)
+        #                      | (h[east][core] > self.h_w)
+        #                      | (h[west][core] > self.h_w))
+        wet_check = np.where(h[core] > self.h_w)
         out_wet = core[wet_check]
+        # partial_wet_check = np.where((h[core] < self.h_w) & (
+        #     (h[north][core] > self.h_w)
+        #     | (h[south][core] > self.h_w) | (h[east][core] > self.h_w)
+        #     | (h[west][core] > self.h_w)))
         partial_wet_check = np.where((h[core] < self.h_w) & (
-            (h[north][core] > self.h_w)
-            | (h[south][core] > self.h_w) | (h[east][core] > self.h_w)
-            | (h[west][core] > self.h_w)))
+            h[horizontal_up][core] > self.h_w) | (
+                h[vertical_up][core] > self.h_w))
         out_partial_wet = core[partial_wet_check]
 
         return out_wet, out_partial_wet
-
-    def calc_closure_functions(self, h, u, v, C, h_link, u_node, v_node,
-                               C_link):
-        """Calculate closure functions for non-advection terms
-        """
-
-        # Calculate entrainment rates of water and sediment
-        U_node = np.sqrt(u_node**2 + v_node**2)
-        U_link = np.sqrt(u**2 + v**2)
-        u_star_node = np.sqrt(self.Cf) * U_node
-        self.ew_node = self.get_ew(U_node, h, C)
-        self.ew_link = self.get_ew(U_link, h_link, C_link)
-        self.es = self.get_es(u_star_node)
-        self.r0[:] = 1.5
 
     def shock_dissipation(
             self,
@@ -1040,109 +1032,6 @@ class TurbidityCurrent2D(Component):
         out[core] = out[core] + eps_i_half[core] * (out[north] - out[core]) \
             - eps_i_half[south] * (out[core] - out[south])
 
-    def get_ew(self, U, h, C, out=None):
-        """ calculate entrainemnt coefficient of ambient water to a turbidity
-            current layer
-
-            Parameters
-            ----------
-            U : ndarray
-               Flow velocities of ambient water and a turbidity current.
-               Row 0 is for an ambient water, and Row 1 is for a turbidity
-               current.
-            h : ndarray
-               Flow heights of ambient water and a turbidity current. Row 0
-               is an ambient water, and Row 1 is a turbidity current.
-            C : ndarray
-               Sediment concentration
-            out : ndarray
-               Outputs
-
-            Returns
-            ---------
-            e_w : ndarray
-               Entrainment coefficient of ambient water
-
-        """
-        if out is None:
-            out = np.zeros(U.shape)
-
-        Ri = np.zeros(U.shape)
-        flow_exist = np.where((h[:] > self.h_w) & (U > 0.01))
-        Ri[flow_exist] = self.R * self.g * C[flow_exist] \
-            * h[flow_exist] / U[flow_exist] ** 2
-        out[flow_exist] = 0.075 / np.sqrt(
-            1 + 718. + Ri[flow_exist]**2.4)  # Parker et al. (1987)
-
-        return out
-
-    def get_ws(self):
-        """ Calculate settling velocity of sediment particles
-            on the basis of Ferguson and Church (1982)
-
-        Return
-        ------------------
-        ws : settling velocity of sediment particles [m/s]
-
-        """
-
-        # copy parameters to local variables
-        R = self.R
-        g = self.g
-        Ds = self.Ds
-        nu = self.nu
-
-        # Coefficients for natural sands
-        C_1 = 18.
-        C_2 = 1.0
-
-        ws = R * g * Ds**2 / (C_1 * nu + (0.75 * C_2 * R * g * Ds**3)**0.5)
-
-        return ws
-
-    def get_es(self, u_star, out=None):
-        """ Calculate entrainment rate of basal sediment to suspension
-            Based on Garcia and Parker (1991)
-
-            Parameters
-            --------------
-            u_star : ndarray
-                flow shear velocity
-            out : ndarray
-                Outputs (entrainment rate of basal sediment)
-
-            Returns
-            ---------------
-            out : ndarray
-                dimensionless entrainment rate of basal sediment into
-                suspension
-        """
-
-        if out is None:
-            out = np.zeros(u_star.shape)
-
-        # basic parameters
-        R = self.R
-        g = self.g
-        Ds = self.Ds
-        nu = self.nu
-        ws = self.ws
-
-        # calculate subordinate parameters
-        Rp = np.sqrt(R * g * Ds) * Ds / nu
-        sus_index = u_star / ws
-
-        # coefficients for calculation
-        a = 7.8 * 10**-7
-        alpha = 0.6
-        p = 0.1
-
-        # calculate entrainemnt rate
-        Z = sus_index * Rp**alpha
-        out[:] = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
-
-        return out
-
     def calc_G_h(self, h, u_node, v_node, C):
         """Calculate non-advection term for h
         """
@@ -1154,7 +1043,8 @@ class TurbidityCurrent2D(Component):
         node_west = self.node_west[core_nodes]
         dx = self.grid.dx
 
-        ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
+        ew_node = get_ew(np.sqrt(u_node**2 + v_node**2), h, C, self.R,
+                         self.g, self.h_w)
         # ew_node = np.zeros(h.shape)
 
         self.G_h[core_nodes] = ew_node[core_nodes] * np.sqrt(
@@ -1169,10 +1059,11 @@ class TurbidityCurrent2D(Component):
         core_nodes = self.core_nodes
         ws = self.ws
 
-        ew_node = self.get_ew(np.sqrt(u_node**2 + v_node**2), h, C)
+        ew_node = get_ew(np.sqrt(u_node**2 + v_node**2), h, C,
+                         self.R, self.g, self.h_w)
         U_node = np.sqrt(u_node**2 + v_node**2)
         u_star_node = np.sqrt(self.Cf) * U_node
-        es = self.get_es(u_star_node)
+        es = get_es(self.R, self.g, self.Ds, self.nu, u_star_node)
         # ew_node = np.zeros(h.shape)
         # es = np.zeros(h.shape)
         r0 = 1.5
@@ -1195,7 +1086,8 @@ class TurbidityCurrent2D(Component):
         Rg = self.R * self.g
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
         eta_grad_x = eta_grad_at_link[link_horiz]
-        ew_link = self.get_ew(np.sqrt(u**2 + v**2), h_link, C_link)
+        ew_link = get_ew(np.sqrt(u**2 + v**2), h_link, C_link,
+                         self.R, self.g, self.h_w)
         u_star_2 = self.Cf * u[link_horiz] * np.sqrt(u[link_horiz]**2 +
                                                      v_on_horiz**2)
 
@@ -1221,7 +1113,8 @@ class TurbidityCurrent2D(Component):
         Rg = self.R * self.g
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
         eta_grad_y = eta_grad_at_link[link_vert]
-        ew_link = self.get_ew(np.sqrt(u**2 + v**2), h_link, C_link)
+        ew_link = get_ew(np.sqrt(u**2 + v**2), h_link, C_link, self.R,
+                         self.g, self.h_w)
         v_star_2 = self.Cf * v[link_vert] * np.sqrt(u_on_vert**2 +
                                                     v[link_vert]**2)
 
@@ -1242,7 +1135,7 @@ class TurbidityCurrent2D(Component):
         ws = self.ws
         r0 = 1.5
         u_star_at_node = self.Cf * (u_node**2 + v_node**2)
-        es = self.get_es(u_star_at_node)
+        es = get_es(self.R, self.g, self.Ds, self.nu, u_star_at_node)
         # es = np.zeros(h.shape)
 
         self.G_eta[core_nodes] = ws * (r0 * C[core_nodes] -
@@ -1412,7 +1305,7 @@ if __name__ == '__main__':
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.2,
+        alpha=0.05,
         kappa=0.0001,
         Ds=100 * 10**-6,
         nu_t=0.01,
@@ -1424,7 +1317,7 @@ if __name__ == '__main__':
     t = time.time()
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
     last = 100
-    ipdb.set_trace()
+    # ipdb.set_trace()
     for i in range(1, last + 1):
         tc.run_one_step(dt=10.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
