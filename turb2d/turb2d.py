@@ -3,7 +3,7 @@ from landlab import Component, FieldError, RasterModelGrid
 from landlab.utils.decorators import use_file_name_or_kwds
 from landlab.grid.structured_quad import links
 from landlab.io.native_landlab import save_grid
-from cip import cip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
+from cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
 from sediment_func import get_es, get_ew, get_ws
 import time
 import ipdb
@@ -161,6 +161,7 @@ class TurbidityCurrent2D(Component):
                  R=1.65,
                  Ds=100 * 10**-6,
                  lambda_p=0.4,
+                 r0 = 0.0,
                  nu=1.010 * 10**-6,
                  nu_t=0.01,
                  kappa=0.001,
@@ -219,6 +220,7 @@ class TurbidityCurrent2D(Component):
         self.h_w = h_w
         self.nu = nu
         self.kappa = kappa
+        self.r0 = r0
         self.lambda_p = lambda_p
         self.implicit_num = implicit_num
         self.C_init = C_init
@@ -328,7 +330,8 @@ class TurbidityCurrent2D(Component):
         self.ew_node = np.zeros(grid.number_of_nodes)
         self.ew_link = np.zeros(grid.number_of_links)
         self.es = np.zeros(grid.number_of_nodes)
-        self.r0 = np.zeros(grid.number_of_nodes)
+        # self.r0 = np.zeros(grid.number_of_nodes)
+        
 
         self.G_h = np.zeros(grid.number_of_nodes)
         self.G_u = np.zeros(grid.number_of_links)
@@ -551,7 +554,7 @@ class TurbidityCurrent2D(Component):
             # calculation of advecton terms of momentum (u and v) equations
             # by CIP method
 
-            cip_2d_M_advection(
+            rcip_2d_M_advection(
                 self.u,
                 self.dudx,
                 self.dudy,
@@ -573,7 +576,7 @@ class TurbidityCurrent2D(Component):
                 out_dfdx=self.dudx_temp,
                 out_dfdy=self.dudy_temp)
 
-            cip_2d_M_advection(
+            rcip_2d_M_advection(
                 self.v,
                 self.dvdx,
                 self.dvdy,
@@ -691,9 +694,9 @@ class TurbidityCurrent2D(Component):
                                 self.v_node_temp, self.C_temp)
 
                 # Update C, h and deposition/erosion
+                self.h_temp = self.h + self.dt_local * self.G_h
                 self.C_temp = (self.C * self.h +
                                self.dt_local * self.G_Ch) / self.h_temp
-                self.h_temp = self.h + self.dt_local * self.G_h
                 self.eta_temp = self.eta + self.dt_local * self.G_eta
 
                 # judge convergence of implicit scheme
@@ -731,15 +734,15 @@ class TurbidityCurrent2D(Component):
             self.update_values()
 
             # apply the shock dissipation scheme
-            self.shock_dissipation(self.C,
-                                   self.h,
-                                   self.core_nodes,
-                                   self.node_north,
-                                   self.node_south,
-                                   self.node_east,
-                                   self.node_west,
-                                   self.dt_local,
-                                   out=self.C_temp)
+            # self.shock_dissipation(self.C,
+            #                        self.h,
+            #                        self.core_nodes,
+            #                        self.node_north,
+            #                        self.node_south,
+            #                        self.node_east,
+            #                        self.node_west,
+            #                        self.dt_local,
+            #                        out=self.C_temp)
 
             self.shock_dissipation(self.u,
                                    self.h_link,
@@ -1035,7 +1038,7 @@ class TurbidityCurrent2D(Component):
         U_node = np.sqrt(u_node**2 + v_node**2)
         ew_node = get_ew(U_node, h, C, self.R,
                          self.g, self.h_w)
-        # ew_node = np.zeros(h.shape)
+        ew_node = np.zeros(h.shape)
 
         self.G_h[core_nodes] = ew_node[core_nodes] * U_node[core_nodes] \
                                - (v[link_north] * h_link[link_north]
@@ -1069,9 +1072,8 @@ class TurbidityCurrent2D(Component):
         U_node = np.sqrt(u_node**2 + v_node**2)
         u_star_node = np.sqrt(self.Cf) * U_node
         es = get_es(self.R, self.g, self.Ds, self.nu, u_star_node)
-        # ew_node = np.zeros(h.shape)
-        # es = np.zeros(h.shape)
-        r0 = 1.5
+        es = np.zeros(h.shape)
+        r0 = self.r0
 
         phi_x = u * C_link * h_link
         phi_y = v * C_link * h_link
@@ -1082,8 +1084,8 @@ class TurbidityCurrent2D(Component):
                                 - (phi_y[link_north] - phi_y[link_south]) \
                                 / dx
 
-        self.G_Ch[np.where(h < (self.h_init * 5))] = 0
-                                
+        # self.G_Ch[np.where((h < (self.h_init*2)) & (self.G_Ch > 0))] = 0
+
 
     def calc_G_u(self, h, h_link, u, v, C, C_link, eta, link_horiz):
         """Calculate non-advection term for u
@@ -1102,6 +1104,7 @@ class TurbidityCurrent2D(Component):
         U_horiz_link = np.sqrt(u[link_horiz]**2 + v_on_horiz**2)
         ew_link = get_ew(U_horiz_link, h_link[link_horiz], C_link[link_horiz],
                          self.R, self.g, self.h_w)
+        ew_link = np.zeros(ew_link.shape)
         u_star_2 = self.Cf * u[link_horiz] * U_horiz_link
 
         self.G_u[link_horiz] = -Rg * C_link[link_horiz] * eta_grad_x \
@@ -1131,7 +1134,8 @@ class TurbidityCurrent2D(Component):
         U_vert_link = np.sqrt(v[link_vert]**2 + u_on_vert**2)
         ew_link = get_ew(U_vert_link, h_link[link_vert], C_link[link_vert],
                          self.R, self.g, self.h_w)
-        u_star_2 = self.Cf * u[link_vert] * U_vert_link
+        ew_link = np.zeros(ew_link.shape)
+        v_star_2 = self.Cf * v[link_vert] * U_vert_link
 
         self.G_v[link_vert] = -Rg * C_link[link_vert] * eta_grad_y \
                    - 0.5 * Rg * (
@@ -1141,7 +1145,7 @@ class TurbidityCurrent2D(Component):
                   C_link[link_vert] * \
                   (h[node_north] - h[node_south]) / dx
                    ) \
-                  - u_star_2 \
+                  - v_star_2 \
                   - ew_link * U_vert_link * v[link_vert] / h_link[link_vert]
 
     def calc_G_eta(self, h, u_node, v_node, C):
@@ -1150,10 +1154,10 @@ class TurbidityCurrent2D(Component):
 
         core_nodes = self.core_nodes
         ws = self.ws
-        r0 = 1.5
+        r0 = self.r0
         u_star_at_node = self.Cf * (u_node**2 + v_node**2)
         es = get_es(self.R, self.g, self.Ds, self.nu, u_star_at_node)
-        # es = np.zeros(h.shape)
+        es = np.zeros(h.shape)
 
         self.G_eta[core_nodes] = ws * (r0 * C[core_nodes] -
                                        es[core_nodes]) / (1 - self.lambda_p)
@@ -1322,7 +1326,7 @@ if __name__ == '__main__':
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.2,
+        alpha=0.1,
         kappa=0.001,
         Ds=100 * 10**-6,
         nu_t=0.01,
@@ -1335,9 +1339,9 @@ if __name__ == '__main__':
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
     last = 100
 
-    ipdb.set_trace()
+    # ipdb.set_trace()            
     for i in range(1, last + 1):
-        tc.run_one_step(dt=10.0)
+        tc.run_one_step(dt=20.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
