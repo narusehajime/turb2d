@@ -123,17 +123,17 @@ def cip_2d_diffusion(u,
     if out_v is None:
         out_v = np.zeros(v.shape)
 
-    out_u[h_active] = u[h_active]
-    +nu_t * dt * (
-        (u[east][h_active] - 2 * u[h_active] + u[west][h_active]) +
-        (u[north][h_active] - 2 * u[h_active] +
-         u[south][h_active])) / dx**2
+    out_u[h_active] = u[h_active] \
+               + nu_t[h_active] * dt * (
+               (u[east][h_active] - 2 * u[h_active] + u[west][h_active])
+                + (u[north][h_active] - 2 * u[h_active] + u[south][h_active]))\
+               / dx**2
 
-    out_v[v_active] = v[v_active]
-    +nu_t * dt * (
-        (v[east][v_active] - 2 * v[v_active] + v[west][v_active]) +
-        (v[north][v_active] - 2 * v[v_active] +
-         v[south][v_active])) / dx**2
+    out_v[v_active] = v[v_active] \
+               + nu_t[v_active] * dt * (
+               (v[east][v_active] - 2 * v[v_active] + v[west][v_active])
+                + (v[north][v_active] - 2 * v[v_active] + v[south][v_active]))\
+                / dx**2
 
     return out_u, out_v
 

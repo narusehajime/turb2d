@@ -163,7 +163,6 @@ class TurbidityCurrent2D(Component):
                  lambda_p=0.4,
                  r0 = 0.0,
                  nu=1.010 * 10**-6,
-                 nu_t=0.01,
                  kappa=0.001,
                  flow_type='3eq',
                  implicit_num=50,
@@ -213,7 +212,6 @@ class TurbidityCurrent2D(Component):
         else:
             self.Cf = Cf
         self.g = g
-        self.nu_t = nu_t
         self.R = R
         self.Ds = Ds
         self.flow_type = flow_type
@@ -330,6 +328,7 @@ class TurbidityCurrent2D(Component):
         self.ew_node = np.zeros(grid.number_of_nodes)
         self.ew_link = np.zeros(grid.number_of_links)
         self.es = np.zeros(grid.number_of_nodes)
+        self.nu_t = np.zeros(grid.number_of_links)
         # self.r0 = np.zeros(grid.number_of_nodes)
         
 
@@ -547,9 +546,16 @@ class TurbidityCurrent2D(Component):
             self.dt_local = dt_local
 
             # Find wet and partial wet grids
-            # wet_horizontal_links, partial_wet_horizontal_links = self.find_wet_grids(self.h_link, self.horizontal_active_links, self.horizontal_up_links, self.vertical_up_links)
-            # wet_vertical_links, partial_wet_vertical_links = self.find_wet_grids(self.h_link, self.vertical_active_links, self.horizontal_up_links, self.vertical_up_links)
-            # wet_nodes, partial_wet_nodes = self.find_wet_grids(self.h, self.core_nodes, self.horizontal_up_nodes, self.vertical_up_nodes)
+            ipdb.set_trace()
+            (wet_nodes,
+                wet_horizontal_links,
+                wet_vertical_links,
+                horizontally_partial_wet_nodes,
+                vertically_partial_wet_nodes,
+                horizontally_wettest_nodes,
+                vertically_wettest_nodes,
+                partial_wet_horizontal_links,
+                partial_wet_vertical_links) = self.find_wet_grids(self.h)
 
             # calculation of advecton terms of momentum (u and v) equations
             # by CIP method
@@ -602,6 +608,7 @@ class TurbidityCurrent2D(Component):
             # self.u_temp[partial_wet_horizontal_links] = self.u_temp[self.horizontal_up_links[partial_wet_horizontal_links]]
             # self.v_temp[partial_wet_vertical_links] = self.v_temp[self.vertical_up_links[partial_wet_vertical_links]]
 
+
             # update values after calculating advection terms
             # map node values to links, and link values to nodes.
             self.h_temp[:] = self.h[:]
@@ -620,10 +627,6 @@ class TurbidityCurrent2D(Component):
             while ((converge > 1.0 * 10**-10) and (count < self.implicit_num)):
                 # for i in range(1):
                 # calculate non-advection terms on wet grids
-                self.map_values(self.h_temp, self.u_temp, self.v_temp,
-                                self.C_temp, self.eta_temp, self.h_link_temp,
-                                self.u_node_temp, self.v_node_temp,
-                                self.C_link_temp)
 
                 self.calc_G_u(self.h_temp, self.h_link, self.u_temp,
                               self.v_temp, self.C_temp, self.C_link,
@@ -710,39 +713,47 @@ class TurbidityCurrent2D(Component):
                     )  / self.grid.number_of_core_nodes
                 h_prev[:] = self.h_temp[:]
                 C_prev[:] = self.C_temp[:]
+
+                self.map_values(self.h_temp, self.u_temp, self.v_temp,
+                                self.C_temp, self.eta_temp, self.h_link_temp,
+                                self.u_node_temp, self.v_node_temp,
+                                self.C_link_temp)
                 count += 1
 
             # update values
             self.update_values()
 
             # Calculate diffusion term of momentum
+            self.calc_nu_t(self.u, self.v, self.h_link, out=self.nu_t)
             cip_2d_diffusion(self.u,
-                                  self.v,
-                                  self.nu_t,
-                                  self.horizontal_active_links,
-                                  self.vertical_active_links,
-                                  self.link_north,
-                                  self.link_south,
-                                  self.link_east,
-                                  self.link_west,
-                                  dx,
-                                  self.dt_local,
-                                  out_u=self.u_temp,
-                                  out_v=self.v_temp)
+                             self.v,
+                             self.nu_t,
+                             self.horizontal_active_links,
+                             self.vertical_active_links,
+                             self.link_north,
+                             self.link_south,
+                             self.link_east,
+                             self.link_west,
+                             dx,
+                             self.dt_local,
+                             out_u=self.u_temp,
+                             out_v=self.v_temp)
 
             # update values
             self.update_values()
+            self.map_values(self.h, self.u, self.v, self.C, self.eta,
+                            self.h_link, self.u_node, self.v_node, self.C_link)
 
             # apply the shock dissipation scheme
-            # self.shock_dissipation(self.C,
-            #                        self.h,
-            #                        self.core_nodes,
-            #                        self.node_north,
-            #                        self.node_south,
-            #                        self.node_east,
-            #                        self.node_west,
-            #                        self.dt_local,
-            #                        out=self.C_temp)
+            self.shock_dissipation(self.C,
+                                   self.h,
+                                   self.core_nodes,
+                                   self.node_north,
+                                   self.node_south,
+                                   self.node_east,
+                                   self.node_west,
+                                   self.dt_local,
+                                   out=self.C_temp)
 
             self.shock_dissipation(self.u,
                                    self.h_link,
@@ -908,64 +919,156 @@ class TurbidityCurrent2D(Component):
 
     def find_wet_grids(
             self,
-            h,
-            core,
-            north,
-            south,
-            east,
-            west,
+            h
     ):
-        """Find wet and partial wet nodes or links
-           In this model, "dry" nodes or links are not subject to calculate
-           wet grids (nodes and links) including partial wet grids are
-           considered in the model calculation. "wet" is judged by the flow 
-           depth (> h_w), and "partial wet" is a dry wet but the upcurrent
-           grid is wet.
+        """Find wet and partial wet nodes and links
+           In this model, "dry" nodes are not subject to calculate.
+           Only "wet nodes" are considered in the model 
+           calculation. "wet" is judged by the flow depth (> h_w).
+           The "partial wet node" is a dry node but the upcurrent
+           node is wet. Flow depth and velocity at partial wet
+           nodes are calculated by the YANG's model (YANG et al.,
+           2016)
 
            Parameters
            --------------------------
            h : ndarray
                flow height values for detecting wet and dry grids
 
-           core : ndarray
-               ndarry indicating indeces of core nodes
-               or links
-
-           north : ndarray
-               ndarray indicating nodes or links locating north of core nodes.
-
-           south : ndarray
-               ndarray indicating nodes or links locating south of core nodes.
-
-           east : ndarray
-               ndarray indicating nodes or links locating east of core nodes.
-
-           west : ndarray
-               ndarray indicating nodes or links locating west of core nodes.
-
-
            Returns
            -------------------------
-           out_wet_nodes : ndarray, int
-               ndarray indicating wet grids. Grids (node or link) showing h
+           wet_nodes : ndarray, int
+               ndarray indicating wet nodes. Nodes showing flow height h
                value larger than the threshold(h_w) value are judged as
                wet grid
 
-           out_partial_wet : ndarray, int
-               ndarray indicating partially wet grids. Grids (node or link)
+           wet_horizontal_links : ndarray, int
+               ndarray indicating wet horizontal links. Links connected
+               with two wet nodes are judged as wet links.
+
+           wet_vertical_links : ndarray, int
+               ndarray indicating wet horizontal links. Links connected
+               with two wet nodes are judged as wet links.
+
+           horizontally_partial_wet_nodes : ndarray, int
+               ndarray indicating horizontally partial wet nodes. Nodes
                showing h value lower than the threshold(h_w) value but an 
-               upcurrent node or a link is a wet grid
+               horizontally upcurrent node is wet
+
+           vertically_partial_wet_nodes : ndarray, int
+               ndarray indicating horizontally partial wet nodes. Nodes
+               showing h value lower than the threshold(h_w) value but an 
+               horizontally upcurrent node is wet
+
+           horizontally_wettest_nodes : ndarray, int
+               ndarray indicating wet nodes horizontally adjacent to
+               partially wet nodes.
+
+           vertically_wettest_nodes : ndarray, int
+               ndarray indicating wet nodes vertically adjacent to
+               partially wet nodes.
+
+           partial_wet_horizontal_links : ndarray, int
+               ndarray indicating partially wet horizontal links
+
+           partial_wet_vertical_links : ndarray, int
+               ndarray indicating partially wet horizontal links
+
 
         """
-        wet_check = np.where(h[core] > self.h_w)
-        out_wet = core[wet_check]
-        partial_wet_check = np.where((h[core] < self.h_w) & (
-            (h[north][core] > self.h_w)
-            | (h[south][core] > self.h_w) | (h[east][core] > self.h_w)
-            | (h[west][core] > self.h_w)))
-        out_partial_wet = core[partial_wet_check]
+        #############################
+        # Copy parameters from self #
+        #############################
+        
+        core = self.core_nodes
+        horiz_links = self.horizontal_active_links
+        vert_links = self.vertical_active_links
+        
+        east_nodes_at_node = self.node_east[core]
+        west_nodes_at_node = self.node_west[core]
+        north_nodes_at_node = self.node_north[core]
+        south_nodes_at_node = self.node_south[core]
+        
+        east_link_at_node = self.east_link_at_node[core]
+        west_link_at_node = self.west_link_at_node[core]
+        north_link_at_node = self.north_link_at_node[core]
+        south_link_at_node = self.south_link_at_node[core]
+        
+        east_nodes_at_link = self.east_node_at_horizontal_link[horiz_links]
+        west_nodes_at_link = self.west_node_at_horizontal_link[horiz_links]
+        north_nodes_at_link = self.north_node_at_vertical_link[vert_links]
+        south_nodes_at_link = self.south_node_at_vertical_link[vert_links]
 
-        return out_wet, out_partial_wet
+        h_w = self.h_w
+
+        ############################
+        # find wet nodes and links #
+        ############################
+        wet_nodes = core[np.where(h[core] > h_w)]
+        wet_horizontal_links = horiz_links[np.where(
+            (h[west_nodes_at_link] > h_w) & (h[east_nodes_at_link] > h_w))]
+        wet_vertical_links = vert_links[np.where(
+            (h[north_nodes_at_link] > h_w) & (h[south_nodes_at_link] > h_w))]
+
+        ######################################################
+        #find partial wet nodes and links in horizontal axis #
+        ######################################################
+        wet_at_east = np.where((h[core] < h_w)
+                           & (h[east_nodes_at_node] > h_w))
+        horizontally_partial_wet_nodes_E = core[wet_at_east]
+        horizontally_wettest_nodes_E = east_nodes_at_node[wet_at_east]
+        partial_wet_horizontal_links_E = east_link_at_node[wet_at_east]
+        wet_at_west = np.where((h[core] < h_w)
+                           & (h[west_nodes_at_node] > h_w))
+        horizontally_partial_wet_nodes_W = core[wet_at_west]
+        horizontally_wettest_nodes_W = west_nodes_at_node[wet_at_west]
+        partial_wet_horizontal_links_W = west_link_at_node[wet_at_west]
+
+        horizontally_partial_wet_nodes = np.concatenate(
+            [horizontally_partial_wet_nodes_E,
+             horizontally_partial_wet_nodes_W])
+        horizontally_wettest_nodes = np.concatenate(
+            [horizontally_wettest_nodes_E,
+             horizontally_wettest_nodes_W])
+        partial_wet_horizontal_links = np.concatenate(
+            [partial_wet_horizontal_links_E,
+             partial_wet_horizontal_links_W])
+        
+        ######################################################
+        #find partial wet nodes and links in vertical axis #
+        ######################################################
+        # vertical partial wet check
+        wet_at_north = np.where((h[core] < h_w)
+                           & (h[north_nodes_at_node] > h_w))
+        vertically_partial_wet_nodes_N = core[wet_at_north]
+        vertically_wettest_nodes_N = north_nodes_at_node[wet_at_north]
+        partial_wet_vertical_links_N = north_link_at_node[wet_at_north]
+        wet_at_south = np.where((h[core] < h_w)
+                           & (h[south_nodes_at_node] > h_w))
+        vertically_partial_wet_nodes_S = core[wet_at_south]
+        vertically_wettest_nodes_S = south_nodes_at_node[wet_at_south]
+        partial_wet_vertical_links_S = south_link_at_node[wet_at_south]
+
+        vertically_partial_wet_nodes = np.concatenate(
+            [vertically_partial_wet_nodes_N,
+             vertically_partial_wet_nodes_S])
+        vertically_wettest_nodes = np.concatenate(
+            [vertically_wettest_nodes_N,
+             vertically_wettest_nodes_S])
+        partial_wet_vertical_links = np.concatenate(
+            [partial_wet_vertical_links_N,
+             partial_wet_vertical_links_S])
+
+        
+        return (wet_nodes,
+                wet_horizontal_links,
+                wet_vertical_links,
+                horizontally_partial_wet_nodes,
+                vertically_partial_wet_nodes,
+                horizontally_wettest_nodes,
+                vertically_wettest_nodes,
+                partial_wet_horizontal_links,
+                partial_wet_vertical_links)
 
     def shock_dissipation(
             self,
@@ -1023,6 +1126,31 @@ class TurbidityCurrent2D(Component):
         eps_i_half[core] = np.max([eps_i[north], eps_i[core]], axis=0)
         out[core] = out[core] + eps_i_half[core] * (out[north] - out[core]) \
             - eps_i_half[south] * (out[core] - out[south])
+
+    def calc_nu_t(self, u, v, h_link, out=None):
+        """Calculate eddy viscosity for horizontal diffusion of momentum
+           
+           Parameters
+           -----------------------
+
+           u : ndarray, float
+               horizontal velocity
+           v : ndarray, float
+               vertical velocity
+           
+           Return
+           -----------------------
+           out : ndarray, float
+               eddy viscosity for horizontal diffusion of momentum
+
+        """
+        if out is None:
+            out = np.zeros(u.shape)
+        
+        kappa = 0.4
+       
+        out = 1 / 6. * kappa * np.sqrt(u**2 + v**2) * h_link
+        
 
     def calc_G_h(self, h, h_link, u, u_node, v, v_node, C, core_nodes):
         """Calculate non-advection term for h
@@ -1329,8 +1457,8 @@ if __name__ == '__main__':
         alpha=0.1,
         kappa=0.001,
         Ds=100 * 10**-6,
-        nu_t=0.01,
-        h_init=0.01,
+        h_init=0.001,
+        h_w = 0.01,
         implicit_num=10,
     )
 
