@@ -3,27 +3,29 @@ import numpy as np
 Empirical functions for calculating models of sediment dynamics
 """
 
-def get_ew(U, h, C, R, g, h_w, out=None):
+def get_ew(U, Ch, R, g, umin, out=None):
     """ calculate entrainemnt coefficient of ambient water to a turbidity
         current layer
 
         Parameters
         ----------
-        U : ndarray
-           Flow velocities of ambient water and a turbidity current.
-           Row 0 is for an ambient water, and Row 1 is for a turbidity
-           current.
-        h : ndarray
-           Flow heights of ambient water and a turbidity current. Row 0
-           is an ambient water, and Row 1 is a turbidity current.
-        C : ndarray
-           Sediment concentration
+        U : ndarray, float
+           Flow velocities of a turbidity current.
+        Ch : ndarray, float
+           Flow height times sediment concentration of a turbidity current. 
+        R : float
+           Submerged specific density of sediment
+        g : float
+           gravity acceleration
+        umin: float
+           minimum threshold value of velocity to calculate water entrainment
+    
         out : ndarray
            Outputs
 
         Returns
         ---------
-        e_w : ndarray
+        e_w : ndarray, float
            Entrainment coefficient of ambient water
 
     """
@@ -31,11 +33,9 @@ def get_ew(U, h, C, R, g, h_w, out=None):
         out = np.zeros(U.shape)
 
     Ri = np.zeros(U.shape)
-    flow_exist = np.where((h[:] > h_w) & (U > 0.01))
-    Ri[flow_exist] = R * g * C[flow_exist] \
-        * h[flow_exist] / U[flow_exist] ** 2
-    out[flow_exist] = 0.075 / np.sqrt(
-        1 + 718. + Ri[flow_exist]**2.4)  # Parker et al. (1987)
+    flowing = np.where(U > umin)
+    Ri[flowing] = R * g * Ch[flowing] / U[flowing] ** 2
+    out = 0.075 / np.sqrt(1 + 718. + Ri**2.4)  # Parker et al. (1987)
     
     return out
 
@@ -88,7 +88,8 @@ def get_es(R, g, Ds, nu, u_star, out=None):
     # coefficients for calculation
     a = 7.8 * 10**-7
     alpha = 0.6
-    p = 0.1
+    # p = 0.1
+    p = 1.0
 
     # calculate entrainemnt rate
     Z = sus_index * Rp**alpha
