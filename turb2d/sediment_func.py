@@ -88,8 +88,8 @@ def get_es(R, g, Ds, nu, u_star, out=None):
     # coefficients for calculation
     a = 7.8 * 10**-7
     alpha = 0.6
-    # p = 0.1
-    p = 1.0
+    p = 0.1
+    # p = 1.0
 
     # calculate entrainemnt rate
     Z = sus_index * Rp**alpha

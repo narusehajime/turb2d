@@ -3,7 +3,7 @@ from landlab import Component, FieldError, RasterModelGrid
 from landlab.utils.decorators import use_file_name_or_kwds
 from landlab.grid.structured_quad import links
 from landlab.io.native_landlab import save_grid
-from cip import cip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
+from cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
 from sediment_func import get_es, get_ew, get_ws
 import time
 import ipdb
@@ -391,6 +391,7 @@ class TurbidityCurrent2D(Component):
         self.dt = None
         self.dt_local = None
         self.first_step = True
+        # self.first_stage_count = 0
 
         self.neighbor_flag = False
         self.default_fixed_links = default_fixed_links
@@ -398,12 +399,15 @@ class TurbidityCurrent2D(Component):
     def calc_time_step(self):
         """Calculate time step
         """
-        sqrt_RCgh = np.sqrt(self.R * self.C * self.g * self.h)
-        # sqrt_RCgh = np.sqrt(self.g * self.h)
+        if self.first_step is True:
+            dt_local = 0.001
+        else:
+        
+            sqrt_RCgh = np.sqrt(self.R * self.C * self.g * self.h)
 
-        dt_local = self.alpha * self._grid.dx \
-            / np.amax(np.array([np.amax(np.abs(self.u_node) + sqrt_RCgh),
-                                np.amax(np.abs(self.v_node) + sqrt_RCgh), 1.0]))
+            dt_local = self.alpha * self._grid.dx \
+                / np.amax(np.array([np.amax(np.abs(self.u_node) + sqrt_RCgh),
+                              np.amax(np.abs(self.v_node) + sqrt_RCgh), 1.0]))
 
         return dt_local
 
@@ -548,6 +552,7 @@ class TurbidityCurrent2D(Component):
         # map node values to links, and link values to nodes.
         self.map_values(self.h, self.u, self.v, self.C, self.eta, self.h_link,
                         self.u_node, self.v_node, self.Ch_link)
+        self.copy_values_to_temp()
         self.update_up_down_links_and_nodes()
 
         # continue calculation until the prescribed time elapsed
@@ -567,7 +572,7 @@ class TurbidityCurrent2D(Component):
             # calculation of advecton terms of momentum (u and v) equations
             # by CIP method
 
-            cip_2d_M_advection(
+            rcip_2d_M_advection(
                 self.u,
                 self.dudx,
                 self.dudy,
@@ -584,7 +589,7 @@ class TurbidityCurrent2D(Component):
                 out_dfdx=self.dudx_temp,
                 out_dfdy=self.dudy_temp)
 
-            cip_2d_M_advection(
+            rcip_2d_M_advection(
                 self.v,
                 self.dvdx,
                 self.dvdy,
@@ -602,7 +607,7 @@ class TurbidityCurrent2D(Component):
                 out_dfdy=self.dvdy_temp)
 
             # process values at partial wet grids
-            cip_2d_M_advection(
+            rcip_2d_M_advection(
                 self.u,
                 self.dudx,
                 self.dudy,
@@ -619,7 +624,7 @@ class TurbidityCurrent2D(Component):
                 out_dfdx=self.dudx_temp,
                 out_dfdy=self.dudy_temp)
 
-            cip_2d_M_advection(
+            rcip_2d_M_advection(
                 self.v,
                 self.dvdx,
                 self.dvdy,
@@ -639,8 +644,8 @@ class TurbidityCurrent2D(Component):
 
             # update values after calculating advection terms
             # map node values to links, and link values to nodes.
-            self.h_temp[:] = self.h[:]
-            self.Ch_temp[:] = self.Ch[:]
+            # self.h_temp[:] = self.h[:]
+            # self.Ch_temp[:] = self.Ch[:]
             self.map_values(self.h_temp, self.u_temp, self.v_temp,
                             self.Ch_temp, self.eta_temp,
                             self.h_link_temp, self.u_node_temp,
@@ -849,6 +854,11 @@ class TurbidityCurrent2D(Component):
             self.map_values(self.h, self.u, self.v, self.Ch, self.eta,
                            self.h_link, self.u_node, self.v_node, self.Ch_link)
             self.update_up_down_links_and_nodes()
+            self.first_step = False
+            # if self.first_stage_count > 10:
+            #     self.first_step = False
+            # else:
+            #     self.first_stage_count += 1
 
             # Calculation is terminated if global dt is not specified.
             if dt is np.inf:
@@ -862,9 +872,13 @@ class TurbidityCurrent2D(Component):
 
     def copy_values_to_temp(self):
         self.h_temp[:] = self.h[:]
+        self.h_link_temp[:] = self.h_link[:]
         self.u_temp[:] = self.u[:]
+        self.u_node_temp[:] = self.u_node[:]
         self.v_temp[:] = self.v[:]
+        self.v_node_temp[:] = self.v_node[:]
         self.Ch_temp[:] = self.Ch[:]
+        self.Ch_link_temp[:] = self.Ch_link[:]
         self.eta_temp[:] = self.eta[:]
 
     def process_partial_wet_grids(self,
@@ -893,6 +907,7 @@ class TurbidityCurrent2D(Component):
         R = self.R
         Cf = self.Cf
         dt = self.dt_local
+        dx = self.grid.dx
         horizontally_partial_wet_nodes = self.horizontally_partial_wet_nodes
         vertically_partial_wet_nodes = self.vertically_partial_wet_nodes
         horizontally_wettest_nodes = self.horizontally_wettest_nodes
@@ -910,29 +925,33 @@ class TurbidityCurrent2D(Component):
         # and partial wet nodes                              #
         ######################################################
         M_horiz = gamma * h[horizontally_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[horizontally_wettest_nodes])
+            * np.sqrt(2.0 * R * g * Ch[horizontally_wettest_nodes]) \
+            / dx * dt
         M_vert = gamma * h[vertically_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[vertically_wettest_nodes])
+            * np.sqrt(2.0 * R * g * Ch[vertically_wettest_nodes]) \
+            / dx * dt
         CM_horiz = gamma * Ch[horizontally_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[horizontally_wettest_nodes])
+            * np.sqrt(2.0 * R * g * Ch[horizontally_wettest_nodes]) \
+            / dx * dt
         CM_vert = gamma * Ch[vertically_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[vertically_wettest_nodes])
+            * np.sqrt(2.0 * R * g * Ch[vertically_wettest_nodes]) \
+            / dx * dt
 
         ################################################################
         # Calculate time development of variables at partial wet nodes #
         ################################################################
 
         # overspilling horizontally
-        h_temp[horizontally_partial_wet_nodes] += M_horiz * dt
-        h_temp[horizontally_wettest_nodes] -= M_horiz * dt
-        Ch_temp[horizontally_partial_wet_nodes] += CM_horiz * dt
-        Ch_temp[horizontally_wettest_nodes] -= CM_horiz * dt
+        h_temp[horizontally_partial_wet_nodes] += M_horiz
+        h_temp[horizontally_wettest_nodes] -= M_horiz
+        Ch_temp[horizontally_partial_wet_nodes] += CM_horiz
+        Ch_temp[horizontally_wettest_nodes] -= CM_horiz
 
         # overspilling vertically
-        h_temp[vertically_partial_wet_nodes] += M_vert * dt
-        h_temp[vertically_wettest_nodes] -= M_vert * dt
-        Ch_temp[vertically_partial_wet_nodes] += CM_vert * dt
-        Ch_temp[vertically_wettest_nodes] -= CM_vert * dt
+        h_temp[vertically_partial_wet_nodes] += M_vert
+        h_temp[vertically_wettest_nodes] -= M_vert
+        Ch_temp[vertically_partial_wet_nodes] += CM_vert
+        Ch_temp[vertically_wettest_nodes] -= CM_vert
 
         ################################################################
         # Calculate time development of variables at partial wet links #
@@ -1380,7 +1399,8 @@ class TurbidityCurrent2D(Component):
 
         ws = self.ws
         r0 = self.r0
-        u_star_at_node = self.Cf * (u_node[core]**2 + v_node[core]**2)
+        u_star_at_node = np.sqrt(self.Cf) * np.sqrt(
+            u_node[core]**2 + v_node[core]**2)
         self.es = get_es(self.R, self.g, self.Ds, self.nu, u_star_at_node)
 
         out_geta[core] = ws * (r0 * Ch[core] / h[core] - self.es)
@@ -1497,24 +1517,25 @@ if __name__ == '__main__':
     # making topography
     # set the slope
     slope = 0.1
-    slope_basin_break = 1000
+    slope_basin_break = 2000
     grid.at_node['topographic__elevation'] = (grid.node_y -
                                               slope_basin_break) * slope
 
     # set canyon
     canyon_center = 1000
     canyon_half_width = 800
-    canyon_depth = 100
+    canyon_depth = 200
     a = canyon_depth / canyon_half_width ** 2
     w = canyon_half_width
     c = canyon_center
     canyon = ((grid.node_x >= canyon_center - canyon_half_width) &
               (grid.node_x <= canyon_center + canyon_half_width))
+    grid.at_node['topographic__elevation'][canyon] += a * (
+    grid.node_x[canyon] - canyon_center)**2 - canyon_depth
+
     # grid.at_node['topographic__elevation'][canyon] -= canyon_depth - np.abs(
     #     (grid.node_x[canyon] -
     #      canyon_center)) * canyon_depth / canyon_half_width
-    grid.at_node['topographic__elevation'][canyon] += a * (
-        grid.node_x[canyon] - canyon_center)**2 - canyon_depth
 
     # set basin
     basin_region = grid.at_node['topographic__elevation'] < 0
@@ -1541,8 +1562,8 @@ if __name__ == '__main__':
         kappa=0.25,
         Ds=100 * 10**-6,
         h_init=0.0,
-        h_w = 0.01,
-        C_init=0.0,
+        h_w = 0.001,
+        C_init=0.00001,
         implicit_num=20,
         r0=1.5
     )
@@ -1554,7 +1575,7 @@ if __name__ == '__main__':
 
     ipdb.set_trace()
     for i in range(1, last + 1):
-        tc.run_one_step(dt=20.0)
+        tc.run_one_step(dt=100.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
