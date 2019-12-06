@@ -6,6 +6,7 @@ from landlab.io.native_landlab import save_grid
 from cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
 from sediment_func import get_es, get_ew, get_ws
 import time
+from osgeo import gdal, gdalconst
 import ipdb
 """A component of landlab that simulates a turbidity current on 2D grids
 
@@ -662,7 +663,7 @@ class TurbidityCurrent2D(Component):
             Ch_prev = self.Ch_temp.copy()
             converge = 10.0
             count = 0
-            while ((converge > 1.0 * 10**-15) and (count < self.implicit_num)):
+            while ((converge > 1.0 * 10**-12) and (count < self.implicit_num)):
 
                 self.calc_G_u(self.h_temp, self.h_link_temp, self.u_temp,
                               self.v_temp, self.Ch_temp, self.Ch_link_temp,
@@ -734,12 +735,12 @@ class TurbidityCurrent2D(Component):
                     ((self.h_temp[self.wet_nodes]
                      - h_prev[self.wet_nodes])
                     / self.h_temp[self.wet_nodes])**2 \
-                    )  / self.grid.number_of_core_nodes \
+                    )  / self.wet_nodes.shape[0] \
                     + np.sum(
                     ((self.Ch_temp[self.wet_nodes]
                      - Ch_prev[self.wet_nodes])
                     / self.Ch_temp[self.wet_nodes])**2 \
-                    )  / self.grid.number_of_core_nodes
+                    )  / self.wet_nodes[0]
 
                 h_prev[:] = self.h_temp[:]
                 Ch_prev[:] = self.Ch_temp[:]
@@ -912,6 +913,7 @@ class TurbidityCurrent2D(Component):
                         wet_nodes,
                         out_geta=self.G_eta_c)
         self.G_eta = 0.5 * (self.G_eta_c + self.G_eta_p)
+
         out_Ch[wet_nodes] = Ch[wet_nodes] \
                                     + self.dt_local * (
                                         - self.G_eta[wet_nodes])
@@ -1474,6 +1476,16 @@ class TurbidityCurrent2D(Component):
 
         out_geta[core] = ws * (r0 * Ch[core] / h[core] - self.es)
 
+        # remove too large gradients
+        maxC = 0.05
+        illeagal_val = np.where(out_geta[core] * self.dt_local > Ch[core])
+        out_geta[core][illeagal_val] = Ch[core[illeagal_val]] / self.dt_local
+        illeagal_val2 = np.where(
+            Ch[core] - out_geta[core] * self.dt_local > maxC * h[core])
+        out_geta[core][illeagal_val2] = (
+            maxC * h[core][illeagal_val2] -
+            Ch[core][illeagal_val2]) / self.dt_local
+
     def map_values(self, h, u, v, Ch, eta, h_link, u_node, v_node, Ch_link):
         """map parameters at nodes to links, and those at links to nodes
         """
@@ -1580,12 +1592,12 @@ def create_topography(
         length=8000,
         width=2000,
         spacing=20,
-        slope=0.1,
+        slope_outside=0.1,
+        slope_inside=0.05,
         slope_basin_break=2000,
+        canyon_basin_break=2200,
         canyon_center=1000,
-        canyon_half_width=800,
-        canyon_depth=200,
-        canyon_type='U-Shape',
+        canyon_half_width=100,
 ):
     # making grid
     # size of calculation domain is 4 x 8 km with dx = 20 m
@@ -1601,25 +1613,21 @@ def create_topography(
 
     # making topography
     # set the slope
-    grid.at_node['topographic__elevation'] = (grid.node_y -
-                                              slope_basin_break) * slope
+    grid.at_node['topographic__elevation'] = (
+        grid.node_y - slope_basin_break) * slope_outside
 
     # set canyon
-    canyon = ((grid.node_x >= canyon_center - canyon_half_width) &
-              (grid.node_x <= canyon_center + canyon_half_width))
-    if canyon_type == 'U_shape':
-        a = canyon_depth / canyon_half_width**2
-        grid.at_node['topographic__elevation'][canyon] += a * (
-            grid.node_x[canyon] - canyon_center)**2 - canyon_depth
-    elif canyon_type == 'V_shape':
-        grid.at_node['topographic__elevation'][
-            canyon] -= canyon_depth - np.abs(
-                (grid.node_x[canyon] -
-                 canyon_center)) * canyon_depth / canyon_half_width
+    d0 = slope_inside * (canyon_basin_break - slope_basin_break)
+    d = slope_inside * (grid.node_y - canyon_basin_break) - d0
+    a = d0 / canyon_half_width**2
+    canyon_elev = a * (grid.node_x - canyon_center)**2 + d
+    inside = np.where(canyon_elev < grid.at_node['topographic__elevation'])
+    grid.at_node['topographic__elevation'][inside] = canyon_elev[inside]
 
     # set basin
-    basin_region = grid.at_node['topographic__elevation'] < 0
-    grid.at_node['topographic__elevation'][basin_region] = 0
+    basin_height = 0
+    basin_region = grid.at_node['topographic__elevation'] < basin_height
+    grid.at_node['topographic__elevation'][basin_region] = basin_height
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
 
     return grid
@@ -1641,32 +1649,68 @@ def create_init_flow_region(
         initial_flow_region] = initial_flow_concentration
 
 
+def create_topography_from_geotiff(geotiff_filename,
+                                   xlim=None,
+                                   ylim=None,
+                                   spacing=500):
+
+    # read a geotiff file into ndarray
+    topo_file = gdal.Open(geotiff_filename, gdalconst.GA_ReadOnly)
+    topo_data = topo_file.GetRasterBand(1).ReadAsArray()
+    if (xlim is not None) and (ylim is not None):
+        topo_data = topo_data[xlim[0]:xlim[1], ylim[0]:ylim[1]]
+
+    grid = RasterModelGrid(topo_data.shape, spacing=spacing)
+    grid.add_zeros('flow__depth', at='node')
+    grid.add_zeros('topographic__elevation', at='node')
+    grid.add_zeros('flow__horizontal_velocity', at='link')
+    grid.add_zeros('flow__vertical_velocity', at='link')
+    grid.add_zeros('flow__sediment_concentration', at='node')
+    grid.add_zeros('bed__thickness', at='node')
+
+    grid.at_node['topographic__elevation'][grid.nodes] = topo_data
+
+    return grid
+
+
 if __name__ == '__main__':
 
-    grid = create_topography(
-        length=8000,
-        width=2000,
-        spacing=20,
-        slope=0.03,
-        slope_basin_break=2000,
-        canyon_center=1000,
-        canyon_half_width=800,
-        canyon_depth=200,
-        canyon_type='U-Shape',
-    )
+    # ipdb.set_trace()
+    # grid = create_topography(
+    #     length=8000,
+    #     width=2000,
+    #     spacing=20,
+    #     slope_outside=0.1,
+    #     slope_inside=0.05,
+    #     slope_basin_break=4000,
+    #     canyon_basin_break=4200,
+    #     canyon_center=1000,
+    #     canyon_half_width=100,
+    # )
+    grid = create_topography_from_geotiff('depth500.tif',
+                                          xlim=[200, 800],
+                                          ylim=[400, 1200],
+                                          spacing=500)
 
+    # create_init_flow_region(
+    #     grid,
+    #     initial_flow_concentration=0.01,
+    #     initial_flow_thickness=200,
+    #     initial_region_radius=200,
+    #     initial_region_center=[1000, 6000],
+    # )
     create_init_flow_region(
         grid,
         initial_flow_concentration=0.01,
-        initial_flow_thickness=200,
-        initial_region_radius=200,
-        initial_region_center=[1000, 7000],
+        initial_flow_thickness=500,
+        initial_region_radius=30000,
+        initial_region_center=[200000, 125000],
     )
 
     # making turbidity current object
     tc = TurbidityCurrent2D(grid,
                             Cf=0.004,
-                            alpha=0.1,
+                            alpha=0.03,
                             kappa=0.25,
                             Ds=100 * 10**-6,
                             h_init=0.00001,
@@ -1680,9 +1724,8 @@ if __name__ == '__main__':
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
     last = 100
 
-    ipdb.set_trace()
     for i in range(1, last + 1):
-        tc.run_one_step(dt=100.0)
+        tc.run_one_step(dt=300.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
