@@ -1,214 +1,265 @@
-from debris_flow import DebrisFlow
-from landlab.io.esri_ascii import read_esri_ascii
+from turb2d import TurbidityCurrent2D
+from turb2d import create_topography, create_init_flow_region
 import numpy as np
-import copy
+import os
 import ipdb
 import time
 import multiprocessing as mp
+import netCDF4
+from landlab.io.native_landlab import save_grid
 
 
 class RunMultiFlows():
     """A class to run multiple flows for conducting inverse analysis
     """
-
     def __init__(
             self,
-            proc,
-            range_Cf,
-            range_bfa,
-            range_thick,
-            init_loc,
-            flow_volume,
-            topofile_smoothed_topo_without_lobe,
-            topofile_raw_topo,
-            topofile_lobe_edge_masked_topo,
-            topofile_raw_topo_without_lobe,
-            result_obj_filename='obj.txt',
-            result_init_filename='init.txt',
-            endtime=100,
+            C_ini,
+            r_ini,
+            h_ini,
+            filename,
+            processors=1,
+            endtime=1000,
     ):
 
-        # read topographic file
-        self.grid, self.smoothed_topo_without_lobe = read_esri_ascii(
-            topofile_smoothed_topo_without_lobe)
-        # raw data whose edge is expressed as -9999
-        self.raw_topo = read_esri_ascii(topofile_raw_topo)[1]
-        # raw data whose edge and lobe is expressed as -9999
-        self.lobe_edge_masked_topo = read_esri_ascii(
-            topofile_lobe_edge_masked_topo)[1]
-
-        # raw data but exception:slope on which lobe is estimated one
-        self.raw_topo_without_lobe = read_esri_ascii(
-            topofile_raw_topo_without_lobe)[1]
-
-        # get location of lobe
-        mask_edge = np.where(self.raw_topo == -9999)[0]
-        mask_edgeetlobe = np.where(self.lobe_edge_masked_topo == -9999)[0]
-        mask_lobe = list(set(mask_edge) ^ set(mask_edgeetlobe))
-        self.mask_lobe = np.array(mask_lobe)
-
-        # Calculate thickness of lobe
-        self.lobe_thick = self.raw_topo[
-            self.mask_lobe] - self.raw_topo_without_lobe[self.mask_lobe]
-
-        # set initial parameters
-        self.topofile = topofile_smoothed_topo_without_lobe
-        self.range_Cf = range_Cf
-        self.range_bfa = range_bfa
-        self.range_thick = range_thick
-        self.init_loc = init_loc
-        self.flow_volume = flow_volume
-        self.processors = proc
-        self.result_obj_filename = result_obj_filename
-        self.result_init_filename = result_init_filename
+        self.C_ini = C_ini
+        self.r_ini = r_ini
+        self.h_ini = h_ini
+        self.filename = filename
+        self.num_runs = len(C_ini)
+        self.processors = processors
         self.endtime = endtime
+        self.num_runs = C_ini.shape[0]
 
-    def produce_dflow(self, Cf, bfa, thick):
-        """ producing a DebrisFlow object.
+    def produce_flow(self, C_ini, r_ini, h_ini):
+        """ producing a TurbidityCurrent2D object.
         """
 
-        # read topography
-        # grid = read_esri_ascii(self.topofile)[0]
-        grid = copy.deepcopy(self.grid)
+        # create a grid
+        grid = create_topography(
+            length=5000,
+            width=2000,
+            spacing=10,
+            slope_outside=0.2,
+            slope_inside=0.05,
+            slope_basin_break=2000,
+            canyon_basin_break=2200,
+            canyon_center=1000,
+            canyon_half_width=100,
+        )
 
-        # First, a grid object is created
-        # grid = copy.deepcopy(self.grid)
-        grid.add_field('node', 'topographic__elevation',
-                       self.smoothed_topo_without_lobe)
-        grid.add_zeros('flow__depth', at='node')
-        grid.add_zeros('flow__horizontal_velocity', at='link')
-        grid.add_zeros('flow__vertical_velocity', at='link')
-
-        # set initial flow region
-        flow_region_width = np.sqrt(self.flow_volume / thick)
-        init_loc = self.init_loc + np.array([grid.node_x[0], grid.node_y[0]])
-        initial_flow_region = (grid.node_x >
-                               (init_loc[0] - flow_region_width / 2)) & (
-                                   grid.node_x <
-                                   (init_loc[0] + flow_region_width / 2)
-                               ) & (grid.node_y >
-                                    (init_loc[1] - flow_region_width / 2)) & (
-                                        grid.node_y <
-                                        (init_loc[1] + flow_region_width / 2))
-        grid.at_node['flow__depth'][initial_flow_region] = thick
-        grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
-
-        # create debris flow
-        dflow = DebrisFlow(
+        create_init_flow_region(
             grid,
-            Cf=Cf,
-            h_init=0.001,
-            alpha=0.01,
-            flow_type='Voellmy',
-            basal_friction_angle=bfa)
+            initial_flow_concentration=C_ini,
+            initial_flow_thickness=h_ini,
+            initial_region_radius=r_ini,
+            initial_region_center=[1000, 4000],
+        )
 
-        return dflow
+        # making turbidity current object
+        tc = TurbidityCurrent2D(grid,
+                                Cf=0.004,
+                                alpha=0.05,
+                                kappa=0.25,
+                                Ds=100 * 10**-6,
+                                h_init=0.00001,
+                                h_w=0.01,
+                                C_init=0.00001,
+                                implicit_num=20,
+                                r0=1.5)
 
-    def get_objective_function(self, dflow):
-        """Calculate objective function
-        """
-
-        computed_lobe = dflow.grid.at_node['flow__depth'][self.mask_lobe]
-        obj = np.sum(self.lobe_thick - computed_lobe)**2
-
-        return obj
+        return tc
 
     def run_flow(self, init_values):
         """ Run a flow to obtain the objective function
         """
 
-        # Produce debris_flow object
-        dflow = self.produce_dflow(init_values[0], init_values[1],
-                                   init_values[2])
+        # Produce flow object
+        tc = self.produce_flow(init_values[1], init_values[2], init_values[3])
 
-        # Run the model
-        dt = 1.0
-        num_of_loops = np.round(self.endtime / dt).astype(np.int64)
-        for i in range(num_of_loops):
-            dflow.run_one_step(dt=dt)
-            u = dflow.grid.at_link['flow__horizontal_velocity']
-            v = dflow.grid.at_link['flow__vertical_velocity']
-            v2 = u**2 + v**2
-            if (np.max(v2) < 0.1):
-                print('flow stopped ({0:.2f}) at {1:.3f}, {2:.3f} and {3:.3f}'.
-                      format(
-                          np.max(v2), init_values[0], init_values[1],
-                          init_values[2]))
-                break
-            elif (np.max(v2) > 1000):
-                print('too rapid ({0:.2f}) at {1:.3f}, {2:.3f} and {3:.3f}'.
-                      format(
-                          np.max(v2), init_values[0], init_values[1],
-                          init_values[2]))
-                break
+        # Run the model until endtime or 99% sediment settled
+        Ch_init = np.sum(tc.Ch)
+        t = 0
+        dt = 100
+        while (((np.sum(tc.Ch) / Ch_init) > 0.01) and (t < self.endtime)):
+            tc.run_one_step(dt=dt)
+            t += dt
+        # save_grid(
+        #     tc.grid,
+        #     'run-{0:.3f}-{1:.3f}-{2:.3f}.grid'.format(
+        #         init_values[0], init_values[1], init_values[2]),
+        #     clobber=True)
 
-        dflow.plot_result('{0:.3f}-{1:.3f}-{2:.3f}.png'.format(
-            init_values[0], init_values[1], init_values[2]))
+        bed_thick = tc.grid.node_vector_to_raster(
+            tc.grid.at_node['bed__thickness'])
 
-        obj = self.get_objective_function(dflow)
+        self.save_data(init_values, bed_thick)
 
-        np.save(
-            'obj-{0:.3f}-{1:.3f}-{2:.3f}.npy'.format(
-                init_values[0], init_values[1], init_values[2]), np.array(obj))
+        print('Run no. {} finished'.format(init_values[0]))
 
-        # with open(self.result_init_filename, 'a') as init_file:
-        #     np.savetxt(init_file, np.array([init_values]))
+        return bed_thick
 
-        # with open(self.result_obj_filename, 'a') as obj_file:
-        #    np.savetxt(obj_file, np.array([obj]))
+    def save_data(self, init_values, bed_thick_i):
+        """Save result to a data file.
+        """
+        run_id = init_values[0]
+        C_ini_i = init_values[1]
+        r_ini_i = init_values[2]
+        h_ini_i = init_values[3]
 
-        return obj
+        dfile = netCDF4.Dataset(self.filename, 'a', share=True)
+        C_ini = dfile.variables['C_ini']
+        r_ini = dfile.variables['r_ini']
+        h_ini = dfile.variables['h_ini']
+        bed_thick = dfile.variables['bed_thick']
+
+        C_ini[run_id] = C_ini_i
+        r_ini[run_id] = r_ini_i
+        h_ini[run_id] = h_ini_i
+        bed_thick[run_id, :, :] = bed_thick_i
+
+        dfile.close()
 
     def run_multiple_flows(self):
         """run multiple flows
         """
 
-        Cf = self.range_Cf
-        bfa = self.range_bfa
-        thick = self.range_thick
+        C_ini = self.C_ini
+        r_ini = self.r_ini
+        h_ini = self.h_ini
 
         # Create list of initial values
         init_value_list = list()
-        for i in range(len(Cf)):
-            for j in range(len(bfa)):
-                for k in range(len(thick)):
-                    init_value_list.append([Cf[i], bfa[j], thick[k]])
+        for i in range(len(C_ini)):
+            init_value_list.append([i, C_ini[i], r_ini[i], h_ini[i]])
 
         # run flows using multiple processors
         pool = mp.Pool(self.processors)
-        obj = pool.map(self.run_flow, init_value_list)
-        # obj = list(map(self.run_flow, init_value_list))
+        bed_thick_list = pool.map(self.run_flow, init_value_list)
+        bed_thick = np.array(bed_thick_list)
 
-        return init_value_list, obj
+        return bed_thick
+
+    def save_datafile(self, filename, num_runs, C_ini_val, r_ini_val,
+                      h_ini_val, bed_thick_val):
+
+        np.save('C.npy', C_ini_val)
+        np.save('r.npy', r_ini_val)
+        np.save('h.npy', h_ini_val)
+        np.save('bed.npy', bed_thick_val)
+
+        # record dataset in a netCDF4 file
+        datafile = netCDF4.Dataset(filename, 'w')
+        datafile.createDimension('run_no', num_runs)
+        datafile.createDimension('grid_x', bed_thick_val.shape[1])
+        datafile.createDimension('grid_y', bed_thick_val.shape[2])
+        datafile.createDimension('basic_setting', 1)
+
+        spacing = datafile.createVariable('spacing',
+                                          np.dtype('float64').char,
+                                          ('basic_setting'))
+        spacing.long_name = 'Grid spacing'
+        spacing.units = 'm'
+        C_ini = datafile.createVariable('C_ini',
+                                        np.dtype('float64').char, ('run_no'))
+        C_ini.long_name = 'Initial Concentration'
+        C_ini.units = 'Volumetric concentration (dimensionless)'
+        r_ini = datafile.createVariable('r_ini',
+                                        np.dtype('float64').char, ('run_no'))
+        r_ini.long_name = 'Initial Radius'
+        r_ini.units = 'm'
+        h_ini = datafile.createVariable('h_ini',
+                                        np.dtype('float64').char, ('run_no'))
+        h_ini.long_name = 'Initial Height'
+        h_ini.units = 'm'
+
+        bed_thick = datafile.createVariable('bed_thick',
+                                            np.dtype('float64').char,
+                                            ('run_no', 'grid_x', 'grid_y'))
+        bed_thick.long_name = 'Bed thickness'
+        bed_thick.units = 'm'
+
+        # write dateset
+        C_ini[:] = C_ini_val
+        r_ini[:] = r_ini_val
+        h_ini[:] = h_ini_val
+        bed_thick[:, :, :] = bed_thick_val
+
+        datafile.close()
+
+    def create_datafile(self):
+
+        num_runs = self.num_runs
+
+        # check grid size
+        tc = self.produce_flow(0.01, 100, 100)
+        grid_x = tc.grid.nodes.shape[0]
+        grid_y = tc.grid.nodes.shape[1]
+        dx = tc.grid.dx
+
+        # record dataset in a netCDF4 file
+        datafile = netCDF4.Dataset(self.filename, 'w')
+        datafile.createDimension('run_no', num_runs)
+        datafile.createDimension('grid_x', grid_x)
+        datafile.createDimension('grid_y', grid_y)
+        datafile.createDimension('basic_setting', 1)
+
+        spacing = datafile.createVariable('spacing',
+                                          np.dtype('float64').char,
+                                          ('basic_setting'))
+        spacing.long_name = 'Grid spacing'
+        spacing.units = 'm'
+        spacing[0] = dx
+
+        C_ini = datafile.createVariable('C_ini',
+                                        np.dtype('float64').char, ('run_no'))
+        C_ini.long_name = 'Initial Concentration'
+        C_ini.units = 'Volumetric concentration (dimensionless)'
+        r_ini = datafile.createVariable('r_ini',
+                                        np.dtype('float64').char, ('run_no'))
+        r_ini.long_name = 'Initial Radius'
+        r_ini.units = 'm'
+        h_ini = datafile.createVariable('h_ini',
+                                        np.dtype('float64').char, ('run_no'))
+        h_ini.long_name = 'Initial Height'
+        h_ini.units = 'm'
+
+        bed_thick = datafile.createVariable('bed_thick',
+                                            np.dtype('float64').char,
+                                            ('run_no', 'grid_x', 'grid_y'))
+        bed_thick.long_name = 'Bed thickness'
+        bed_thick.units = 'm'
+
+        # close dateset
+        datafile.close()
 
 
 if __name__ == "__main__":
+    # ipdb.set_trace()
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['OMP_NUM_THREADS'] = '1'
 
-    proc = 6  # number of processors to be used
-    C = np.linspace(5, 65, 3)
-    Cf = 3.71 / C**2
-    bfa = np.linspace(0.025, 0.50, 2)
-    # thick = np.linspace(2.0, 4.0, 2)
-    thick = [3.0]
+    proc = 10  # number of processors to be used
+    num_runs = 3
+    Cmin, Cmax = [0.001, 0.03]
+    rmin, rmax = [50., 200.]
+    hmin, hmax = [25., 150.]
+
+    C_ini = np.random.uniform(Cmin, Cmax, num_runs)
+    r_ini = np.random.uniform(rmin, rmax, num_runs)
+    h_ini = np.random.uniform(hmin, hmax, num_runs)
 
     rmf = RunMultiFlows(
-        proc,
-        Cf,
-        bfa,
-        thick,
-        [70., 510.],
-        200.,
-        '../mars_topo/gg15withoutlobe1m1g1.asc',
-        '../mars_topo/goodgully15.asc',
-        '../mars_topo/goodgully15holeislobe1.asc',
-        '../mars_topo/gg15withoutlobe1.asc',
-        endtime=2.0,
+        C_ini,
+        r_ini,
+        h_ini,
+        'testrmf.nc',
+        processors=proc,
+        endtime=100.0,
     )
+    rmf.create_datafile()
     start = time.time()
-    init_values, obj = rmf.run_multiple_flows()
+    bed_thick = rmf.run_multiple_flows()
     print("elapsed time: {} sec.".format(time.time() - start))
-
-    obj = np.array(obj)
-    init_values = np.array(init_values)
-    np.save('obj.npy', obj)
-    np.save('init_values.npy', init_values)
+    # rmf.save_datafile('kusc{:02d}.nc'.format(i), num_runs, C_ini, r_ini, h_ini,
+    #                   bed_thick)

@@ -7,6 +7,7 @@ from cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
 from sediment_func import get_es, get_ew, get_ws
 import time
 from osgeo import gdal, gdalconst
+import os
 import ipdb
 """A component of landlab that simulates a turbidity current on 2D grids
 
@@ -731,6 +732,7 @@ class TurbidityCurrent2D(Component):
                                 self.u_node_temp, self.v_node_temp,
                                 self.Ch_link_temp)
 
+                # check convergence of calculation
                 converge = np.sum(
                     ((self.h_temp[self.wet_nodes]
                      - h_prev[self.wet_nodes])
@@ -756,6 +758,7 @@ class TurbidityCurrent2D(Component):
             # set velocities to zero at dry links and nodes
             self.u_temp[self.dry_links] = 0
             self.v_temp[self.dry_links] = 0
+            self.Ch_temp[self.dry_nodes] = 0
 
             # update values
             self.update_values()
@@ -893,33 +896,27 @@ class TurbidityCurrent2D(Component):
             out_Ch = np.zeros(Ch.shape)
         if out_eta is None:
             out_eta = np.zeros(eta.shape)
-        wet_nodes = self.wet_nodes
+        nodes = self.wet_nodes
 
         #Predictor
-        self.calc_G_eta(h,
-                        u_node,
-                        v_node,
-                        Ch,
-                        wet_nodes,
-                        out_geta=self.G_eta_p)
-        self.Ch_p[wet_nodes] = Ch[wet_nodes] + self.dt_local * (
-            -self.G_eta[wet_nodes])
+        self.calc_G_eta(h, u_node, v_node, Ch, nodes, out_geta=self.G_eta_p)
+        self.Ch_p[nodes] = Ch[nodes] + self.dt_local * (-self.G_eta[nodes])
 
         #Corrector
         self.calc_G_eta(h,
                         u_node,
                         v_node,
                         self.Ch_p,
-                        wet_nodes,
+                        nodes,
                         out_geta=self.G_eta_c)
         self.G_eta = 0.5 * (self.G_eta_c + self.G_eta_p)
 
-        out_Ch[wet_nodes] = Ch[wet_nodes] \
+        out_Ch[nodes] = Ch[nodes] \
                                     + self.dt_local * (
-                                        - self.G_eta[wet_nodes])
-        out_eta[wet_nodes] = eta[wet_nodes] \
+                                        - self.G_eta[nodes])
+        out_eta[nodes] = eta[nodes] \
                                   + self.dt_local * (
-                                   self.G_eta[wet_nodes] / (
+                                   self.G_eta[nodes] / (
                                        1 - self.lambda_p))
 
     def copy_values_to_temp(self):
@@ -1676,41 +1673,44 @@ def create_topography_from_geotiff(geotiff_filename,
 if __name__ == '__main__':
 
     # ipdb.set_trace()
-    # grid = create_topography(
-    #     length=8000,
-    #     width=2000,
-    #     spacing=20,
-    #     slope_outside=0.1,
-    #     slope_inside=0.05,
-    #     slope_basin_break=4000,
-    #     canyon_basin_break=4200,
-    #     canyon_center=1000,
-    #     canyon_half_width=100,
-    # )
-    grid = create_topography_from_geotiff('depth500.tif',
-                                          xlim=[200, 800],
-                                          ylim=[400, 1200],
-                                          spacing=500)
+    os.environ['MKL_NUM_THREADS'] = '1'
+    os.environ['OMP_NUM_THREADS'] = '1'
 
-    # create_init_flow_region(
-    #     grid,
-    #     initial_flow_concentration=0.01,
-    #     initial_flow_thickness=200,
-    #     initial_region_radius=200,
-    #     initial_region_center=[1000, 6000],
-    # )
+    grid = create_topography(
+        length=5000,
+        width=2000,
+        spacing=10,
+        slope_outside=0.2,
+        slope_inside=0.05,
+        slope_basin_break=2000,
+        canyon_basin_break=2200,
+        canyon_center=1000,
+        canyon_half_width=100,
+    )
+    # grid = create_topography_from_geotiff('depth500.tif',
+    #                                       xlim=[200, 800],
+    #                                       ylim=[400, 1200],
+    #                                       spacing=500)
+
     create_init_flow_region(
         grid,
         initial_flow_concentration=0.01,
-        initial_flow_thickness=500,
-        initial_region_radius=30000,
-        initial_region_center=[200000, 125000],
+        initial_flow_thickness=50,
+        initial_region_radius=50,
+        initial_region_center=[1000, 4000],
     )
+    # create_init_flow_region(
+    #     grid,
+    #     initial_flow_concentration=0.01,
+    #     initial_flow_thickness=500,
+    #     initial_region_radius=30000,
+    #     initial_region_center=[200000, 125000],
+    # )
 
     # making turbidity current object
     tc = TurbidityCurrent2D(grid,
                             Cf=0.004,
-                            alpha=0.03,
+                            alpha=0.05,
                             kappa=0.25,
                             Ds=100 * 10**-6,
                             h_init=0.00001,
@@ -1722,11 +1722,15 @@ if __name__ == '__main__':
     # start calculation
     t = time.time()
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
+    Ch_init = np.sum(tc.Ch)
     last = 100
 
     for i in range(1, last + 1):
-        tc.run_one_step(dt=300.0)
+        tc.run_one_step(dt=100.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
+        if np.sum(tc.Ch) / Ch_init < 0.01:
+            break
+
     print('elapsed time: {} sec.'.format(time.time() - t))
