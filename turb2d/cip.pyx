@@ -1,14 +1,14 @@
 import numpy as np
 cimport numpy as np
 
-DOUBLE = np.float
+DOUBLE = np.float64
 INT = np.int
 
-ctypedef np.float_t DOUBLE_T
+ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
 
-def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
-                       np.ndarray[DOUBLE_T, ndim=1] dfdx,
+def cip_2d_M_advection(object[DOUBLE_T, ndim=1] f,
+                       object[DOUBLE_T, ndim=1] dfdx,
                        np.ndarray[DOUBLE_T, ndim=1] dfdy,
                        np.ndarray[DOUBLE_T, ndim=1] u,
                        np.ndarray[DOUBLE_T, ndim=1] v,
