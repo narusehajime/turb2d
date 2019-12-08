@@ -1,27 +1,27 @@
 import numpy as np
-cimport numpy as cnp
-ctypedef cnp.float64_t DOUBLE_T
-ctypedef cnp.int_t INT_T
+cimport numpy as np
+ctypedef np.float64_t DOUBLE_T
+ctypedef np.int_t INT_T
 
 
-def cip_2d_M_advection(cnp.ndarray[DOUBLE_T, ndim=1] f,
-                       cnp.ndarray[DOUBLE_T, ndim=1] dfdx,
-                       cnp.ndarray[DOUBLE_T, ndim=1] dfdy,
-                       cnp.ndarray[DOUBLE_T, ndim=1] u,
-                       cnp.ndarray[DOUBLE_T, ndim=1] v,
-                       cnp.ndarray[INT_T, ndim=1] core,
-                       cnp.ndarray[DOUBLE_T, ndim=1]  h_up,
-                       cnp.ndarray[DOUBLE_T, ndim=1] h_down,
-                       cnp.ndarray[DOUBLE_T, ndim=1] v_up,
-                       cnp.ndarray[DOUBLE_T, ndim=1] v_down,
+def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
+                       np.ndarray[DOUBLE_T, ndim=1] dfdx,
+                       np.ndarray[DOUBLE_T, ndim=1] dfdy,
+                       np.ndarray[DOUBLE_T, ndim=1] u,
+                       np.ndarray[DOUBLE_T, ndim=1] v,
+                       np.ndarray[INT_T, ndim=1] core,
+                       np.ndarray[DOUBLE_T, ndim=1]  h_up,
+                       np.ndarray[DOUBLE_T, ndim=1] h_down,
+                       np.ndarray[DOUBLE_T, ndim=1] v_up,
+                       np.ndarray[DOUBLE_T, ndim=1] v_down,
                        double dx,
                        double dt,
-                       cnp.ndarray[DOUBLE_T, ndim=1] out_f=None,
-                       cnp.ndarray[DOUBLE_T, ndim=1] out_dfdx=None,
-                       cnp.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
+                       np.ndarray[DOUBLE_T, ndim=1] out_f=None,
+                       np.ndarray[DOUBLE_T, ndim=1] out_dfdx=None,
+                       np.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
     """Calculate one time step using M-type 2D cip method
     """
-    cdef cnp.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, a, b
+    cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, a, b
 
     # First, the variables out and temp are allocated to
     # store the calculation results
@@ -64,24 +64,24 @@ def cip_2d_M_advection(cnp.ndarray[DOUBLE_T, ndim=1] f,
     return out_f, out_dfdx, out_dfdy
 
 
-def cip_2d_nonadvection(cnp.ndarray[DOUBLE_T, ndim=1] f,
-                        cnp.ndarray[DOUBLE_T, ndim=1] dfdx,
-                        cnp.ndarray[DOUBLE_T, ndim=1] dfdy,
-                        cnp.ndarray[DOUBLE_T, ndim=1] G,
-                        cnp.ndarray[DOUBLE_T, ndim=1] u,
-                        cnp.ndarray[DOUBLE_T, ndim=1] v,
-                        cnp.ndarray[INT_T, ndim=1] core,
-                        cnp.ndarray[DOUBLE_T, ndim=1] h_up,
-                        cnp.ndarray[DOUBLE_T, ndim=1] h_down,
-                        cnp.ndarray[DOUBLE_T, ndim=1] v_up,
-                        cnp.ndarray[DOUBLE_T, ndim=1] v_down,
+def cip_2d_nonadvection(np.ndarray[DOUBLE_T, ndim=1] f,
+                        np.ndarray[DOUBLE_T, ndim=1] dfdx,
+                        np.ndarray[DOUBLE_T, ndim=1] dfdy,
+                        np.ndarray[DOUBLE_T, ndim=1] G,
+                        np.ndarray[DOUBLE_T, ndim=1] u,
+                        np.ndarray[DOUBLE_T, ndim=1] v,
+                        np.ndarray[INT_T, ndim=1] core,
+                        np.ndarray[DOUBLE_T, ndim=1] h_up,
+                        np.ndarray[DOUBLE_T, ndim=1] h_down,
+                        np.ndarray[DOUBLE_T, ndim=1] v_up,
+                        np.ndarray[DOUBLE_T, ndim=1] v_down,
                         double dx,
                         double dt,
-                        cnp.ndarray[DOUBLE_T, ndim=1] out_f=None,
-                        cnp.ndarray[DOUBLE_T, ndim=1] out_dfdx=None,
-                        cnp.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
+                        np.ndarray[DOUBLE_T, ndim=1] out_f=None,
+                        np.ndarray[DOUBLE_T, ndim=1] out_dfdx=None,
+                        np.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
 
-    cdef cnp.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y
+    cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y
 
     if out_f is None:
         out_f = np.zeros(f.shape, dtype=DOUBLE_T)
@@ -110,19 +110,19 @@ def cip_2d_nonadvection(cnp.ndarray[DOUBLE_T, ndim=1] f,
     return out_f, out_dfdx, out_dfdy
 
 
-def cip_2d_diffusion(cnp.ndarray[DOUBLE_T, ndim=1] u,
-                     cnp.ndarray[DOUBLE_T, ndim=1] v,
-                     cnp.ndarray[DOUBLE_T, ndim=1] nu_t,
-                     cnp.ndarray[DOUBLE_T, ndim=1] h_active,
-                     cnp.ndarray[DOUBLE_T, ndim=1] v_active,
-                     cnp.ndarray[INT_T, ndim=1] north,
-                     cnp.ndarray[INT_T, ndim=1] south,
-                     cnp.ndarray[INT_T, ndim=1] east,
-                     cnp.ndarray[INT_T, ndim=1] west,
+def cip_2d_diffusion(np.ndarray[DOUBLE_T, ndim=1] u,
+                     np.ndarray[DOUBLE_T, ndim=1] v,
+                     np.ndarray[DOUBLE_T, ndim=1] nu_t,
+                     np.ndarray[DOUBLE_T, ndim=1] h_active,
+                     np.ndarray[DOUBLE_T, ndim=1] v_active,
+                     np.ndarray[INT_T, ndim=1] north,
+                     np.ndarray[INT_T, ndim=1] south,
+                     np.ndarray[INT_T, ndim=1] east,
+                     np.ndarray[INT_T, ndim=1] west,
                      double dx,
                      double dt,
-                     cnp.ndarray[DOUBLE_T, ndim=1] out_u=None,
-                     cnp.ndarray[DOUBLE_T, ndim=1] out_v=None):
+                     np.ndarray[DOUBLE_T, ndim=1] out_u=None,
+                     np.ndarray[DOUBLE_T, ndim=1] out_v=None):
     """Caclulate horizontal and vertical diffusion of velocities u and v
     """
     if out_u is None:
@@ -145,16 +145,16 @@ def cip_2d_diffusion(cnp.ndarray[DOUBLE_T, ndim=1] u,
     return out_u, out_v
 
 
-def rcip_1d_advection(cnp.ndarray[DOUBLE_T, ndim=1] f,
-                      cnp.ndarray[DOUBLE_T, ndim=1] dfdx,
-                      cnp.ndarray[DOUBLE_T, ndim=1] u,
-                      cnp.ndarray[INT_T, ndim=1] core,
-                      cnp.ndarray[INT_T, ndim=1] up,
-                      cnp.ndarray[INT_T, ndim=1] down,
+def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
+                      np.ndarray[DOUBLE_T, ndim=1] dfdx,
+                      np.ndarray[DOUBLE_T, ndim=1] u,
+                      np.ndarray[INT_T, ndim=1] core,
+                      np.ndarray[INT_T, ndim=1] up,
+                      np.ndarray[INT_T, ndim=1] down,
                       double dx,
                       double dt,
-                      cnp.ndarray[DOUBLE_T, ndim=1] out_f=None,
-                      cnp.ndarray[DOUBLE_T, ndim=1] out_dfdx=None):
+                      np.ndarray[DOUBLE_T, ndim=1] out_f=None,
+                      np.ndarray[DOUBLE_T, ndim=1] out_dfdx=None):
     """ calculate 1 step of advection phase by rational function
         CIP method.
 
@@ -234,28 +234,28 @@ def rcip_1d_advection(cnp.ndarray[DOUBLE_T, ndim=1] f,
     return out_f, out_dfdx
 
 
-def rcip_2d_M_advection(cnp.ndarray[DOUBLE_T, ndim=1] f,
-                        cnp.ndarray[DOUBLE_T, ndim=1] dfdx,
-                        cnp.ndarray[DOUBLE_T, ndim=1] dfdy,
-                        cnp.ndarray[DOUBLE_T, ndim=1] u,
-                        cnp.ndarray[DOUBLE_T, ndim=1] v,
-                        cnp.ndarray[INT_T, ndim=1] core,
-                        cnp.ndarray[INT_T, ndim=1] h_up,
-                        cnp.ndarray[INT_T, ndim=1] h_down,
-                        cnp.ndarray[INT_T, ndim=1] v_up,
-                        cnp.ndarray[INT_T, ndim=1] v_down,
+def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
+                        np.ndarray[DOUBLE_T, ndim=1] dfdx,
+                        np.ndarray[DOUBLE_T, ndim=1] dfdy,
+                        np.ndarray[DOUBLE_T, ndim=1] u,
+                        np.ndarray[DOUBLE_T, ndim=1] v,
+                        np.ndarray[INT_T, ndim=1] core,
+                        np.ndarray[INT_T, ndim=1] h_up,
+                        np.ndarray[INT_T, ndim=1] h_down,
+                        np.ndarray[INT_T, ndim=1] v_up,
+                        np.ndarray[INT_T, ndim=1] v_down,
                         double dx,
                         double dt,
-                        cnp.ndarray[DOUBLE_T, ndim=1] out_f=None,
-                        cnp.ndarray[DOUBLE_T, ndim=1] out_dfdx=None,
-                        cnp.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
+                        np.ndarray[DOUBLE_T, ndim=1] out_f=None,
+                        np.ndarray[DOUBLE_T, ndim=1] out_dfdx=None,
+                        np.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
     """Calculate one time step using M-type 2D cip method
     """
 
     # First, the variables out and temp are allocated to
     # store the calculation results
-    cdef cnp.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, alpha, BB_x, BB_y
-    cdef cnp.ndarray[INT_T, ndim= 1] S_x, dz_index
+    cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, alpha, BB_x, BB_y
+    cdef np.ndarray[INT_T, ndim= 1] S_x, dz_index
 
     if out_f is None:
         out_f = np.empty(f.shape)
