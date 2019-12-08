@@ -1,11 +1,11 @@
 import numpy as np
 cimport numpy as np
-DOUBLE_T = np.float64
-INT_T = np.int
+
+DOUBLE = np.float64
+INT = np.int
 
 ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
-
 
 def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                        np.ndarray[DOUBLE_T, ndim=1] dfdx,
@@ -29,12 +29,12 @@ def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # First, the variables out and temp are allocated to
     # store the calculation results
 
-#    if out_f is None:
-#        out_f = np.empty(f.shape, dtype=DOUBLE_T)
-#    if out_dfdx is None:
-#        out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE_T)
-#    if out_dfdy is None:
-#        out_dfdy = np.empty(dfdy.shape, dtype=DOUBLE_T)
+   if out_f is None:
+       out_f = np.empty(f.shape, dtype=DOUBLE)
+   if out_dfdx is None:
+       out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
+   if out_dfdy is None:
+       out_dfdy = np.empty(dfdy.shape, dtype=DOUBLE)
 
     # 1st step for horizontal advection
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
@@ -86,12 +86,12 @@ def cip_2d_nonadvection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y
 
-#     if out_f is None:
-#         out_f = np.zeros(f.shape, dtype=DOUBLE_T)
-#     if out_dfdx is None:
-#         out_dfdx = np.zeros(dfdx.shape, dtype=DOUBLE_T)
-#     if out_dfdy is None:
-#         out_dfdy = np.zeros(dfdy.shape, dtype=DOUBLE_T)
+    if out_f is None:
+        out_f = np.zeros(f.shape, dtype=DOUBLE)
+    if out_dfdx is None:
+        out_dfdx = np.zeros(dfdx.shape, dtype=DOUBLE)
+    if out_dfdy is None:
+        out_dfdy = np.zeros(dfdy.shape, dtype=DOUBLE)
 
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
     xi_x = -u * dt
@@ -211,8 +211,8 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # advection phase
     D = -np.where(u > 0., 1.0, -1.0) * dx
     xi = -u * dt
-    BB = np.ones(D[core].shape)
-    alpha = np.zeros(D[core].shape)
+    BB = np.ones(D[core].shape, dtype=DOUBLE)
+    alpha = np.zeros(D[core].shape, dtype=DOUBLE)
     S = (f[up] - f[core]) / D[core]
     dz_index = (dfdx[up] - S) == 0.0
     BB[dz_index] = -1.0 / D[core][dz_index]
@@ -260,18 +260,18 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, alpha, BB_x, BB_y
     cdef np.ndarray[INT_T, ndim= 1] S_x, dz_index
 
-#     if out_f is None:
-#         out_f = np.empty(f.shape)
-#     if out_dfdx is None:
-#         out_dfdx = np.empty(dfdx.shape)
-#     if out_dfdy is None:
-#         out_dfdy = np.empty(dfdy.shape)
+    if out_f is None:
+        out_f = np.empty(f.shape, dtype=DOUBLE)
+    if out_dfdx is None:
+        out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
+    if out_dfdy is None:
+        out_dfdy = np.empty(dfdy.shape, dtype=DOUBLE)
 
     # 1st step for horizontal advection
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
     xi_x = -u * dt
-    BB_x = np.ones(D_x[core].shape, dtype=DOUBLE_T)
-    alpha = np.zeros(D_x[core].shape, dtype=DOUBLE_T)
+    BB_x = np.ones(D_x[core].shape, dtype=DOUBLE)
+    alpha = np.zeros(D_x[core].shape, dtype=DOUBLE)
     S_x = (f[h_up] - f[core]) / D_x[core]
     dz_index = (dfdx[h_up] - S_x) == 0.0
     BB_x[dz_index] = -1.0 / D_x[core][dz_index]
@@ -299,8 +299,8 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # 2nd step for vertical advection
     D_y = -np.where(v > 0., 1.0, -1.0) * dx
     xi_y = -v * dt
-    BB_y = np.ones(D_y[core].shape, dtype=DOUBLE_T)
-    alpha = np.zeros(D_y[core].shape, dtype=DOUBLE_T)
+    BB_y = np.ones(D_y[core].shape, dtype=DOUBLE)
+    alpha = np.zeros(D_y[core].shape, dtype=DOUBLE)
     S_y = (out_f[v_up] - out_f[core]) / D_y[core]
     dz_index = (out_dfdy[v_up] - S_y) == 0.0
     BB_y[dz_index] = -1.0 / D_y[core][dz_index]
