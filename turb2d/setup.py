@@ -1,7 +1,4 @@
 from distutils.core import setup
-from distutils.extension import Extension
-from Cython.Distutils import build_ext
+from Cython.Build import cythonize
 
-ext_modules = [Extension("cip", ["cip.pyx"])]
-
-setup(name='cip', cmdclass={'cip': build_ext}, ext_modules=ext_modules)
+setup(ext_modules=cythonize("cip.pyx"))
