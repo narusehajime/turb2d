@@ -3,9 +3,11 @@ cimport numpy as np
 
 DOUBLE = np.float64
 INT = np.int
+BOOL = np.bool
 
 ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
+ctypedef np.bool_t BOOL_T
 
 def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                        np.ndarray[DOUBLE_T, ndim=1] dfdx,
@@ -207,6 +209,8 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     """
     cdef int n = f.shape[0]
+    cdef ndarray[DOUBLE_T, ndim=1] D, xi, BB, alpha, S
+    cdef ndarray[BOOL_T, ndim=1] dz_index
 
     if out_f is None:
         out_f = np.zeros(n, dtype=DOUBLE)
@@ -264,7 +268,7 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # store the calculation results
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y,
     cdef np.ndarray[DOUBLE_T, ndim=1] alpha, BB_x, BB_y, S_x, S_y
-    cdef np.ndarray[INT_T, ndim= 1] dz_index
+    cdef np.ndarray[BOOL_T, ndim= 1] dz_index
     cdef int n = f.shape[0]
     cdef int m = core.shape[0]
 
