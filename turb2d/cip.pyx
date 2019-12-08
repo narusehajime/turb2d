@@ -1,5 +1,4 @@
-import numpy as np
-cimport numpy as cnp
+cimport numpy as np
 ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
 
