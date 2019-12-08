@@ -209,8 +209,8 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     """
     cdef int n = f.shape[0]
-    cdef ndarray[DOUBLE_T, ndim=1] D, xi, BB, alpha, S
-    cdef ndarray[BOOL_T, ndim=1] dz_index
+    cdef np.ndarray[DOUBLE_T, ndim=1] D, xi, BB, alpha, S
+    cdef np.ndarray[BOOL_T, ndim=1] dz_index
 
     if out_f is None:
         out_f = np.zeros(n, dtype=DOUBLE)
