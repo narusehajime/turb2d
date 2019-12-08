@@ -97,8 +97,6 @@ class RunMultiFlows():
 
         print('Run no. {} finished'.format(init_values[0]))
 
-        return bed_thick
-
     def save_data(self, init_values, bed_thick_i):
         """Save result to a data file.
         """

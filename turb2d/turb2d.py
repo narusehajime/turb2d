@@ -3,12 +3,12 @@ from landlab import Component, FieldError, RasterModelGrid
 from landlab.utils.decorators import use_file_name_or_kwds
 from landlab.grid.structured_quad import links
 from landlab.io.native_landlab import save_grid
-from cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_diffusion
-from sediment_func import get_es, get_ew, get_ws
+from turb2d.cip import rcip_2d_M_advection, cip_2d_nonadvection
+from turb2d.cip import cip_2d_diffusion
+from turb2d.sediment_func import get_es, get_ew, get_ws
 import time
 from osgeo import gdal, gdalconst
 import os
-import ipdb
 """A component of landlab that simulates a turbidity current on 2D grids
 
 This component simulates turbidity currents using the 2-D numerical model of
@@ -1671,7 +1671,7 @@ def create_topography_from_geotiff(geotiff_filename,
 
 
 if __name__ == '__main__':
-
+    # import ipdb
     # ipdb.set_trace()
     os.environ['MKL_NUM_THREADS'] = '1'
     os.environ['OMP_NUM_THREADS'] = '1'
