@@ -265,7 +265,7 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, alpha, BB_x, BB_y
     cdef np.ndarray[INT_T, ndim= 1] S_x, dz_index
     cdef int n = f.shape[0]
-    cdef int m = D_x[core].shape[0]
+    cdef int m = core.shape[0]
 
     if out_f is None:
         out_f = np.empty(n, dtype=DOUBLE)
