@@ -373,12 +373,13 @@ def shock_dissipation(
     """
     cdef np.ndarray[DOUBLE_T, ndim=1] eps_i, eps_i_half
     cdef np.ndarray[INT_T, ndim=1] north, south, east, west
+    cdef int n = f.shape[0]
 
     if out is None:
-        out = np.zeros(f.shape)
+        out = np.zeros(n)
 	
-    eps_i = np.zeros(h.shape)
-    eps_i_half = np.zeros(h.shape)
+    eps_i = np.zeros(n, dtype=DOUBLE)
+    eps_i_half = np.zeros(n, dtype=DOUBLE)
     north = north_id[core]
     south = south_id[core]
     east = east_id[core]
