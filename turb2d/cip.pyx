@@ -7,8 +7,8 @@ INT = np.int
 ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
 
-def cip_2d_M_advection(object[DOUBLE_T, ndim=1] f,
-                       object[DOUBLE_T, ndim=1] dfdx,
+def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
+                       np.ndarray[DOUBLE_T, ndim=1] dfdx,
                        np.ndarray[DOUBLE_T, ndim=1] dfdy,
                        np.ndarray[DOUBLE_T, ndim=1] u,
                        np.ndarray[DOUBLE_T, ndim=1] v,
@@ -30,7 +30,7 @@ def cip_2d_M_advection(object[DOUBLE_T, ndim=1] f,
     # store the calculation results
 
     if out_f is None:
-        out_f = np.empty(f.shape, dtype=DOUBLE)
+        out_f = np.empty(100, dtype=DOUBLE)
     if out_dfdx is None:
         out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
     if out_dfdy is None:
