@@ -1,10 +1,10 @@
 import numpy as np
 cimport numpy as np
 
-DOUBLE = np.float64
+DOUBLE = np.float
 INT = np.int
 
-ctypedef np.float64_t DOUBLE_T
+ctypedef np.float_t DOUBLE_T
 ctypedef np.int_t INT_T
 
 def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
@@ -13,10 +13,10 @@ def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                        np.ndarray[DOUBLE_T, ndim=1] u,
                        np.ndarray[DOUBLE_T, ndim=1] v,
                        np.ndarray[INT_T, ndim=1] core,
-                       np.ndarray[DOUBLE_T, ndim=1]  h_up,
-                       np.ndarray[DOUBLE_T, ndim=1] h_down,
-                       np.ndarray[DOUBLE_T, ndim=1] v_up,
-                       np.ndarray[DOUBLE_T, ndim=1] v_down,
+                       np.ndarray[INT_T, ndim=1]  h_up,
+                       np.ndarray[INT_T, ndim=1] h_down,
+                       np.ndarray[INT_T, ndim=1] v_up,
+                       np.ndarray[INT_T, ndim=1] v_down,
                        double dx,
                        double dt,
                        np.ndarray[DOUBLE_T, ndim=1] out_f=None,
@@ -129,9 +129,9 @@ def cip_2d_diffusion(np.ndarray[DOUBLE_T, ndim=1] u,
     """Caclulate horizontal and vertical diffusion of velocities u and v
     """
     if out_u is None:
-        out_u = np.zeros(u.shape, dtype=DOUBLE_T)
+        out_u = np.zeros(u.shape, dtype=DOUBLE)
     if out_v is None:
-        out_v = np.zeros(v.shape, dtype=DOUBLE_T)
+        out_v = np.zeros(v.shape, dtype=DOUBLE)
 
     out_u[h_active] = u[h_active] \
         + nu_t[h_active] * dt * (
@@ -204,9 +204,9 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     """
 
     if out_f is None:
-        out_f = np.zeros(f.shape)
+        out_f = np.zeros(f.shape, dtype=DOUBLE)
     if out_dfdx is None:
-        out_dfdx = np.zeros(f.shape)
+        out_dfdx = np.zeros(f.shape, dtype=DOUBLE)
 
     # advection phase
     D = -np.where(u > 0., 1.0, -1.0) * dx
