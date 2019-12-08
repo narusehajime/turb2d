@@ -1,4 +1,9 @@
+import numpy as np
 from distutils.core import setup
-from Cython.Build import cythonize
+from distutils.extension import Extension
+from Cython.Distutils import build_ext
 
-setup(ext_modules=cythonize("cip.pyx"))
+setup(cmdclass={'build_ext': build_ext},
+      ext_modules=[
+          Extension("cip", ["cip.pyx"], include_dirs=[np.get_include()])
+      ])
