@@ -1,5 +1,8 @@
 import numpy as np
 cimport numpy as np
+DOUBLE_T = np.float64
+INT_T = np.int
+
 ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
 
