@@ -80,7 +80,7 @@ class RunMultiFlows():
         # Run the model until endtime or 99% sediment settled
         Ch_init = np.sum(tc.Ch)
         t = 0
-        dt = 100
+        dt = 20
         while (((np.sum(tc.Ch) / Ch_init) > 0.01) and (t < self.endtime)):
             tc.run_one_step(dt=dt)
             t += dt
@@ -135,57 +135,9 @@ class RunMultiFlows():
 
         # run flows using multiple processors
         pool = mp.Pool(self.processors)
-        bed_thick_list = pool.map(self.run_flow, init_value_list)
-        bed_thick = np.array(bed_thick_list)
-
-        return bed_thick
-
-    def save_datafile(self, filename, num_runs, C_ini_val, r_ini_val,
-                      h_ini_val, bed_thick_val):
-
-        np.save('C.npy', C_ini_val)
-        np.save('r.npy', r_ini_val)
-        np.save('h.npy', h_ini_val)
-        np.save('bed.npy', bed_thick_val)
-
-        # record dataset in a netCDF4 file
-        datafile = netCDF4.Dataset(filename, 'w')
-        datafile.createDimension('run_no', num_runs)
-        datafile.createDimension('grid_x', bed_thick_val.shape[1])
-        datafile.createDimension('grid_y', bed_thick_val.shape[2])
-        datafile.createDimension('basic_setting', 1)
-
-        spacing = datafile.createVariable('spacing',
-                                          np.dtype('float64').char,
-                                          ('basic_setting'))
-        spacing.long_name = 'Grid spacing'
-        spacing.units = 'm'
-        C_ini = datafile.createVariable('C_ini',
-                                        np.dtype('float64').char, ('run_no'))
-        C_ini.long_name = 'Initial Concentration'
-        C_ini.units = 'Volumetric concentration (dimensionless)'
-        r_ini = datafile.createVariable('r_ini',
-                                        np.dtype('float64').char, ('run_no'))
-        r_ini.long_name = 'Initial Radius'
-        r_ini.units = 'm'
-        h_ini = datafile.createVariable('h_ini',
-                                        np.dtype('float64').char, ('run_no'))
-        h_ini.long_name = 'Initial Height'
-        h_ini.units = 'm'
-
-        bed_thick = datafile.createVariable('bed_thick',
-                                            np.dtype('float64').char,
-                                            ('run_no', 'grid_x', 'grid_y'))
-        bed_thick.long_name = 'Bed thickness'
-        bed_thick.units = 'm'
-
-        # write dateset
-        C_ini[:] = C_ini_val
-        r_ini[:] = r_ini_val
-        h_ini[:] = h_ini_val
-        bed_thick[:, :, :] = bed_thick_val
-
-        datafile.close()
+        pool.map(self.run_flow, init_value_list)
+        pool.join()
+        pool.close()
 
     def create_datafile(self):
 
@@ -240,7 +192,7 @@ if __name__ == "__main__":
     os.environ['OMP_NUM_THREADS'] = '1'
 
     proc = 10  # number of processors to be used
-    num_runs = 3
+    num_runs = 300
     Cmin, Cmax = [0.001, 0.03]
     rmin, rmax = [50., 200.]
     hmin, hmax = [25., 150.]
@@ -253,13 +205,11 @@ if __name__ == "__main__":
         C_ini,
         r_ini,
         h_ini,
-        'testrmf.nc',
+        'super191208_01.nc',
         processors=proc,
-        endtime=100.0,
+        endtime=4000.0,
     )
     rmf.create_datafile()
     start = time.time()
-    bed_thick = rmf.run_multiple_flows()
+    rmf.run_multiple_flows()
     print("elapsed time: {} sec.".format(time.time() - start))
-    # rmf.save_datafile('kusc{:02d}.nc'.format(i), num_runs, C_ini, r_ini, h_ini,
-    #                   bed_thick)
