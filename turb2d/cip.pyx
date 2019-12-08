@@ -7,7 +7,7 @@ BOOL = np.bool
 
 ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
-ctypedef np.bool_t BOOL_T
+ctypedef np.npy_bool BOOL_T
 
 def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                        np.ndarray[DOUBLE_T, ndim=1] dfdx,
