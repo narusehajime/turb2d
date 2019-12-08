@@ -262,8 +262,9 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     # First, the variables out and temp are allocated to
     # store the calculation results
-    cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, alpha, BB_x, BB_y
-    cdef np.ndarray[INT_T, ndim= 1] S_x, dz_index
+    cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y,
+    cdef np.ndarray[DOUBLE_T, ndim=1] alpha, BB_x, BB_y, S_x, S_y
+    cdef np.ndarray[INT_T, ndim= 1] dz_index
     cdef int n = f.shape[0]
     cdef int m = core.shape[0]
 
