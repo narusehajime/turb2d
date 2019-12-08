@@ -21,6 +21,6 @@ setup(name='turb2d',
       author_email='naruse@kueps.kyoto-u.ac.jp',
       url='https://github.com/narusehajime/turb2d.git',
       license=license,
-      install_requires=['numpy', 'landlab', 'matplotlib', 'gdal'],
+      install_requires=['numpy', 'landlab', 'matplotlib', 'gdal', 'cython'],
       ext_modules=cythonize([ext]),
       packages=find_packages(exclude=('tests', 'docs')))

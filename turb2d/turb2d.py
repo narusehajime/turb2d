@@ -659,7 +659,6 @@ class TurbidityCurrent2D(Component):
             self.update_up_down_links_and_nodes()
 
             # calculate non-advection terms using implicit method
-            # self.copy_values_to_temp()
             h_prev = self.h_temp.copy()
             Ch_prev = self.Ch_temp.copy()
             converge = 10.0
