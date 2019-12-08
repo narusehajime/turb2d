@@ -556,6 +556,7 @@ class TurbidityCurrent2D(Component):
         self.Ch = self.C * self.h
 
         # map node values to links, and link values to nodes.
+        self.find_wet_grids(self.h)
         self.map_values(self.h, self.u, self.v, self.C, self.eta, self.h_link,
                         self.u_node, self.v_node, self.Ch_link)
         self.copy_values_to_temp()
@@ -651,10 +652,8 @@ class TurbidityCurrent2D(Component):
             # map node values to links, and link values to nodes.
             # self.h_temp[:] = self.h[:]
             # self.Ch_temp[:] = self.Ch[:]
-            self.map_values(self.h_temp, self.u_temp, self.v_temp,
-                            self.Ch_temp, self.eta_temp, self.h_link_temp,
-                            self.u_node_temp, self.v_node_temp,
-                            self.Ch_link_temp)
+            self.map_links_to_nodes(self.u_temp, self.v_temp, self.u_node_temp,
+                                    self.v_node_temp)
             self.update_values()
             self.update_up_down_links_and_nodes()
 
@@ -708,10 +707,12 @@ class TurbidityCurrent2D(Component):
                     out_dfdx=self.dvdx_temp,
                     out_dfdy=self.dvdy_temp)
 
-                self.map_values(self.h_temp, self.u_temp, self.v_temp,
-                                self.Ch_temp, self.eta_temp, self.h_link_temp,
-                                self.u_node_temp, self.v_node_temp,
-                                self.Ch_link_temp)
+                self.map_links_to_nodes(
+                    self.u_temp,
+                    self.v_temp,
+                    self.u_node_temp,
+                    self.v_node_temp,
+                )
 
                 # Calculate non-advection terms of h and Ch
                 self.calc_G_h(self.h_temp, self.h_link_temp, self.u_temp,
@@ -726,10 +727,9 @@ class TurbidityCurrent2D(Component):
                     self.dt_local * self.G_Ch[self.wet_nodes])
 
                 # update values
-                self.map_values(self.h_temp, self.u_temp, self.v_temp,
-                                self.Ch_temp, self.eta_temp, self.h_link_temp,
-                                self.u_node_temp, self.v_node_temp,
-                                self.Ch_link_temp)
+                self.map_nodes_to_links(self.h_temp, self.Ch_temp,
+                                        self.eta_temp, self.h_link_temp,
+                                        self.Ch_link_temp)
 
                 # check convergence of calculation
                 converge = np.sum(
@@ -753,11 +753,6 @@ class TurbidityCurrent2D(Component):
 
             # Find wet and partial wet grids
             self.find_wet_grids(self.h_temp)
-
-            # set velocities to zero at dry links and nodes
-            self.u_temp[self.dry_links] = 0
-            self.v_temp[self.dry_links] = 0
-            self.Ch_temp[self.dry_nodes] = 0
 
             # update values
             self.update_values()
@@ -1434,12 +1429,13 @@ class TurbidityCurrent2D(Component):
     def map_values(self, h, u, v, Ch, eta, h_link, u_node, v_node, Ch_link):
         """map parameters at nodes to links, and those at links to nodes
         """
+        self.map_links_to_nodes(u, v, u_node, v_node)
+        self.map_nodes_to_links(h, Ch, eta, h_link, Ch_link)
 
+    def map_links_to_nodes(self, u, v, u_node, v_node):
+        """map parameters at links to nodes
+        """
         grid = self.grid
-
-        # remove illeagal values
-        h[h < self.h_init] = self.h_init
-        Ch[Ch < self.C_init * self.h_init] = self.C_init * self.h_init
 
         # Map values of horizontal links to vertical links, and
         # values of vertical links to horizontal links.
@@ -1458,6 +1454,21 @@ class TurbidityCurrent2D(Component):
         # map link values (u, v) to nodes
         grid.map_mean_of_links_to_node(u, out=u_node)
         grid.map_mean_of_links_to_node(v, out=v_node)
+
+        # set velocity zero at dry links and nodes
+        u[self.dry_links] = 0
+        v[self.dry_links] = 0
+        u_node[self.dry_nodes] = 0
+        v_node[self.dry_nodes] = 0
+
+    def map_nodes_to_links(self, h, Ch, eta, h_link, Ch_link):
+        """map parameters at nodes to links
+        """
+        grid = self.grid
+
+        # remove illeagal values
+        h[h < self.h_init] = self.h_init
+        Ch[Ch < self.C_init * self.h_init] = self.C_init * self.h_init
 
         # map node values (h, C, eta) to links
         grid.map_mean_of_link_nodes_to_link(h, out=h_link)
