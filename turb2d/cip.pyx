@@ -339,3 +339,62 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
         D_y[core] * (out_dfdx[core] - out_dfdx[v_up])
 
     return out_f, out_dfdx, out_dfdy
+
+def shock_dissipation(
+            np.ndarray[DOUBLE_T, ndim=1] f,
+            np.ndarray[DOUBLE_T, ndim=1] h,
+            np.ndarray[INT_T, ndim=1] core,
+            np.ndarray[INT_T, ndim=1] north_id,
+            np.ndarray[INT_T, ndim=1] south_id,
+            np.ndarray[INT_T, ndim=1] east_id,
+            np.ndarray[INT_T, ndim=1] west_id,
+            double dt,
+	    double kappa,
+            np.ndarray[DOUBLE_T, ndim=1] out=None,
+    ):
+    """ adding artificial viscosity for numerical stability
+
+        Parameters
+        ------------------
+        f : ndarray, float
+            parameter for which the artificial viscosity is applied
+        h : ndarray, float
+            flow height
+        core : ndarray, int
+            indeces of core nodes or links
+        north_id : ndarray, int
+            indeces of nodes or links that locate north of core
+        south_id : ndarray, int
+            indeces of nodes or links that locate south of core
+        east_id : ndarray, int
+            indeces of nodes or links that locate east of core
+        west_id : ndarray, int
+            indeces of nodes or links that locate west of core
+    """
+    cdef np.ndarray[DOUBLE_T, ndim=1] eps_i, eps_i_half
+    cdef np.ndarray[INT_T, ndim=1] north, south, east, west
+
+    if out is None:
+        out = np.zeros(f.shape)
+	
+    eps_i = np.zeros(h.shape)
+    eps_i_half = np.zeros(h.shape)
+    north = north_id[core]
+    south = south_id[core]
+    east = east_id[core]
+    west = west_id[core]
+
+    # First, artificial diffusion is applied to east-west direction
+    eps_i[core] = kappa * np.abs(h[east] - 2 * h[core] + h[west]) / \
+        (h[east] + 2 * h[core] + h[west])
+    eps_i_half[core] = np.max([eps_i[east], eps_i[core]], axis=0)
+    out[core] = f[core] + eps_i_half[core] * (f[east] - f[core]) - \
+        eps_i_half[west] * (f[core] - f[west])
+
+    # Next, artificial diffusion is applied to north-south direction
+    eps_i[core] = kappa * np.abs(h[north] - 2 * h[core] + h[south]) / (
+        h[north] + 2 * h[core] + h[south])
+    eps_i_half[core] = np.max([eps_i[north], eps_i[core]], axis=0)
+    out[core] = out[core] + (eps_i_half[core] *
+                             (out[north] - out[core]) - eps_i_half[south] *
+                             (out[core] - out[south]))
