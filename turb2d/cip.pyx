@@ -29,11 +29,11 @@ def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # First, the variables out and temp are allocated to
     # store the calculation results
 
-   if out_f is None:
-       out_f = np.empty(f.shape, dtype=DOUBLE)
-   if out_dfdx is None:
-       out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
-   if out_dfdy is None:
+    if out_f is None:
+        out_f = np.empty(f.shape, dtype=DOUBLE)
+    if out_dfdx is None:
+        out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
+    if out_dfdy is None:
        out_dfdy = np.empty(dfdy.shape, dtype=DOUBLE)
 
     # 1st step for horizontal advection
@@ -128,10 +128,10 @@ def cip_2d_diffusion(np.ndarray[DOUBLE_T, ndim=1] u,
                      np.ndarray[DOUBLE_T, ndim=1] out_v=None):
     """Caclulate horizontal and vertical diffusion of velocities u and v
     """
-#     if out_u is None:
-#         out_u = np.zeros(u.shape, dtype=DOUBLE_T)
-#     if out_v is None:
-#         out_v = np.zeros(v.shape, dtype=DOUBLE_T)
+    if out_u is None:
+        out_u = np.zeros(u.shape, dtype=DOUBLE_T)
+    if out_v is None:
+        out_v = np.zeros(v.shape, dtype=DOUBLE_T)
 
     out_u[h_active] = u[h_active] \
         + nu_t[h_active] * dt * (
@@ -203,10 +203,10 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     """
 
-#     if out_f is None:
-#         out_f = np.zeros(f.shape)
-#     if out_dfdx is None:
-#         out_dfdx = np.zeros(f.shape)
+    if out_f is None:
+        out_f = np.zeros(f.shape)
+    if out_dfdx is None:
+        out_dfdx = np.zeros(f.shape)
 
     # advection phase
     D = -np.where(u > 0., 1.0, -1.0) * dx
