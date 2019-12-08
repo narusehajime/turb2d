@@ -25,16 +25,17 @@ def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     """Calculate one time step using M-type 2D cip method
     """
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, a, b
+    cdef int n = f.shape[0]
 
     # First, the variables out and temp are allocated to
     # store the calculation results
 
     if out_f is None:
-        out_f = np.empty(100, dtype=DOUBLE)
+        out_f = np.empty(n, dtype=DOUBLE)
     if out_dfdx is None:
-        out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
+        out_dfdx = np.empty(n, dtype=DOUBLE)
     if out_dfdy is None:
-       out_dfdy = np.empty(dfdy.shape, dtype=DOUBLE)
+       out_dfdy = np.empty(n, dtype=DOUBLE)
 
     # 1st step for horizontal advection
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
@@ -85,13 +86,14 @@ def cip_2d_nonadvection(np.ndarray[DOUBLE_T, ndim=1] f,
                         np.ndarray[DOUBLE_T, ndim=1] out_dfdy=None):
 
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y
+    cdef int n = f.shape[0]
 
     if out_f is None:
-        out_f = np.zeros(f.shape, dtype=DOUBLE)
+        out_f = np.zeros(n, dtype=DOUBLE)
     if out_dfdx is None:
-        out_dfdx = np.zeros(dfdx.shape, dtype=DOUBLE)
+        out_dfdx = np.zeros(n, dtype=DOUBLE)
     if out_dfdy is None:
-        out_dfdy = np.zeros(dfdy.shape, dtype=DOUBLE)
+        out_dfdy = np.zeros(n, dtype=DOUBLE)
 
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
     xi_x = -u * dt
@@ -128,10 +130,12 @@ def cip_2d_diffusion(np.ndarray[DOUBLE_T, ndim=1] u,
                      np.ndarray[DOUBLE_T, ndim=1] out_v=None):
     """Caclulate horizontal and vertical diffusion of velocities u and v
     """
+    cdef int n = u.shape[0]
+
     if out_u is None:
-        out_u = np.zeros(u.shape, dtype=DOUBLE)
+        out_u = np.zeros(n, dtype=DOUBLE)
     if out_v is None:
-        out_v = np.zeros(v.shape, dtype=DOUBLE)
+        out_v = np.zeros(n, dtype=DOUBLE)
 
     out_u[h_active] = u[h_active] \
         + nu_t[h_active] * dt * (
@@ -202,17 +206,18 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
             output value of dfdx
 
     """
+    cdef int n = f.shape[0]
 
     if out_f is None:
-        out_f = np.zeros(f.shape, dtype=DOUBLE)
+        out_f = np.zeros(n, dtype=DOUBLE)
     if out_dfdx is None:
-        out_dfdx = np.zeros(f.shape, dtype=DOUBLE)
+        out_dfdx = np.zeros(n, dtype=DOUBLE)
 
     # advection phase
     D = -np.where(u > 0., 1.0, -1.0) * dx
     xi = -u * dt
-    BB = np.ones(D[core].shape, dtype=DOUBLE)
-    alpha = np.zeros(D[core].shape, dtype=DOUBLE)
+    BB = np.ones(D[core].shape[0], dtype=DOUBLE)
+    alpha = np.zeros(D[core].shape[0], dtype=DOUBLE)
     S = (f[up] - f[core]) / D[core]
     dz_index = (dfdx[up] - S) == 0.0
     BB[dz_index] = -1.0 / D[core][dz_index]
@@ -259,19 +264,21 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # store the calculation results
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y, alpha, BB_x, BB_y
     cdef np.ndarray[INT_T, ndim= 1] S_x, dz_index
+    cdef int n = f.shape[0]
+    cdef int m = D_x[core].shape[0]
 
     if out_f is None:
-        out_f = np.empty(f.shape, dtype=DOUBLE)
+        out_f = np.empty(n, dtype=DOUBLE)
     if out_dfdx is None:
-        out_dfdx = np.empty(dfdx.shape, dtype=DOUBLE)
+        out_dfdx = np.empty(n, dtype=DOUBLE)
     if out_dfdy is None:
-        out_dfdy = np.empty(dfdy.shape, dtype=DOUBLE)
+        out_dfdy = np.empty(n, dtype=DOUBLE)
 
     # 1st step for horizontal advection
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
     xi_x = -u * dt
-    BB_x = np.ones(D_x[core].shape, dtype=DOUBLE)
-    alpha = np.zeros(D_x[core].shape, dtype=DOUBLE)
+    BB_x = np.ones(m, dtype=DOUBLE)
+    alpha = np.zeros(m, dtype=DOUBLE)
     S_x = (f[h_up] - f[core]) / D_x[core]
     dz_index = (dfdx[h_up] - S_x) == 0.0
     BB_x[dz_index] = -1.0 / D_x[core][dz_index]
@@ -299,8 +306,8 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # 2nd step for vertical advection
     D_y = -np.where(v > 0., 1.0, -1.0) * dx
     xi_y = -v * dt
-    BB_y = np.ones(D_y[core].shape, dtype=DOUBLE)
-    alpha = np.zeros(D_y[core].shape, dtype=DOUBLE)
+    BB_y = np.ones(m, dtype=DOUBLE)
+    alpha = np.zeros(m, dtype=DOUBLE)
     S_y = (out_f[v_up] - out_f[core]) / D_y[core]
     dz_index = (out_dfdy[v_up] - S_y) == 0.0
     BB_y[dz_index] = -1.0 / D_y[core][dz_index]
