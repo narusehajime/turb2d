@@ -809,49 +809,49 @@ class TurbidityCurrent2D(Component):
             self.update_up_down_links_and_nodes()
 
             # apply the shock dissipation scheme
-            self.shock_dissipation(self.Ch,
-                                   self.h,
-                                   self.wet_nodes,
-                                   self.node_north,
-                                   self.node_south,
-                                   self.node_east,
-                                   self.node_west,
-                                   self.dt_local,
-                                   self.kappa,
-                                   out=self.Ch_temp)
+            shock_dissipation(self.Ch,
+                              self.h,
+                              self.wet_nodes,
+                              self.node_north,
+                              self.node_south,
+                              self.node_east,
+                              self.node_west,
+                              self.dt_local,
+                              self.kappa,
+                              out=self.Ch_temp)
 
-            self.shock_dissipation(self.u,
-                                   self.h_link,
-                                   self.wet_horizontal_links,
-                                   self.link_north,
-                                   self.link_south,
-                                   self.link_east,
-                                   self.link_west,
-                                   self.dt_local,
-                                   self.kappa,
-                                   out=self.u_temp)
+            shock_dissipation(self.u,
+                              self.h_link,
+                              self.wet_horizontal_links,
+                              self.link_north,
+                              self.link_south,
+                              self.link_east,
+                              self.link_west,
+                              self.dt_local,
+                              self.kappa,
+                              out=self.u_temp)
 
-            self.shock_dissipation(self.v,
-                                   self.h_link,
-                                   self.wet_vertical_links,
-                                   self.link_north,
-                                   self.link_south,
-                                   self.link_east,
-                                   self.link_west,
-                                   self.dt_local,
-                                   self.kappa,
-                                   out=self.v_temp)
+            shock_dissipation(self.v,
+                              self.h_link,
+                              self.wet_vertical_links,
+                              self.link_north,
+                              self.link_south,
+                              self.link_east,
+                              self.link_west,
+                              self.dt_local,
+                              self.kappa,
+                              out=self.v_temp)
 
-            self.shock_dissipation(self.h,
-                                   self.h,
-                                   self.wet_nodes,
-                                   self.node_north,
-                                   self.node_south,
-                                   self.node_east,
-                                   self.node_west,
-                                   self.dt_local,
-                                   self.kappa,
-                                   out=self.h_temp)
+            shock_dissipation(self.h,
+                              self.h,
+                              self.wet_nodes,
+                              self.node_north,
+                              self.node_south,
+                              self.node_east,
+                              self.node_west,
+                              self.dt_local,
+                              self.kappa,
+                              out=self.h_temp)
 
             # Reset our field values with the newest flow depth and
             # discharge.
