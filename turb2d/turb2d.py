@@ -3,9 +3,10 @@ from landlab import Component, FieldError, RasterModelGrid
 from landlab.utils.decorators import use_file_name_or_kwds
 from landlab.grid.structured_quad import links
 from landlab.io.native_landlab import save_grid
-from turb2d.cip import rcip_2d_M_advection, cip_2d_nonadvection
-from turb2d.cip import cip_2d_diffusion, shock_dissipation
-from turb2d.sediment_func import get_es, get_ew, get_ws
+from cip import rcip_2d_M_advection, cip_2d_nonadvection
+from cip import cip_2d_diffusion, shock_dissipation
+from .sediment_func import get_es, get_ew, get_ws
+
 import time
 # from osgeo import gdal, gdalconst
 import os
@@ -1464,7 +1465,12 @@ class TurbidityCurrent2D(Component):
     def map_links_to_nodes(self, u, v, u_node, v_node, U, U_node):
         """map parameters at links to nodes
         """
-        grid = self.grid
+
+        # set velocity zero at dry links and nodes
+        u[self.dry_links] = 0
+        v[self.dry_links] = 0
+        u_node[self.dry_nodes] = 0
+        v_node[self.dry_nodes] = 0
 
         # Map values of horizontal links to vertical links, and
         # values of vertical links to horizontal links.
@@ -1479,17 +1485,24 @@ class TurbidityCurrent2D(Component):
             v[self.vertical_link_SE] + v[self.vertical_link_SW]) / 4.0
 
         # Calculate composite velocity at links
-        U = np.sqrt(u**2 + v**2)
+        U[self.active_links] = np.sqrt(u[self.active_links]**2 +
+                                       v[self.active_links]**2)
 
         # map link values (u, v) to nodes
-        grid.map_mean_of_links_to_node(u, out=u_node)
-        grid.map_mean_of_links_to_node(v, out=v_node)
+        self.map_mean_of_links_to_node(u, self.core_nodes, out=u_node)
+        self.map_mean_of_links_to_node(v, self.core_nodes, out=v_node)
+        self.map_mean_of_links_to_node(U, self.core_nodes, out=U_node)
 
-        # set velocity zero at dry links and nodes
-        u[self.dry_links] = 0
-        v[self.dry_links] = 0
-        u_node[self.dry_nodes] = 0
-        v_node[self.dry_nodes] = 0
+    def map_mean_of_links_to_node(self, f, core, out=None):
+
+        if out is None:
+            out = np.zeros(self.number_of_nodes)
+        out[core] = (f[self.north_link_at_node[core]] +
+                     f[self.south_link_at_node[core]] +
+                     f[self.east_link_at_node[core]] +
+                     f[self.west_link_at_node[core]]) / 4.0
+
+        return out
 
     def map_nodes_to_links(self, h, Ch, eta, h_link, Ch_link):
         """map parameters at nodes to links
@@ -1712,10 +1725,10 @@ if __name__ == '__main__':
     t = time.time()
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
     Ch_init = np.sum(tc.Ch)
-    last = 100
+    last = 1
 
     for i in range(1, last + 1):
-        tc.run_one_step(dt=100.0)
+        tc.run_one_step(dt=1.0)
         save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
