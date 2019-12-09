@@ -375,3 +375,99 @@ def shock_dissipation(
     out[core] = out[core] + (eps_i_half[core] *
                              (out[north] - out[core]) - eps_i_half[south] *
                              (out[core] - out[south]))
+
+
+def cip_nonadvection_phase(h, u, v, Ch, dudx, dudy, dvdx, dvdy, h_temp, u_temp,
+                           v_temp, Ch_temp, eta_temp, dudx_temp, dudy_temp,
+                           dvdx_temp, dvdy_temp, h_link_temp, u_node_temp,
+                           v_node_temp, Ch_link_temp, wet_nodes,
+                           wet_horizontal_links, wet_vertical_links,
+                           horizontal_up_links, horizontal_down_links,
+                           vertical_up_links, vertical_down_links,
+                           implicit_num, threshold):
+    """Calculate non-advection phase of the model
+    """
+
+    h_prev = h_temp.copy()
+    Ch_prev = Ch_temp.copy()
+    converge = 10.0
+    count = 0
+    while ((converge > threshold) and (count < implicit_num)):
+
+        calc_G_u(h_temp, h_link_temp, u_temp, v_temp, Ch_temp, Ch_link_temp,
+                 eta_temp, wet_horizontal_links)
+        calc_G_v(h_temp, h_link_temp, u_temp, v_temp, Ch_temp, Ch_link_temp,
+                 eta_temp, wet_vertical_links)
+
+        cip_2d_nonadvection(u,
+                            dudx,
+                            dudy,
+                            G_u,
+                            u_temp,
+                            v_temp,
+                            wet_horizontal_links,
+                            horizontal_up_links[wet_horizontal_links],
+                            horizontal_down_links[wet_horizontal_links],
+                            vertical_up_links[wet_horizontal_links],
+                            vertical_down_links[wet_horizontal_links],
+                            dx,
+                            dt_local,
+                            out_f=u_temp,
+                            out_dfdx=dudx_temp,
+                            out_dfdy=dudy_temp)
+
+        cip_2d_nonadvection(v,
+                            dvdx,
+                            dvdy,
+                            G_v,
+                            u_temp,
+                            v_temp,
+                            wet_vertical_links,
+                            horizontal_up_links[wet_vertical_links],
+                            horizontal_down_links[wet_vertical_links],
+                            vertical_up_links[wet_vertical_links],
+                            vertical_down_links[wet_vertical_links],
+                            dx,
+                            dt_local,
+                            out_f=v_temp,
+                            out_dfdx=dvdx_temp,
+                            out_dfdy=dvdy_temp)
+
+        map_links_to_nodes(
+            u_temp,
+            v_temp,
+            u_node_temp,
+            v_node_temp,
+        )
+
+        # Calculate non-advection terms of h and Ch
+        calc_G_h(h_temp, h_link_temp, u_temp, u_node_temp, v_temp, v_node_temp,
+                 Ch_temp, wet_nodes)
+        calc_G_Ch(Ch_temp, Ch_link_temp, u_temp, v_temp, wet_nodes)
+        h_temp[wet_nodes] = h[wet_nodes] \
+            + dt_local * G_h[wet_nodes]
+        Ch_temp[wet_nodes] = (Ch[wet_nodes] + dt_local * G_Ch[wet_nodes])
+
+        # update values
+        map_nodes_to_links(h_temp, Ch_temp, eta_temp, h_link_temp,
+                           Ch_link_temp)
+
+        # check convergence of calculation
+        converge = np.sum(
+            ((h_temp[wet_nodes]
+              - h_prev[wet_nodes])
+             / h_temp[wet_nodes])**2
+        ) / wet_nodes.shape[0] \
+            + np.sum(
+            ((Ch_temp[wet_nodes]
+              - Ch_prev[wet_nodes])
+             / Ch_temp[wet_nodes])**2
+        ) / wet_nodes[0]
+
+        h_prev[:] = h_temp[:]
+        Ch_prev[:] = Ch_temp[:]
+
+        count += 1
+
+    if count == implicit_num:
+        print('Implicit calculation did not converge')

@@ -1,5 +1,6 @@
 """This is a script to run the model of TurbidityCurrent2D
 """
+import ipdb
 from turb2d import create_topography
 from turb2d import create_init_flow_region, create_topography_from_geotiff
 from turb2d import TurbidityCurrent2D
@@ -8,8 +9,8 @@ from landlab.io.native_landlab import save_grid
 import os
 import numpy as np
 
-# import ipdb
-# ipdb.set_trace()
+import ipdb
+ipdb.set_trace()
 os.environ['MKL_NUM_THREADS'] = '2'
 os.environ['OMP_NUM_THREADS'] = '2'
 
@@ -32,8 +33,8 @@ grid = create_topography(
 create_init_flow_region(
     grid,
     initial_flow_concentration=0.01,
-    initial_flow_thickness=50,
-    initial_region_radius=50,
+    initial_flow_thickness=100,
+    initial_region_radius=100,
     initial_region_center=[1000, 4000],
 )
 # create_init_flow_region(
@@ -47,7 +48,7 @@ create_init_flow_region(
 # making turbidity current object
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
-                        alpha=0.02,
+                        alpha=0.1,
                         kappa=0.25,
                         Ds=80 * 10**-6,
                         h_init=0.00001,
@@ -60,7 +61,7 @@ tc = TurbidityCurrent2D(grid,
 t = time.time()
 save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
 Ch_init = np.sum(tc.Ch)
-last = 1
+last = 100
 
 for i in range(1, last + 1):
     tc.run_one_step(dt=1.0)
