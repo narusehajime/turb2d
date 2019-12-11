@@ -112,6 +112,7 @@ class TurbidityCurrent2D(Component):
         'flow__sediment_concentration',
         'topographic__elevation',
         'bed__thickness',
+        'flow__surface_elevation',
     )
 
     _output_var_names = (
@@ -121,6 +122,7 @@ class TurbidityCurrent2D(Component):
         'flow__sediment_concentration',
         'topographic__elevation',
         'bed__thickness',
+        'flow__surface_elevation',
     )
 
     _var_units = {
@@ -130,6 +132,7 @@ class TurbidityCurrent2D(Component):
         'flow__sediment_concentration': '1',
         'topographic__elevation': 'm',
         'bed__thickness': 'm',
+        'flow__surface_elevation': 'm',
     }
 
     _var_mapping = {
@@ -139,6 +142,7 @@ class TurbidityCurrent2D(Component):
         'flow__sediment_concentration': 'node',
         'topographic__elevation': 'node',
         'bed__thickness': 'node',
+        'flow__surface_elevation': 'node',
     }
 
     _var_doc = {
@@ -150,6 +154,7 @@ class TurbidityCurrent2D(Component):
         'flow__sediment_concentration': 'Sediment concentration in flow',
         'topographic__elevation': 'The land surface elevation.',
         'bed__thickness': 'The bed thickness',
+        'flow__surface_elevation': 'Elevation of flow surface',
     }
 
     @use_file_name_or_kwds
@@ -232,13 +237,44 @@ class TurbidityCurrent2D(Component):
                 'topographic__elevation',
                 at='node',
                 units=self._var_units['topographic__elevation'])
+
+        except FieldError:
+            # Field was already set
+            self.eta = self._grid.at_node['topographic__elevation']
+
+        try:
             self.bed_thick = grid.add_zeros(
                 'bed__thickness',
                 at='node',
                 units=self._var_units['bed__thickness'])
+        except FieldError:
+            # Field was already set
+            self.bed_thick = self._grid.at_node['bed__thickness']
+
+        try:
             self.h = grid.add_zeros('flow__depth',
                                     at='node',
                                     units=self._var_units['flow__depth'])
+            self.C = grid.add_zeros(
+                'flow__sediment_concentration',
+                at='node',
+                units=self._var_units['flow__sediment_concentration'])
+
+        except FieldError:
+            # Field was already set
+            self.h = grid.at_node['flow__depth']
+            self.C = grid.at_node['flow__sediment_concentration']
+
+        try:
+            grid.add_zeros('flow__surface_elevation',
+                           at='node',
+                           units=self._var_units['flow__surface_elevation'])
+            grid.at_node['flow__surface_elevation'] = self.h + self.eta
+
+        except FieldError:
+            grid.at_node['flow__surface_elevation'] = self.h + self.eta
+
+        try:
             self.u = grid.add_zeros(
                 'flow__horizontal_velocity',
                 at='link',
@@ -247,29 +283,17 @@ class TurbidityCurrent2D(Component):
                 'flow__vertical_velocity',
                 at='link',
                 units=self._var_units['flow__vertical_velocity'])
-            self.C = grid.add_zeros(
-                'flow__sediment_concentration',
-                at='link',
-                units=self._var_units['flow__sediment_concentration'])
 
         except FieldError:
             # Field was already set
             self.u = grid.at_link['flow__horizontal_velocity']
             self.v = grid.at_link['flow__vertical_velocity']
-            self.h = grid.at_node['flow__depth']
-            self.C = grid.at_node['flow__sediment_concentration']
-            self.eta = self._grid.at_node['topographic__elevation']
-            self.bed_thick = self._grid.at_node['bed__thickness']
 
         self.h += self.h_init
         self.C += self.C_init
 
         # For gradient of parameters at nodes and links
         try:
-            self.dxidx = grid.add_zeros('flow_surface__horizontal_gradient',
-                                        at='node')
-            self.dxidy = grid.add_zeros('flow_surface__vertical_gradient',
-                                        at='node')
             self.dudx = grid.add_zeros(
                 'flow_horizontal_velocity__horizontal_gradient', at='link')
             self.dudy = grid.add_zeros(
@@ -279,14 +303,7 @@ class TurbidityCurrent2D(Component):
             self.dvdy = grid.add_zeros(
                 'flow_vertical_velocity__vertical_gradient', at='link')
 
-            self.eta_grad = grid.add_zeros('topographic_elevation__gradient',
-                                           at='link')
-
         except FieldError:
-            self.dxidx = grid.at_node['flow_surface__horizontal_gradient']
-            self.dxidy = grid.at_node['flow_surface__vertical_gradient']
-            self.dhdx = grid.at_node['flow_depth__horizontal_gradient']
-            self.dhdy = grid.at_node['flow_depth__vertical_gradient']
             self.dudx = grid.at_link[
                 'flow_horizontal_velocity__horizontal_gradient']
             self.dudy = grid.at_link[
@@ -295,10 +312,6 @@ class TurbidityCurrent2D(Component):
                 'flow_vertical_velocity__horizontal_gradient']
             self.dvdy = grid.at_link[
                 'flow_vertical_velocity__vertical_gradient']
-            self.dCdx = grid.at_node[
-                'flow_sediment_concentration__horizontal_gradient']
-            self.dCdy = grid.at_node[
-                'flow_sediment_concentration__vertical_gradient']
 
         # record active links
         self.active_link_ids = links.active_link_ids(self.grid.shape,
@@ -998,18 +1011,15 @@ class TurbidityCurrent2D(Component):
         # horizontal and vertical flow discharge between wet #
         # and partial wet nodes                              #
         ######################################################
-        M_horiz = gamma * h[horizontally_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[horizontally_wettest_nodes]) \
-            / dx * dt
-        M_vert = gamma * h[vertically_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[vertically_wettest_nodes]) \
-            / dx * dt
-        CM_horiz = gamma * Ch[horizontally_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[horizontally_wettest_nodes]) \
-            / dx * dt
-        CM_vert = gamma * Ch[vertically_wettest_nodes] \
-            * np.sqrt(2.0 * R * g * Ch[vertically_wettest_nodes]) \
-            / dx * dt
+        overspill_velocity_x = gamma * np.sqrt(
+            2.0 * R * g * Ch[horizontally_wettest_nodes]) / dx * dt
+        overspill_velocity_y = gamma * np.sqrt(
+            2.0 * R * g * Ch[vertically_wettest_nodes]) / dx * dt
+
+        M_horiz = h[horizontally_wettest_nodes] * overspill_velocity_x
+        M_vert = h[vertically_wettest_nodes] * overspill_velocity_y
+        CM_horiz = Ch[horizontally_wettest_nodes] * overspill_velocity_x
+        CM_vert = Ch[vertically_wettest_nodes] * overspill_velocity_y
 
         ################################################################
         # Calculate time development of variables at partial wet nodes #
@@ -1069,6 +1079,15 @@ class TurbidityCurrent2D(Component):
         self.grid.at_node['flow__sediment_concentration'] = self.C
         self.grid.at_node['topographic__elevation'] = self.eta
         self.grid.at_node['bed__thickness'] = self.bed_thick
+        self.grid.at_node['flow__surface_elevation'] = self.eta + self.h
+        self.grid.at_link[
+            'flow_horizontal_velocity__horizontal_gradient'] = self.dudx
+        self.grid.at_link[
+            'flow_horizontal_velocity__vertical_gradient'] = self.dudy
+        self.grid.at_link[
+            'flow_vertical_velocity__horizontal_gradient'] = self.dvdx
+        self.grid.at_link[
+            'flow_vertical_velocity__vertical_gradient'] = self.dvdy
 
     def update_values(self):
         """Update variables from temporally variables and
@@ -1375,7 +1394,6 @@ class TurbidityCurrent2D(Component):
         node_west = self.west_node_at_horizontal_link[link_horiz]
 
         dx = self.grid.dx
-        v_on_horiz = v[link_horiz]
 
         Rg = self.R * self.g
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
@@ -1404,7 +1422,6 @@ class TurbidityCurrent2D(Component):
         node_south = self.south_node_at_vertical_link[link_vert]
 
         dx = self.grid.dx
-        u_on_vert = u[link_vert]
 
         Rg = self.R * self.g
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
@@ -1492,6 +1509,9 @@ class TurbidityCurrent2D(Component):
         self.map_mean_of_links_to_node(u, self.core_nodes, out=u_node)
         self.map_mean_of_links_to_node(v, self.core_nodes, out=v_node)
         self.map_mean_of_links_to_node(U, self.core_nodes, out=U_node)
+        # self.grid.map_mean_of_links_to_node(u, out=u_node)
+        # self.grid.map_mean_of_links_to_node(v, out=v_node)
+        # self.grid.map_mean_of_links_to_node(U, out=U_node)
 
     def map_mean_of_links_to_node(self, f, core, out=None):
 
@@ -1510,8 +1530,8 @@ class TurbidityCurrent2D(Component):
         grid = self.grid
 
         # remove illeagal values
-        h[h < self.h_init] = self.h_init
-        Ch[Ch < self.C_init * self.h_init] = self.C_init * self.h_init
+        # h[h < self.h_init] = self.h_init
+        # Ch[Ch < self.C_init * self.h_init] = self.C_init * self.h_init
 
         # map node values (h, C, eta) to links
         grid.map_mean_of_link_nodes_to_link(h, out=h_link)
@@ -1725,7 +1745,7 @@ if __name__ == '__main__':
     t = time.time()
     save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
     Ch_init = np.sum(tc.Ch)
-    last = 1
+    last = 2
 
     for i in range(1, last + 1):
         tc.run_one_step(dt=1.0)

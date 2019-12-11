@@ -1,11 +1,12 @@
 """This is a script to run the model of TurbidityCurrent2D
 """
-import ipdb
+
 from turb2d import create_topography
 from turb2d import create_init_flow_region, create_topography_from_geotiff
 from turb2d import TurbidityCurrent2D
 import time
-from landlab.io.native_landlab import save_grid
+from landlab.io.netcdf import write_netcdf, read_netcdf
+from landlab.io.native_landlab import load_grid, save_grid
 import os
 import numpy as np
 
@@ -59,16 +60,16 @@ tc = TurbidityCurrent2D(grid,
 
 # start calculation
 t = time.time()
-save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
+write_netcdf('tc{:04d}.nc'.format(0), grid)
 Ch_init = np.sum(tc.Ch)
-last = 100
+last = 4
 
-for i in range(1, last + 1):
+for i in range(6, last + 1):
     tc.run_one_step(dt=1.0)
-    save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
+    write_netcdf('tc{:04d}.nc'.format(i), grid)
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')
     if np.sum(tc.Ch) / Ch_init < 0.01:
         break
-
+save_grid(grid, 'tc{:04d}.nc'.format(i))
 print('elapsed time: {} sec.'.format(time.time() - t))
