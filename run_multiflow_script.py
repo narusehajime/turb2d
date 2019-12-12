@@ -1,11 +1,11 @@
-import numpy as np
 import os
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
+import numpy as np
 from turb2d import RunMultiFlows
 import time
 
 # ipdb.set_trace()
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['OMP_NUM_THREADS'] = '1'
 
 proc = 10  # number of processors to be used
 num_runs = 100

@@ -1,3 +1,5 @@
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['OMP_NUM_THREADS'] = '1'
 from turb2d import TurbidityCurrent2D
 from turb2d import create_topography, create_init_flow_region
 import numpy as np
@@ -11,7 +13,6 @@ from landlab.io.native_landlab import save_grid
 class RunMultiFlows():
     """A class to run multiple flows for conducting inverse analysis
     """
-
     def __init__(
             self,
             C_ini,
@@ -186,8 +187,6 @@ class RunMultiFlows():
 
 if __name__ == "__main__":
     # ipdb.set_trace()
-    os.environ['MKL_NUM_THREADS'] = '1'
-    os.environ['OMP_NUM_THREADS'] = '1'
 
     proc = 10  # number of processors to be used
     num_runs = 300
