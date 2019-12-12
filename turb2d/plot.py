@@ -1,11 +1,9 @@
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from landlab import Component, FieldError, RasterModelGrid
 from landlab.plot.imshow import imshow_grid
-from matplotlib import pylab as plb
 import numpy as np
-from landlab.io.native_landlab import load_grid, save_grid
+from landlab.io.native_landlab import load_grid
 import sys
 
 
@@ -40,12 +38,11 @@ def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
     elev = grid.node_vector_to_raster(z)
     X = grid.node_vector_to_raster(grid.node_x)
     Y = grid.node_vector_to_raster(grid.node_y)
-    cs = plt.contour(
-        X,
-        Y,
-        elev,
-        colors=['dimgray'],
-        levels=np.arange(np.min(z), np.max(z), 20))
+    cs = plt.contour(X,
+                     Y,
+                     elev,
+                     colors=['dimgray'],
+                     levels=np.arange(np.min(z), np.max(z), 20))
     cs.clabel(inline=True, fmt='%1i', fontsize=10)
 
     plt.savefig(filename)
@@ -61,7 +58,6 @@ if __name__ == '__main__':
             grid,
             'tc{:04d}.png'.format(i),
             variable_name,
-            # vmin=0.0,
             vmin=np.min(grid.at_node[variable_name]),
             #     vmax=0.005,
             # )
