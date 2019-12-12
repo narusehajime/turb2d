@@ -51,13 +51,8 @@ create_init_flow_region(
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
                         alpha=0.1,
-                        kappa=0.25,
                         Ds=80 * 10**-6,
-                        h_init=0.00001,
-                        h_w=0.01,
-                        C_init=0.00001,
-                        implicit_num=20,
-                        r0=1.5)
+                        )
 
 # Save the initial condition to a netcdf file which can be read by
 # paraview
@@ -96,13 +91,8 @@ create_init_flow_region(
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
                         alpha=0.1,
-                        kappa=0.25,
                         Ds=80 * 10**-6,
-                        h_init=0.00001,
-                        h_w=0.01,
-                        C_init=0.00001,
-                        implicit_num=20,
-                        r0=1.5)
+                        )
 
 write_netcdf('tc{:04d}.nc'.format(0), grid)
 
