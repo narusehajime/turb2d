@@ -42,7 +42,7 @@ def plot_result(grid, filename, variable_name, vmin=None, vmax=None):
                      Y,
                      elev,
                      colors=['dimgray'],
-                     levels=np.arange(np.min(z), np.max(z), 20))
+                     levels=np.linspace(np.min(z), np.max(z), 10))
     cs.clabel(inline=True, fmt='%1i', fontsize=10)
 
     plt.savefig(filename)
