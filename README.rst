@@ -10,7 +10,7 @@ Here is an example of installation command.
 
 python setup.py install
 
-Please note that Visual C++ or other cpp compiler is installed in your environemnts if you use windows. This is because this code uses Cython.
+Please note that Visual C++ or other cpp compiler is installed in your environemnts if you use windows. Cython require the C compiler. Get free Microsoft Visual C++ 14.0 with "Microsoft Visual C++ Build Tools": https://visualstudio.microsoft.com/downloads/
 
 ---------------
 Usage
