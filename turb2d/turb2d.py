@@ -372,36 +372,30 @@ class TurbidityCurrent2D(Component):
         self.U_temp = self.U.copy()
         self.U_node_temp = self.U_node.copy()
 
-        self.horizontal_up_nodes = np.zeros(grid.number_of_nodes,
-                                            dtype=np.int64)
-        self.vertical_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.horizontal_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
+        self.vertical_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
         self.horizontal_down_nodes = np.zeros(grid.number_of_nodes,
-                                              dtype=np.int64)
-        self.vertical_down_nodes = np.zeros(grid.number_of_nodes,
-                                            dtype=np.int64)
+                                              dtype=np.int)
+        self.vertical_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
 
-        self.horizontal_up_links = np.zeros(grid.number_of_links,
-                                            dtype=np.int64)
-        self.vertical_up_links = np.zeros(grid.number_of_links, dtype=np.int64)
+        self.horizontal_up_links = np.zeros(grid.number_of_links, dtype=np.int)
+        self.vertical_up_links = np.zeros(grid.number_of_links, dtype=np.int)
         self.horizontal_down_links = np.zeros(grid.number_of_links,
-                                              dtype=np.int64)
-        self.vertical_down_links = np.zeros(grid.number_of_links,
-                                            dtype=np.int64)
+                                              dtype=np.int)
+        self.vertical_down_links = np.zeros(grid.number_of_links, dtype=np.int)
 
-        self.east_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int64)
-        self.north_link_at_node = np.zeros(grid.number_of_nodes,
-                                           dtype=np.int64)
-        self.west_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int64)
-        self.south_link_at_node = np.zeros(grid.number_of_nodes,
-                                           dtype=np.int64)
+        self.east_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
+        self.north_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
+        self.west_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
+        self.south_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
         self.west_node_at_horizontal_link = np.zeros(grid.number_of_links,
-                                                     dtype=np.int64)
+                                                     dtype=np.int)
         self.east_node_at_horizontal_link = np.zeros(grid.number_of_links,
-                                                     dtype=np.int64)
+                                                     dtype=np.int)
         self.south_node_at_vertical_link = np.zeros(grid.number_of_links,
-                                                    dtype=np.int64)
+                                                    dtype=np.int)
         self.north_node_at_vertical_link = np.zeros(grid.number_of_links,
-                                                    dtype=np.int64)
+                                                    dtype=np.int)
 
         # Calculate subordinate parameters
         self.ws = get_ws(self.R, self.g, self.Ds, self.nu)
@@ -1542,9 +1536,9 @@ class TurbidityCurrent2D(Component):
            at horizontally upcurrent and downcurrent directions
         """
         if out_up is None:
-            out_up = np.empty(u.shape, dtype=np.int64)
+            out_up = np.empty(u.shape, dtype=np.int)
         if out_down is None:
-            out_down = np.empty(u.shape, dtype=np.int64)
+            out_down = np.empty(u.shape, dtype=np.int)
 
         out_up[:] = self.node_west[:]
         out_down[:] = self.node_east[:]
@@ -1560,9 +1554,9 @@ class TurbidityCurrent2D(Component):
         """
 
         if out_up is None:
-            out_up = np.empty(u.shape, dtype=np.int64)
+            out_up = np.empty(u.shape, dtype=np.int)
         if out_down is None:
-            out_down = np.empty(u.shape, dtype=np.int64)
+            out_down = np.empty(u.shape, dtype=np.int)
 
         out_up[:] = self.node_south[:]
         out_down[:] = self.node_north[:]
@@ -1577,9 +1571,9 @@ class TurbidityCurrent2D(Component):
            at horizontally upcurrent and downcurrent directions
         """
         if out_up is None:
-            out_up = np.zeros(u.shape, dtype=np.int64)
+            out_up = np.zeros(u.shape, dtype=np.int)
         if out_down is None:
-            out_down = np.zeros(u.shape, dtype=np.int64)
+            out_down = np.zeros(u.shape, dtype=np.int)
 
         out_up[:] = self.link_west[:]
         out_down[:] = self.link_east[:]
@@ -1594,9 +1588,9 @@ class TurbidityCurrent2D(Component):
         """
 
         if out_up is None:
-            out_up = np.zeros(u.shape, dtype=np.int64)
+            out_up = np.zeros(u.shape, dtype=np.int)
         if out_down is None:
-            out_down = np.zeros(u.shape, dtype=np.int64)
+            out_down = np.zeros(u.shape, dtype=np.int)
 
         out_up[:] = self.link_south[:]
         out_down[:] = self.link_north[:]

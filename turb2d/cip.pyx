@@ -9,6 +9,7 @@ ctypedef np.float64_t DOUBLE_T
 ctypedef np.int_t INT_T
 ctypedef np.npy_bool BOOL_T
 
+
 def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                        np.ndarray[DOUBLE_T, ndim=1] dfdx,
                        np.ndarray[DOUBLE_T, ndim=1] dfdy,
@@ -37,7 +38,7 @@ def cip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     if out_dfdx is None:
         out_dfdx = np.empty(n, dtype=DOUBLE)
     if out_dfdy is None:
-       out_dfdy = np.empty(n, dtype=DOUBLE)
+        out_dfdy = np.empty(n, dtype=DOUBLE)
 
     # 1st step for horizontal advection
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
@@ -209,8 +210,8 @@ def rcip_1d_advection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     """
     cdef int n = f.shape[0]
-    cdef np.ndarray[DOUBLE_T, ndim=1] D, xi, BB, alpha, S
-    cdef np.ndarray[BOOL_T, ndim=1] dz_index
+    cdef np.ndarray[DOUBLE_T, ndim = 1] D, xi, BB, alpha, S
+    cdef np.ndarray[BOOL_T, cast = True, ndim = 1] dz_index
 
     if out_f is None:
         out_f = np.zeros(n, dtype=DOUBLE)
@@ -267,8 +268,8 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # First, the variables out and temp are allocated to
     # store the calculation results
     cdef np.ndarray[DOUBLE_T, ndim= 1] D_x, D_y, xi_x, xi_y,
-    cdef np.ndarray[DOUBLE_T, ndim=1] alpha, BB_x, BB_y, S_x, S_y
-    cdef np.ndarray[BOOL_T, ndim= 1] dz_index
+    cdef np.ndarray[DOUBLE_T, ndim = 1] alpha, BB_x, BB_y, S_x, S_y
+    cdef np.ndarray[BOOL_T, cast= True, ndim = 1] dz_index
     cdef int n = f.shape[0]
     cdef int m = core.shape[0]
 
@@ -340,18 +341,19 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
 
     return out_f, out_dfdx, out_dfdy
 
+
 def shock_dissipation(
-            np.ndarray[DOUBLE_T, ndim=1] f,
-            np.ndarray[DOUBLE_T, ndim=1] h,
-            np.ndarray[INT_T, ndim=1] core,
-            np.ndarray[INT_T, ndim=1] north_id,
-            np.ndarray[INT_T, ndim=1] south_id,
-            np.ndarray[INT_T, ndim=1] east_id,
-            np.ndarray[INT_T, ndim=1] west_id,
-            double dt,
-	    double kappa,
-            np.ndarray[DOUBLE_T, ndim=1] out=None,
-    ):
+    np.ndarray[DOUBLE_T, ndim=1] f,
+    np.ndarray[DOUBLE_T, ndim=1] h,
+    np.ndarray[INT_T, ndim=1] core,
+    np.ndarray[INT_T, ndim=1] north_id,
+    np.ndarray[INT_T, ndim=1] south_id,
+    np.ndarray[INT_T, ndim=1] east_id,
+    np.ndarray[INT_T, ndim=1] west_id,
+    double dt,
+    double kappa,
+    np.ndarray[DOUBLE_T, ndim=1] out=None,
+):
     """ adding artificial viscosity for numerical stability
 
         Parameters
@@ -371,13 +373,13 @@ def shock_dissipation(
         west_id : ndarray, int
             indeces of nodes or links that locate west of core
     """
-    cdef np.ndarray[DOUBLE_T, ndim=1] eps_i, eps_i_half
-    cdef np.ndarray[INT_T, ndim=1] north, south, east, west
+    cdef np.ndarray[DOUBLE_T, ndim = 1] eps_i, eps_i_half
+    cdef np.ndarray[INT_T, ndim = 1] north, south, east, west
     cdef int n = f.shape[0]
 
     if out is None:
         out = np.zeros(n)
-	
+
     eps_i = np.zeros(n, dtype=DOUBLE)
     eps_i_half = np.zeros(n, dtype=DOUBLE)
     north = north_id[core]
