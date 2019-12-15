@@ -12,6 +12,9 @@ with open('LICENSE') as f:
 ext = Extension("cip",
                 sources=["turb2d/cip.pyx"],
                 include_dirs=[np.get_include()])
+ext2 = Extension("gridutils",
+                 sources=["turb2d/gridutils.pyx"],
+                 include_dirs=[np.get_include()])
 
 setup(name='turb2d',
       version='0.1.0',
@@ -22,5 +25,5 @@ setup(name='turb2d',
       url='https://github.com/narusehajime/turb2d.git',
       license=license,
       install_requires=['numpy', 'landlab', 'matplotlib', 'gdal', 'cython'],
-      ext_modules=cythonize([ext]),
+      ext_modules=cythonize([ext, ext2]),
       packages=find_packages(exclude=('tests', 'docs')))
