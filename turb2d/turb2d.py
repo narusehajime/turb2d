@@ -5,7 +5,7 @@ shallow-water equations over topography on the basis of 3 equation model of
 Parker et al. (1986). This component is based on the landlab component
  overland_flow that was written by Jordan Adams.
 
-.. codeauthor:: Hajime Naruse
+.. codeauthor: : Hajime Naruse
 
 Examples
 ---------
@@ -74,20 +74,21 @@ Examples
     print('elapsed time: {} sec.'.format(time.time() - t))
 
 """
-from osgeo import gdal, gdalconst
-import os
-import time
-import numpy as np
-from landlab import Component, FieldError, RasterModelGrid
-from landlab.utils.decorators import use_file_name_or_kwds
-from landlab.grid.structured_quad import links
-from landlab.io.native_landlab import save_grid
-from cip import rcip_2d_M_advection, cip_2d_nonadvection
-from cip import cip_2d_diffusion, shock_dissipation
-from sediment_func import get_es, get_ew, get_ws
-from wetdry import find_wet_grids, process_partial_wet_grids
-from gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
+from gridutils import map_values, map_links_to_nodes, map_nodes_to_links
+from wetdry import find_wet_grids, process_partial_wet_grids
+from sediment_func import get_es, get_ew, get_ws
+from runge_kutta_grad import runge_kutta_grad
+from cip import cip_2d_diffusion, shock_dissipation
+from cip import rcip_2d_M_advection, cip_2d_nonadvection
+from landlab.io.native_landlab import save_grid
+from landlab.io.netcdf import write_netcdf
+from landlab.grid.structured_quad import links
+from landlab.utils.decorators import use_file_name_or_kwds
+from landlab import Component, FieldError, RasterModelGrid
+import numpy as np
+import time
+from osgeo import gdal, gdalconst
 
 
 class TurbidityCurrent2D(Component):
@@ -100,7 +101,7 @@ class TurbidityCurrent2D(Component):
     Default input file is named "turbidity_current_input.txt" and is
     contained in the turb2d directory.
 
-    The primary method of this class is :func:'run_one_step'
+    The primary method of this class is: func: 'run_one_step'
     """
 
     _name = 'TurbidityCurrent2D'
@@ -182,32 +183,32 @@ class TurbidityCurrent2D(Component):
 
         Parameters
         ----------
-        grid : RasterModelGrid
+        grid: RasterModelGrid
             A landlab grid.
-        h_init : float, optional
+        h_init: float, optional
             Thickness of initial thin layer of flow to prevent divide by zero
-            errors (m).
-        h_w : float, optional
-            Thickness of flow to judge "wet" nodes and links (m).
-        alpha : float, optional
+            errors(m).
+        h_w: float, optional
+            Thickness of flow to judge "wet" nodes and links(m).
+        alpha: float, optional
             Time step coefficient
-        Cf : float, optional
+        Cf: float, optional
             Dimensionless Chezy friction coefficient.
-        g : float, optional
-            Acceleration due to gravity (m/s^2)
-        R : float, optional
-            Submerged specific density (rho_s/rho_f - 1) (1)
-        Ds : float, optional
-            Sediment diameter (m)
-        lambda_p : float, optional
-            Bed sediment porosity (1)
-        nu : float, optional
-            Kinematic viscosity of water (at 293K)
+        g: float, optional
+            Acceleration due to gravity(m/s ^ 2)
+        R: float, optional
+            Submerged specific density(rho_s/rho_f - 1)(1)
+        Ds: float, optional
+            Sediment diameter(m)
+        lambda_p: float, optional
+            Bed sediment porosity(1)
+        nu: float, optional
+            Kinematic viscosity of water(at 293K)
         nu_t: float, optional
             Eddy viscosity for horizontal velocity components
-        flow_type : str, optional
+        flow_type: str, optional
             '3eq' for the three equation model
-            '4eq' for the four equation model (not implemented)
+            '4eq' for the four equation model(not implemented)
         """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
 
@@ -465,10 +466,10 @@ class TurbidityCurrent2D(Component):
 
         Parameters
         ----------------
-        dt : float, optional
+        dt: float, optional
             time to finish calculation of this step. Inside the model,
             local value of dt is used for stability of calculation.
-            If dt=None, dt is set to be equal to local dt.
+            If dt = None, dt is set to be equal to local dt.
         """
 
         # DH adds a loop to enable an imposed tstep while maintaining stability
@@ -558,9 +559,10 @@ class TurbidityCurrent2D(Component):
             # map node values to links, and link values to nodes.
             # self.h_temp[:] = self.h[:]
             # self.Ch_temp[:] = self.Ch[:]
-            map_links_to_nodes(self, self.u_temp, self.v_temp,
-                               self.u_node_temp, self.v_node_temp, self.U_temp,
-                               self.U_node_temp)
+            map_values(self, self.h_temp, self.u_temp, self.v_temp,
+                       self.Ch_temp, self.eta_temp, self.h_link_temp,
+                       self.u_node_temp, self.v_node_temp, self.Ch_link_temp,
+                       self.U_temp, self.U_node_temp)
             self.update_values()
             update_up_down_links_and_nodes(self)
 
@@ -902,14 +904,14 @@ class TurbidityCurrent2D(Component):
            Parameters
            -----------------------
 
-           u : ndarray, float
+           u: ndarray, float
                horizontal velocity
-           v : ndarray, float
+           v: ndarray, float
                vertical velocity
 
            Return
            -----------------------
-           out : ndarray, float
+           out: ndarray, float
                eddy viscosity for horizontal diffusion of momentum
 
         """
@@ -1049,6 +1051,39 @@ class TurbidityCurrent2D(Component):
             maxC * h[core][illeagal_val2] -
             Ch[core][illeagal_val2]) / self.dt_local
 
+    def save_grid(self, filename, clobber=True):
+        """save a grid file
+
+           This function saves grid as a pickled file. Although a grid file
+           contain all variables, its file size is large.
+
+           Parameters
+           ------------------------------
+           filename : string
+               A file name to store a grid.
+
+           clobber : boolean
+               Overwrite an existing file
+        """
+
+        save_grid(self.grid, filename, clobber=clobber)
+
+    def save_nc(self, filename):
+        """save a grid in netCDF format
+
+           This function saves grid as a netCDF file that can be loaded by
+           paraview or VizIt.
+
+           Parameters
+           ------------------------------
+           filename : string
+               A file name to store a grid.
+
+           clobber : boolean
+               Overwrite an existing file
+        """
+        write_netcdf(filename, self.grid)
+
 
 def create_topography(
         length=8000,
@@ -1136,11 +1171,6 @@ def create_topography_from_geotiff(geotiff_filename,
 
 
 if __name__ == '__main__':
-    # import ipdb
-    # ipdb.set_trace()
-    os.environ['MKL_NUM_THREADS'] = '1'
-    os.environ['OMP_NUM_THREADS'] = '1'
-
     grid = create_topography(
         length=5000,
         width=2000,
@@ -1160,8 +1190,8 @@ if __name__ == '__main__':
     create_init_flow_region(
         grid,
         initial_flow_concentration=0.01,
-        initial_flow_thickness=50,
-        initial_region_radius=50,
+        initial_flow_thickness=100,
+        initial_region_radius=100,
         initial_region_center=[1000, 4000],
     )
     # create_init_flow_region(
@@ -1175,24 +1205,25 @@ if __name__ == '__main__':
     # making turbidity current object
     tc = TurbidityCurrent2D(grid,
                             Cf=0.004,
-                            alpha=0.1,
+                            alpha=0.2,
                             kappa=0.25,
                             Ds=100 * 10**-6,
                             h_init=0.00001,
-                            h_w=0.01,
+                            h_w=0.001,
                             C_init=0.00001,
                             implicit_num=20,
                             r0=1.5)
 
     # start calculation
     t = time.time()
-    save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
+    tc.save_grid('tc{:04d}.grid'.format(0), clobber=True)
     Ch_init = np.sum(tc.Ch)
-    last = 2
+    last = 10
 
     for i in range(1, last + 1):
         tc.run_one_step(dt=1.0)
-        save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
+        tc.save_grid('tc{:04d}.grid'.format(i), clobber=True)
+        tc.save_nc('tc{:04d}.grid'.format(i))
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
         if np.sum(tc.Ch) / Ch_init < 0.01:
