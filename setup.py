@@ -12,18 +12,20 @@ with open('LICENSE') as f:
 ext = Extension("cip",
                 sources=["turb2d/cip.pyx"],
                 include_dirs=[np.get_include()])
-ext2 = Extension("gridutils",
-                 sources=["turb2d/gridutils.pyx"],
-                 include_dirs=[np.get_include()])
+# ext2 = Extension("gridutils",
+#                  sources=["turb2d/gridutils.pyx"],
+#                  include_dirs=[np.get_include()])
 
-setup(name='turb2d',
-      version='0.1.0',
-      description='2D shallow water model for turbidity currents',
-      long_description=readme,
-      author='Hajime Naruse',
-      author_email='naruse@kueps.kyoto-u.ac.jp',
-      url='https://github.com/narusehajime/turb2d.git',
-      license=license,
-      install_requires=['numpy', 'landlab', 'matplotlib', 'gdal', 'cython'],
-      ext_modules=cythonize([ext, ext2]),
-      packages=find_packages(exclude=('tests', 'docs')))
+setup(
+    name='turb2d',
+    version='0.1.0',
+    description='2D shallow water model for turbidity currents',
+    long_description=readme,
+    author='Hajime Naruse',
+    author_email='naruse@kueps.kyoto-u.ac.jp',
+    url='https://github.com/narusehajime/turb2d.git',
+    license=license,
+    install_requires=['numpy', 'landlab', 'matplotlib', 'gdal', 'cython'],
+    # ext_modules=cythonize([ext, ext2]),
+    ext_modules=cythonize([ext]),
+    packages=find_packages(exclude=('tests', 'docs')))

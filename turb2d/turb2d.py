@@ -78,10 +78,9 @@ from gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
 from gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from wetdry import find_wet_grids, process_partial_wet_grids
 from sediment_func import get_es, get_ew, get_ws
-from runge_kutta_grad import runge_kutta_grad
 from cip import cip_2d_diffusion, shock_dissipation
 from cip import rcip_2d_M_advection, cip_2d_nonadvection
-from landlab.io.native_landlab import save_grid
+from landlab.io.native_landlab import save_grid, load_grid
 from landlab.io.netcdf import write_netcdf
 from landlab.grid.structured_quad import links
 from landlab.utils.decorators import use_file_name_or_kwds
@@ -178,6 +177,7 @@ class TurbidityCurrent2D(Component):
                  flow_type='3eq',
                  implicit_num=50,
                  C_init=0.00001,
+                 gamma=0.35,
                  **kwds):
         """Create a debris-flow component.
 
@@ -233,6 +233,7 @@ class TurbidityCurrent2D(Component):
         self.lambda_p = lambda_p
         self.implicit_num = implicit_num
         self.C_init = C_init
+        self.gamma = gamma
 
         # Now setting up fields at nodes and links
         try:
@@ -1171,41 +1172,43 @@ def create_topography_from_geotiff(geotiff_filename,
 
 
 if __name__ == '__main__':
-    grid = create_topography(
-        length=5000,
-        width=2000,
-        spacing=10,
-        slope_outside=0.2,
-        slope_inside=0.05,
-        slope_basin_break=2000,
-        canyon_basin_break=2200,
-        canyon_center=1000,
-        canyon_half_width=100,
-    )
-    # grid = create_topography_from_geotiff('depth500.tif',
-    #                                       xlim=[200, 800],
-    #                                       ylim=[400, 1200],
-    #                                       spacing=500)
+    # grid = create_topography(
+    #     length=5000,
+    #     width=2000,
+    #     spacing=10,
+    #     slope_outside=0.2,
+    #     slope_inside=0.1,
+    #     slope_basin_break=2000,
+    #     canyon_basin_break=2200,
+    #     canyon_center=1000,
+    #     canyon_half_width=100,
+    # )
+    # # grid = create_topography_from_geotiff('depth500.tif',
+    # #                                       xlim=[200, 800],
+    # #                                       ylim=[400, 1200],
+    # #                                       spacing=500)
 
-    create_init_flow_region(
-        grid,
-        initial_flow_concentration=0.01,
-        initial_flow_thickness=100,
-        initial_region_radius=100,
-        initial_region_center=[1000, 4000],
-    )
     # create_init_flow_region(
     #     grid,
     #     initial_flow_concentration=0.01,
-    #     initial_flow_thickness=500,
-    #     initial_region_radius=30000,
-    #     initial_region_center=[200000, 125000],
+    #     initial_flow_thickness=100,
+    #     initial_region_radius=100,
+    #     initial_region_center=[1000, 4000],
     # )
+    # # create_init_flow_region(
+    # #     grid,
+    # #     initial_flow_concentration=0.01,
+    # #     initial_flow_thickness=500,
+    # #     initial_region_radius=30000,
+    # #     initial_region_center=[200000, 125000],
+    # # )
+
+    grid = load_grid('tc0050.grid')
 
     # making turbidity current object
     tc = TurbidityCurrent2D(grid,
                             Cf=0.004,
-                            alpha=0.2,
+                            alpha=0.05,
                             kappa=0.25,
                             Ds=100 * 10**-6,
                             h_init=0.00001,
@@ -1216,17 +1219,17 @@ if __name__ == '__main__':
 
     # start calculation
     t = time.time()
-    tc.save_grid('tc{:04d}.grid'.format(0), clobber=True)
+    tc.save_nc('tc{:04d}.nc'.format(50))
     Ch_init = np.sum(tc.Ch)
-    last = 10
+    last = 100
 
-    for i in range(1, last + 1):
-        tc.run_one_step(dt=1.0)
-        tc.save_grid('tc{:04d}.grid'.format(i), clobber=True)
-        tc.save_nc('tc{:04d}.grid'.format(i))
+    for i in range(50, last + 1):
+        tc.run_one_step(dt=10.0)
+        tc.save_nc('tc{:04d}.nc'.format(i))
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
         if np.sum(tc.Ch) / Ch_init < 0.01:
             break
 
     print('elapsed time: {} sec.'.format(time.time() - t))
+    tc.save_grid('tc{:04d}.grid'.format(i), clobber=True)
