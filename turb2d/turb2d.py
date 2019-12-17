@@ -74,10 +74,10 @@ Examples
     print('elapsed time: {} sec.'.format(time.time() - t))
 
 """
-from gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
-from gridutils import map_values, map_links_to_nodes, map_nodes_to_links
-from wetdry import find_wet_grids, process_partial_wet_grids
-from sediment_func import get_es, get_ew, get_ws
+from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
+from .gridutils import map_values, map_links_to_nodes, map_nodes_to_links
+from .wetdry import find_wet_grids, process_partial_wet_grids
+from .sediment_func import get_es, get_ew, get_ws
 from cip import cip_2d_diffusion, shock_dissipation
 from cip import rcip_2d_M_advection, cip_2d_nonadvection
 from landlab.io.native_landlab import save_grid, load_grid

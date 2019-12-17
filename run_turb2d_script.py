@@ -49,23 +49,23 @@ tc = TurbidityCurrent2D(grid,
                         kappa=0.25,
                         Ds=80 * 10**-6,
                         h_init=0.00001,
-                        h_w=0.01,
+                        h_w=0.001,
                         C_init=0.00001,
                         implicit_num=20,
                         r0=1.5)
 
 # start calculation
 t = time.time()
-write_netcdf('tc{:04d}.nc'.format(0), grid)
+tc.save_nc('tc{:04d}.nc'.format(0))
 Ch_init = np.sum(tc.Ch)
-last = 2
+last = 100
 
 for i in range(1, last + 1):
-    tc.run_one_step(dt=1.0)
-    write_netcdf('tc{:04d}.nc'.format(i), grid)
+    tc.run_one_step(dt=20.0)
+    tc.save_nc('tc{:04d}.nc'.format(i))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')
     if np.sum(tc.Ch) / Ch_init < 0.01:
         break
-save_grid(grid, 'tc{:04d}.nc'.format(i), clobber=True)
+tc.save_grid('tc{:04d}.nc'.format(i))
 print('elapsed time: {} sec.'.format(time.time() - t))
