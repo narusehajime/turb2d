@@ -293,6 +293,19 @@ class TurbidityCurrent2D(Component):
             self.u = grid.at_link['flow__horizontal_velocity']
             self.v = grid.at_link['flow__vertical_velocity']
 
+        try:
+            self.u_node = grid.add_zeros(
+                'flow__horizontal_velocity_at_node',
+                at='node',
+                units=self._var_units['flow__horizontal_velocity'])
+            self.v_node = grid.add_zeros(
+                'flow__vertical_velocity_at_node',
+                at='node',
+                units=self._var_units['flow__vertical_velocity'])
+        except FieldError:
+            self.u_node = grid.at_node['flow__horizontal_velocity_at_node']
+            self.v_node = grid.at_node['flow__vertical_velocity_at_node']
+
         self.h += self.h_init
         self.C += self.C_init
 
@@ -572,7 +585,7 @@ class TurbidityCurrent2D(Component):
             self.Ch_prev[:] = self.Ch_temp[:]
             converge = 10.0
             count = 0
-            while ((converge > 1.0 * 10**-12) and (count < self.implicit_num)):
+            while ((converge > 1.0 * 10**-15) and (count < self.implicit_num)):
 
                 self.calc_G_u(self.h_temp, self.h_link_temp, self.u_temp,
                               self.v_temp, self.Ch_temp, self.Ch_link_temp,
@@ -651,12 +664,12 @@ class TurbidityCurrent2D(Component):
                     ((self.h_temp[self.wet_nodes]
                       - self.h_prev[self.wet_nodes])
                      / self.h_temp[self.wet_nodes])**2
-                ) / self.wet_nodes.shape[0] \
+                ) / self.grid.number_of_nodes \
                     + np.sum(
                     ((self.Ch_temp[self.wet_nodes]
                       - self.Ch_prev[self.wet_nodes])
                      / self.Ch_temp[self.wet_nodes])**2
-                ) / self.wet_nodes[0]
+                ) / self.grid.number_of_nodes
 
                 self.h_prev[:] = self.h_temp[:]
                 self.Ch_prev[:] = self.Ch_temp[:]
@@ -868,6 +881,8 @@ class TurbidityCurrent2D(Component):
         self.grid.at_node['topographic__elevation'] = self.eta
         self.grid.at_node['bed__thickness'] = self.bed_thick
         self.grid.at_node['flow__surface_elevation'] = self.eta + self.h
+        self.grid.at_node['flow__horizontal_velocity_at_node'] = self.u_node
+        self.grid.at_node['flow__vertical_velocity_at_node'] = self.v_node
         self.grid.at_link[
             'flow_horizontal_velocity__horizontal_gradient'] = self.dudx
         self.grid.at_link[
@@ -1172,43 +1187,41 @@ def create_topography_from_geotiff(geotiff_filename,
 
 
 if __name__ == '__main__':
-    # grid = create_topography(
-    #     length=5000,
-    #     width=2000,
-    #     spacing=10,
-    #     slope_outside=0.2,
-    #     slope_inside=0.1,
-    #     slope_basin_break=2000,
-    #     canyon_basin_break=2200,
-    #     canyon_center=1000,
-    #     canyon_half_width=100,
-    # )
-    # # grid = create_topography_from_geotiff('depth500.tif',
-    # #                                       xlim=[200, 800],
-    # #                                       ylim=[400, 1200],
-    # #                                       spacing=500)
+    grid = create_topography(
+        length=5000,
+        width=2000,
+        spacing=10,
+        slope_outside=0.2,
+        slope_inside=0.1,
+        slope_basin_break=2000,
+        canyon_basin_break=2200,
+        canyon_center=1000,
+        canyon_half_width=100,
+    )
+    # grid = create_topography_from_geotiff('depth500.tif',
+    #                                       xlim=[200, 800],
+    #                                       ylim=[400, 1200],
+    #                                       spacing=500)
 
+    create_init_flow_region(
+        grid,
+        initial_flow_concentration=0.01,
+        initial_flow_thickness=100,
+        initial_region_radius=100,
+        initial_region_center=[1000, 4000],
+    )
     # create_init_flow_region(
     #     grid,
     #     initial_flow_concentration=0.01,
-    #     initial_flow_thickness=100,
-    #     initial_region_radius=100,
-    #     initial_region_center=[1000, 4000],
+    #     initial_flow_thickness=500,
+    #     initial_region_radius=30000,
+    #     initial_region_center=[200000, 125000],
     # )
-    # # create_init_flow_region(
-    # #     grid,
-    # #     initial_flow_concentration=0.01,
-    # #     initial_flow_thickness=500,
-    # #     initial_region_radius=30000,
-    # #     initial_region_center=[200000, 125000],
-    # # )
-
-    grid = load_grid('tc0050.grid')
 
     # making turbidity current object
     tc = TurbidityCurrent2D(grid,
                             Cf=0.004,
-                            alpha=0.05,
+                            alpha=0.1,
                             kappa=0.25,
                             Ds=100 * 10**-6,
                             h_init=0.00001,
@@ -1219,17 +1232,17 @@ if __name__ == '__main__':
 
     # start calculation
     t = time.time()
-    tc.save_nc('tc{:04d}.nc'.format(50))
+    tc.save_nc('test{:04d}.nc'.format(0))
     Ch_init = np.sum(tc.Ch)
-    last = 100
+    last = 2
 
-    for i in range(50, last + 1):
-        tc.run_one_step(dt=10.0)
-        tc.save_nc('tc{:04d}.nc'.format(i))
+    for i in range(1, last + 1):
+        tc.run_one_step(dt=1.0)
+        tc.save_nc('test{:04d}.nc'.format(i))
         print("", end="\r")
         print("{:.1f}% finished".format(i / last * 100), end='\r')
         if np.sum(tc.Ch) / Ch_init < 0.01:
             break
 
     print('elapsed time: {} sec.'.format(time.time() - t))
-    tc.save_grid('tc{:04d}.grid'.format(i), clobber=True)
+    tc.save_grid('test{:04d}.grid'.format(i), clobber=True)
