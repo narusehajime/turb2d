@@ -389,14 +389,14 @@ def shock_dissipation(
 
     # First, artificial diffusion is applied to east-west direction
     eps_i[core] = kappa * np.abs(h[east] - 2 * h[core] + h[west]) / \
-        (np.abs(h[east]) + 2 * np.abs(h[core]) + np.abs(h[west]) + 10**-15)
+        (np.abs(h[east]) + 2 * np.abs(h[core]) + np.abs(h[west]) + 10**-20)
     eps_i_half[core] = np.max([eps_i[east], eps_i[core]], axis=0)
     out[core] = f[core] + eps_i_half[core] * (f[east] - f[core]) - \
         eps_i_half[west] * (f[core] - f[west])
 
     # Next, artificial diffusion is applied to north-south direction
     eps_i[core] = kappa * np.abs(h[north] - 2 * h[core] + h[south]) / (
-        np.abs(h[north]) + 2 * np.abs(h[core]) + np.abs(h[south]) + 10**-15)
+        np.abs(h[north]) + 2 * np.abs(h[core]) + np.abs(h[south]) + 10**-20)
     eps_i_half[core] = np.max([eps_i[north], eps_i[core]], axis=0)
     out[core] = out[core] + (eps_i_half[core] *
                              (out[north] - out[core]) - eps_i_half[south] *
