@@ -9,9 +9,9 @@ with open('README.rst') as f:
 with open('LICENSE') as f:
     license = f.read()
 
-# ext = Extension("cip",
-#                 sources=["turb2d/cip.pyx"],
-#                 include_dirs=[np.get_include()])
+ext = Extension("cip",
+                sources=["turb2d/cip.pyx"],
+                include_dirs=[np.get_include()])
 # ext2 = Extension("gridutils",
 #                  sources=["turb2d/gridutils.pyx"],
 #                  include_dirs=[np.get_include()])
@@ -27,5 +27,5 @@ setup(
     license=license,
     install_requires=['numpy', 'landlab', 'matplotlib', 'gdal', 'cython'],
     # ext_modules=cythonize([ext, ext2]),
-    # ext_modules=cythonize([ext]),
+    ext_modules=cythonize([ext]),
     packages=find_packages(exclude=('tests', 'docs')))

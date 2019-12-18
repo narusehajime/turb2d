@@ -401,3 +401,5 @@ def shock_dissipation(
     out[core] = out[core] + (eps_i_half[core] *
                              (out[north] - out[core]) - eps_i_half[south] *
                              (out[core] - out[south]))
+
+    return out

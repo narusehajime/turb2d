@@ -78,8 +78,8 @@ from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
 from .gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from .wetdry import find_wet_grids, process_partial_wet_grids
 from .sediment_func import get_es, get_ew, get_ws
-from .cip import cip_2d_diffusion, shock_dissipation
-from .cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_M_advection
+from cip import cip_2d_diffusion, shock_dissipation
+from cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_M_advection
 from landlab.io.native_landlab import save_grid, load_grid
 from landlab.io.netcdf import write_netcdf
 from landlab.grid.structured_quad import links
@@ -215,7 +215,7 @@ class TurbidityCurrent2D(Component):
             Minimum value of sediment concentration.
         gamma: float, optional
             Coefficient for calculating flow front between dry and wet grids.
-        
+
         """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
 
@@ -232,7 +232,6 @@ class TurbidityCurrent2D(Component):
         self.g = g
         self.R = R
         self.Ds = Ds
-        self.flow_type = flow_type
         self.h_w = h_w
         self.nu = nu
         self.kappa = kappa
@@ -456,7 +455,6 @@ class TurbidityCurrent2D(Component):
         # self.first_stage_count = 0
 
         self.neighbor_flag = False
-        self.default_fixed_links = default_fixed_links
 
     def calc_time_step(self):
         """Calculate time step
