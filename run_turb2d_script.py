@@ -1,8 +1,8 @@
 """This is a script to run the model of TurbidityCurrent2D
 """
 import os
-os.environ['MKL_NUM_THREADS'] = '1'
-os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '6'
+os.environ['OMP_NUM_THREADS'] = '6'
 import numpy as np
 from turb2d import create_topography
 from turb2d import create_init_flow_region, create_topography_from_geotiff
@@ -45,11 +45,11 @@ create_init_flow_region(
 # making turbidity current object
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
-                        alpha=0.1,
+                        alpha=0.05,
                         kappa=0.25,
                         Ds=80 * 10**-6,
                         h_init=0.00001,
-                        h_w=0.001,
+                        h_w=0.01,
                         C_init=0.00001,
                         implicit_num=20,
                         r0=1.5)
@@ -61,7 +61,7 @@ Ch_init = np.sum(tc.Ch)
 last = 100
 
 for i in range(1, last + 1):
-    tc.run_one_step(dt=20.0)
+    tc.run_one_step(dt=10.0)
     tc.save_nc('tc{:04d}.nc'.format(i))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')
