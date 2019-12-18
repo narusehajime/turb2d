@@ -46,7 +46,7 @@ create_init_flow_region(
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
                         alpha=0.05,
-                        kappa=0.25,
+                        kappa=0.001,
                         Ds=80 * 10**-6,
                         h_init=0.00001,
                         h_w=0.01,
@@ -61,7 +61,7 @@ Ch_init = np.sum(tc.Ch)
 last = 100
 
 for i in range(1, last + 1):
-    tc.run_one_step(dt=10.0)
+    tc.run_one_step(dt=20.0)
     tc.save_nc('tc{:04d}.nc'.format(i))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')

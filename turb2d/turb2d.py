@@ -57,7 +57,7 @@ Examples
     tc = TurbidityCurrent2D(
         grid,
         Cf=0.004,
-        alpha=0.2,
+        alpha=0.1,
         kappa=0.001,
         Ds=80 * 10**-6,
     )
@@ -164,10 +164,9 @@ class TurbidityCurrent2D(Component):
     @use_file_name_or_kwds
     def __init__(self,
                  grid,
-                 default_fixed_links=False,
                  h_init=0.0001,
                  h_w=0.01,
-                 alpha=0.1,
+                 alpha=0.05,
                  Cf=0.004,
                  g=9.81,
                  R=1.65,
@@ -175,9 +174,8 @@ class TurbidityCurrent2D(Component):
                  lambda_p=0.4,
                  r0=1.5,
                  nu=1.010 * 10**-6,
-                 kappa=0.25,
-                 flow_type='3eq',
-                 implicit_num=50,
+                 kappa=0.001,
+                 implicit_num=20,
                  C_init=0.00001,
                  gamma=0.35,
                  **kwds):
@@ -206,11 +204,18 @@ class TurbidityCurrent2D(Component):
             Bed sediment porosity(1)
         nu: float, optional
             Kinematic viscosity of water(at 293K)
-        nu_t: float, optional
-            Eddy viscosity for horizontal velocity components
-        flow_type: str, optional
-            '3eq' for the three equation model
-            '4eq' for the four equation model(not implemented)
+        kappa: float, optional
+            Artificial viscosity. This value, alpha and h_w affect to 
+            calculation stability.
+        implicit_num: float, optional
+            Maximum number of loops for implicit calculation.
+        r0: float, optional
+            Ratio of near-bed concentration to layer-averaged concentration
+        C_init: float, optional
+            Minimum value of sediment concentration.
+        gamma: float, optional
+            Coefficient for calculating flow front between dry and wet grids.
+        
         """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
 
@@ -737,7 +742,7 @@ class TurbidityCurrent2D(Component):
             # apply the shock dissipation scheme
             shock_dissipation(
                 self.Ch,
-                self.h,
+                self.Ch,
                 # self.wet_pwet_nodes,
                 self.core_nodes,
                 self.node_north,
@@ -750,7 +755,7 @@ class TurbidityCurrent2D(Component):
 
             shock_dissipation(
                 self.u,
-                self.h_link,
+                self.Ch_link,
                 # self.wet_pwet_horizontal_links,
                 self.horizontal_active_links,
                 self.link_north,
@@ -763,7 +768,7 @@ class TurbidityCurrent2D(Component):
 
             shock_dissipation(
                 self.v,
-                self.h_link,
+                self.Ch_link,
                 # self.wet_pwet_vertical_links,
                 self.vertical_active_links,
                 self.link_north,
@@ -776,7 +781,7 @@ class TurbidityCurrent2D(Component):
 
             shock_dissipation(
                 self.h,
-                self.h,
+                self.Ch,
                 # self.wet_pwet_nodes,
                 self.core_nodes,
                 self.node_north,
@@ -1232,11 +1237,9 @@ if __name__ == '__main__':
     tc = TurbidityCurrent2D(grid,
                             Cf=0.004,
                             alpha=0.05,
-                            kappa=0.25,
+                            kappa=0.001,
                             Ds=100 * 10**-6,
-                            h_init=0.00001,
-                            h_w=0.001,
-                            C_init=0.00001,
+                            h_w=0.01,
                             implicit_num=20,
                             r0=1.5)
 
