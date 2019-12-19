@@ -283,20 +283,20 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
     # 1st step for horizontal advection
     D_x = -np.where(u > 0., 1.0, -1.0) * dx
     xi_x = -u * dt
-    BB_x = np.ones(m, dtype=DOUBLE)
-    alpha = np.zeros(m, dtype=DOUBLE)
+    BB_x = np.ones(D_x[core].shape)
+    alpha = np.zeros(D_x[core].shape)
     S_x = (f[h_up] - f[core]) / D_x[core]
     dz_index = (dfdx[h_up] - S_x) == 0.0
     BB_x[dz_index] = -1.0 / D_x[core][dz_index]
     BB_x[~dz_index] = (np.abs(
         (S_x[~dz_index] - dfdx[core][~dz_index]) /
         (dfdx[h_up][~dz_index] - S_x[~dz_index] + 1.e-10)) -
-        1.0) / D_x[core][~dz_index]
+                       1.0) / D_x[core][~dz_index]
     alpha[(S_x - dfdx[core]) / (dfdx[h_up] - S_x + 1.e-10) >= 0.0] = 1.0
 
     a = (dfdx[core] - S_x +
-         (dfdx[h_up] - S_x) * (1.0 + alpha * BB_x * D_x[core])) \
-        / (D_x[core]**2)
+             (dfdx[h_up] - S_x) * (1.0 + alpha * BB_x * D_x[core])) \
+             / (D_x[core]**2)
     b = S_x * alpha * BB_x + (S_x - dfdx[core]) / D_x[core] - a * D_x[core]
     c = dfdx[core] + f[core] * alpha * BB_x
 
@@ -304,29 +304,29 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                    * xi_x[core] + f[core]) \
         / (1.0 + alpha * BB_x * xi_x[core])
     out_dfdx[core] = ((3. * a * xi_x[core] + 2. * b) * xi_x[core] + c) \
-        / (1.0 + alpha * BB_x * xi_x[core]) \
-        - out_f[core] * alpha * BB_x / (1.0 + alpha * BB_x * xi_x[core])
+            / (1.0 + alpha * BB_x * xi_x[core]) \
+            - out_f[core] * alpha * BB_x / (1.0 + alpha * BB_x * xi_x[core])
     out_dfdy[core] = dfdy[core] - xi_x[core] / \
         D_x[core] * (dfdy[core] - dfdy[h_up])
 
     # 2nd step for vertical advection
     D_y = -np.where(v > 0., 1.0, -1.0) * dx
     xi_y = -v * dt
-    BB_y = np.ones(m, dtype=DOUBLE)
-    alpha = np.zeros(m, dtype=DOUBLE)
+    BB_y = np.ones(D_y[core].shape)
+    alpha = np.zeros(D_y[core].shape)
     S_y = (out_f[v_up] - out_f[core]) / D_y[core]
     dz_index = (out_dfdy[v_up] - S_y) == 0.0
     BB_y[dz_index] = -1.0 / D_y[core][dz_index]
     BB_y[~dz_index] = (np.abs(
         (S_y[~dz_index] - out_dfdy[core][~dz_index]) /
         (out_dfdy[v_up][~dz_index] - S_y[~dz_index] + 1.e-10)) -
-        1.0) / D_y[core][~dz_index]
+                       1.0) / D_y[core][~dz_index]
     alpha[(S_y - out_dfdy[core]) /
           (out_dfdy[v_up] - S_y + 1.e-10) >= 0.0] = 1.0
 
     a = (out_dfdy[core] - S_y +
-         (out_dfdy[v_up] - S_y) * (1.0 + alpha * BB_y * D_y[core])) \
-        / (D_y[core]**2)
+             (out_dfdy[v_up] - S_y) * (1.0 + alpha * BB_y * D_y[core])) \
+             / (D_y[core]**2)
     b = S_y * alpha * BB_y + (S_y - out_dfdy[core]) / D_y[core] - a * D_y[core]
     c = out_dfdy[core] + out_f[core] * alpha * BB_y
 
@@ -334,8 +334,8 @@ def rcip_2d_M_advection(np.ndarray[DOUBLE_T, ndim=1] f,
                    * xi_y[core] + out_f[core]) \
         / (1.0 + alpha * BB_y * xi_y[core])
     out_dfdy[core] = ((3. * a * xi_y[core] + 2. * b) * xi_y[core] + c) \
-        / (1.0 + alpha * BB_y * xi_y[core]) \
-        - out_f[core] * alpha * BB_y / (1.0 + alpha * BB_y * xi_y[core])
+            / (1.0 + alpha * BB_y * xi_y[core]) \
+            - out_f[core] * alpha * BB_y / (1.0 + alpha * BB_y * xi_y[core])
     out_dfdx[core] = out_dfdx[core] - xi_y[core] / \
         D_y[core] * (out_dfdx[core] - out_dfdx[v_up])
 
@@ -372,13 +372,15 @@ def shock_dissipation(
             indeces of nodes or links that locate east of core
         west_id : ndarray, int
             indeces of nodes or links that locate west of core
+        kappa : double
+            aritificial visocisty
     """
     cdef np.ndarray[DOUBLE_T, ndim = 1] eps_i, eps_i_half
     cdef np.ndarray[INT_T, ndim = 1] north, south, east, west
     cdef int n = f.shape[0]
 
     if out is None:
-        out = np.zeros(n)
+       out = np.zeros(n, dtype=DOUBLE)
 
     eps_i = np.zeros(n, dtype=DOUBLE)
     eps_i_half = np.zeros(n, dtype=DOUBLE)
@@ -388,15 +390,15 @@ def shock_dissipation(
     west = west_id[core]
 
     # First, artificial diffusion is applied to east-west direction
-    eps_i[core] = kappa * np.abs(h[east] - 2 * h[core] + h[west]) / \
-        (np.abs(h[east]) + 2 * np.abs(h[core]) + np.abs(h[west]) + 10**-20)
+    eps_i[core] = kappa * np.abs(h[east] - 2 * h[core] + h[west]) /\
+        (np.abs(h[east]) + 2 * np.abs(h[core]) + np.abs(h[west]) + 0.000000001)
     eps_i_half[core] = np.max([eps_i[east], eps_i[core]], axis=0)
     out[core] = f[core] + eps_i_half[core] * (f[east] - f[core]) - \
         eps_i_half[west] * (f[core] - f[west])
 
     # Next, artificial diffusion is applied to north-south direction
-    eps_i[core] = kappa * np.abs(h[north] - 2 * h[core] + h[south]) / (
-        np.abs(h[north]) + 2 * np.abs(h[core]) + np.abs(h[south]) + 10**-20)
+    eps_i[core] = kappa * np.abs(h[north] - 2 * h[core] + h[south]) /\
+        (np.abs(h[north]) + 2 * np.abs(h[core]) + np.abs(h[south]) + 0.000000001)
     eps_i_half[core] = np.max([eps_i[north], eps_i[core]], axis=0)
     out[core] = out[core] + (eps_i_half[core] *
                              (out[north] - out[core]) - eps_i_half[south] *

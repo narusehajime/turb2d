@@ -88,8 +88,6 @@ from landlab import Component, FieldError, RasterModelGrid
 import numpy as np
 import time
 from osgeo import gdal, gdalconst
-import ipdb
-ipdb.set_trace()
 
 
 class TurbidityCurrent2D(Component):
@@ -740,7 +738,7 @@ class TurbidityCurrent2D(Component):
             # apply the shock dissipation scheme
             shock_dissipation(
                 self.Ch,
-                self.Ch,
+                self.Ch * self.h,
                 # self.wet_pwet_nodes,
                 self.core_nodes,
                 self.node_north,
@@ -753,7 +751,7 @@ class TurbidityCurrent2D(Component):
 
             shock_dissipation(
                 self.u,
-                self.Ch_link,
+                self.Ch_link * self.h_link,
                 # self.wet_pwet_horizontal_links,
                 self.horizontal_active_links,
                 self.link_north,
@@ -766,7 +764,7 @@ class TurbidityCurrent2D(Component):
 
             shock_dissipation(
                 self.v,
-                self.Ch_link,
+                self.Ch_link * self.h_link,
                 # self.wet_pwet_vertical_links,
                 self.vertical_active_links,
                 self.link_north,
@@ -779,7 +777,7 @@ class TurbidityCurrent2D(Component):
 
             shock_dissipation(
                 self.h,
-                self.Ch,
+                self.Ch * self.h,
                 # self.wet_pwet_nodes,
                 self.core_nodes,
                 self.node_north,

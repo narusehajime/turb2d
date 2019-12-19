@@ -61,7 +61,7 @@ Ch_init = np.sum(tc.Ch)
 last = 10
 
 for i in range(1, last + 1):
-    tc.run_one_step(dt=1.0)
+    tc.run_one_step(dt=2.0)
     tc.save_nc('tc{:04d}.nc'.format(i))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')
