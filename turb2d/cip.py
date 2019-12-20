@@ -40,8 +40,8 @@ def cip_2d_M_advection(f,
         + dfdx[core] * xi_x[core] + f[core]
     out_dfdx[core] = 3 * a * (xi_x[core] ** 2) + 2 * b * xi_x[core]\
         + dfdx[core]
-    out_dfdy[core] = dfdy[core] - xi_x[core] / \
-        D_x[core] * (dfdy[core] - dfdy[h_up])
+    out_dfdy[core] = dfdy[core] + xi_x[core] / \
+        dx * (dfdy[core] - dfdy[h_up])
 
     # 2nd step for vertical advection
     D_y = -np.where(v > 0., 1.0, -1.0) * dx
@@ -54,8 +54,8 @@ def cip_2d_M_advection(f,
         + out_dfdy[core] * xi_y[core] + out_f[core]
     out_dfdy[core] = 3 * a * (xi_y[core] ** 2) + 2 * b * xi_y[core]\
         + out_dfdy[core]
-    out_dfdx[core] = out_dfdx[core] - xi_y[core] / \
-        D_y[core] * (out_dfdx[core] - out_dfdx[v_up])
+    out_dfdx[core] = out_dfdx[core] + xi_y[core] / \
+        dx * (out_dfdx[core] - out_dfdx[v_up])
 
     return out_f, out_dfdx, out_dfdy
 
@@ -138,18 +138,19 @@ def cip_2d_diffusion(u,
 
     return out_u, out_v
 
-    def rcip_1d_advection(self,
-                          f,
-                          dfdx,
-                          u,
-                          core,
-                          up,
-                          down,
-                          dx,
-                          dt,
-                          out_f=None,
-                          out_dfdx=None):
-        """ calculate 1 step of advection phase by rational function
+
+def rcip_1d_advection(self,
+                      f,
+                      dfdx,
+                      u,
+                      core,
+                      up,
+                      down,
+                      dx,
+                      dt,
+                      out_f=None,
+                      out_dfdx=None):
+    """ calculate 1 step of advection phase by rational function
             CIP method.
 
             Parameters
@@ -194,38 +195,37 @@ def cip_2d_diffusion(u,
 
         """
 
-        if out_f is None:
-            out_f = np.zeros(f.shape)
-        if out_dfdx is None:
-            out_dfdx = np.zeros(f.shape)
+    if out_f is None:
+        out_f = np.zeros(f.shape)
+    if out_dfdx is None:
+        out_dfdx = np.zeros(f.shape)
 
-        # advection phase
-        D = -np.where(u > 0., 1.0, -1.0) * dx
-        xi = -u * dt
-        BB = np.ones(D[core].shape)
-        alpha = np.zeros(D[core].shape)
-        S = (f[up] - f[core]) / D[core]
-        dz_index = (dfdx[up] - S) == 0.0
-        BB[dz_index] = -1.0 / D[core][dz_index]
-        BB[~dz_index] = (np.abs(
-            (S[~dz_index] - dfdx[core][~dz_index]) /
-            (dfdx[up][~dz_index] - S[~dz_index] + 1.e-10)) -
-                         1.0) / D[core][~dz_index]
-        alpha[(S - dfdx[core]) / (dfdx[up] - S + 1.e-10) >= 0.0] = 1.0
+    # advection phase
+    D = -np.where(u > 0., 1.0, -1.0) * dx
+    xi = -u * dt
+    BB = np.ones(D[core].shape)
+    alpha = np.zeros(D[core].shape)
+    S = (f[up] - f[core]) / D[core]
+    dz_index = (dfdx[up] - S) == 0.0
+    BB[dz_index] = -1.0 / D[core][dz_index]
+    BB[~dz_index] = (np.abs((S[~dz_index] - dfdx[core][~dz_index]) /
+                            (dfdx[up][~dz_index] - S[~dz_index] + 1.e-10)) -
+                     1.0) / D[core][~dz_index]
+    alpha[(S - dfdx[core]) / (dfdx[up] - S + 1.e-10) >= 0.0] = 1.0
 
-        a = (dfdx[core] - S + (dfdx[up] - S) *
-             (1.0 + alpha * BB * D[core])) / (D[core]**2)
-        b = S * alpha * BB + (S - dfdx[core]) / D[core] - a * D[core]
-        c = dfdx[core] + f[core] * alpha * BB
+    a = (dfdx[core] - S + (dfdx[up] - S) *
+         (1.0 + alpha * BB * D[core])) / (D[core]**2)
+    b = S * alpha * BB + (S - dfdx[core]) / D[core] - a * D[core]
+    c = dfdx[core] + f[core] * alpha * BB
 
-        out_f[core] = (((a * xi[core] + b) * xi[core] + c)
-                       * xi[core] + f[core]) \
-            / (1.0 + alpha * BB * xi[core])
-        out_dfdx[core] = ((3. * a * xi[core] + 2. * b) * xi[core] + c) \
-            / (1.0 + alpha * BB * xi[core]) \
-            - out_f[core] * alpha * BB / (1.0 + alpha * BB * xi[core])
+    out_f[core] = (((a * xi[core] + b) * xi[core] + c)
+                   * xi[core] + f[core]) \
+        / (1.0 + alpha * BB * xi[core])
+    out_dfdx[core] = ((3. * a * xi[core] + 2. * b) * xi[core] + c) \
+        / (1.0 + alpha * BB * xi[core]) \
+        - out_f[core] * alpha * BB / (1.0 + alpha * BB * xi[core])
 
-        return out_f, out_dfdx
+    return out_f, out_dfdx
 
 
 def rcip_2d_M_advection(f,
@@ -282,8 +282,8 @@ def rcip_2d_M_advection(f,
     out_dfdx[core] = ((3. * a * xi_x[core] + 2. * b) * xi_x[core] + c) \
             / (1.0 + alpha * BB_x * xi_x[core]) \
             - out_f[core] * alpha * BB_x / (1.0 + alpha * BB_x * xi_x[core])
-    out_dfdy[core] = dfdy[core] - xi_x[core] / \
-        D_x[core] * (dfdy[core] - dfdy[h_up])
+    out_dfdy[core] = dfdy[core] + xi_x[core] / \
+        dx * (dfdy[core] - dfdy[h_up])
 
     # 2nd step for vertical advection
     D_y = -np.where(v > 0., 1.0, -1.0) * dx
@@ -312,8 +312,8 @@ def rcip_2d_M_advection(f,
     out_dfdy[core] = ((3. * a * xi_y[core] + 2. * b) * xi_y[core] + c) \
             / (1.0 + alpha * BB_y * xi_y[core]) \
             - out_f[core] * alpha * BB_y / (1.0 + alpha * BB_y * xi_y[core])
-    out_dfdx[core] = out_dfdx[core] - xi_y[core] / \
-        D_y[core] * (out_dfdx[core] - out_dfdx[v_up])
+    out_dfdx[core] = out_dfdx[core] + xi_y[core] / \
+        dx * (out_dfdx[core] - out_dfdx[v_up])
 
     return out_f, out_dfdx, out_dfdy
 
@@ -377,3 +377,56 @@ def shock_dissipation(
                              (out[core] - out[south]))
 
     return out
+
+
+def update_gradient_terms(f,
+                          f_new,
+                          dfdx,
+                          dfdy,
+                          core,
+                          north,
+                          south,
+                          east,
+                          west,
+                          dx,
+                          out_dfdx=None,
+                          out_dfdy=None):
+    """update gradient terms that are used in cip scheme. When f is updated,
+       this function must be executed.
+       
+       Parameters
+       ---------------
+       f : ndarray, float
+         Main variable before update
+       f_new : ndarray, float
+         Main variable after update
+       dfdx : ndarray, float
+         f differentiated by x
+       dfdy : ndarray, float
+         f differentiated by y
+       north : ndarray, int
+         grid id located at north
+       south : ndarray, int
+         grid id located at south
+       east : ndarray, int
+         grid id located at east
+       west : ndarray, int
+         grid id located at west
+       dx : float
+         grid spacing
+       out_dfdx : ndarray, float
+         output for dfdx
+       out_dfdy : ndarray, float
+         output for dfdy
+    """
+    if out_dfdx is None:
+        out_dfdx = np.zeros(dfdx.shape[0])
+    if out_dfdy is None:
+        out_dfdy = np.zeros(dfdy.shape[0])
+
+    out_dfdx[core] = dfdx[core] + 1 / (2 * dx) * (f_new[east] - f[east] -
+                                                  f_new[west] + f[west])
+    out_dfdy[core] = dfdy[core] + 1 / (2 * dx) * (f_new[north] - f[north] -
+                                                  f_new[south] + f[south])
+
+    return out_dfdx, out_dfdy

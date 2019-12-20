@@ -48,20 +48,20 @@ tc = TurbidityCurrent2D(grid,
                         alpha=0.05,
                         kappa=0.001,
                         Ds=80 * 10**-6,
-                        h_init=0.00001,
+                        h_init=0.0000,
                         h_w=0.01,
-                        C_init=0.00001,
-                        implicit_num=20,
+                        C_init=0.0000,
+                        implicit_num=30,
                         r0=1.5)
 
 # start calculation
 t = time.time()
 tc.save_nc('tc{:04d}.nc'.format(0))
 Ch_init = np.sum(tc.Ch)
-last = 10
+last = 100
 
 for i in range(1, last + 1):
-    tc.run_one_step(dt=2.0)
+    tc.run_one_step(dt=20.0)
     tc.save_nc('tc{:04d}.nc'.format(i))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')

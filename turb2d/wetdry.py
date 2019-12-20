@@ -4,6 +4,7 @@
 """
 
 import numpy as np
+from .cip import update_gradient_terms
 
 
 def find_wet_grids(tc, h):
@@ -175,6 +176,13 @@ def find_wet_grids(tc, h):
     tc.wet_pwet_links = np.concatenate(
         [tc.wet_pwet_horizontal_links, tc.wet_pwet_vertical_links])
 
+    #################################
+    #
+    #
+    tc.wettest_nodes = np.unique(
+        np.concatenate(
+            [tc.horizontally_wettest_nodes, tc.vertically_wettest_nodes]))
+
     ############################
     # find dry nodes and links #
     ############################
@@ -247,17 +255,6 @@ def process_partial_wet_grids(
     # horizontal and vertical flow discharge between wet #
     # and partial wet nodes                              #
     ######################################################
-
-    # overspill_velocity_x = gamma * np.sqrt(
-    #     2.0 * R * g * Ch[horizontally_wettest_nodes]) / dx * dt
-    # overspill_velocity_y = gamma * np.sqrt(
-    #     2.0 * R * g * Ch[vertically_wettest_nodes]) / dx * dt
-
-    # M_horiz = h[horizontally_wettest_nodes] * overspill_velocity_x
-    # M_vert = h[vertically_wettest_nodes] * overspill_velocity_y
-    # CM_horiz = Ch[horizontally_wettest_nodes] * overspill_velocity_x
-    # CM_vert = Ch[vertically_wettest_nodes] * overspill_velocity_y
-
     M_horiz, CM_horiz = calc_overspill_velocity(h[horizontally_wettest_nodes],
                                                 Ch[horizontally_wettest_nodes],
                                                 gamma, R, g, dx, dt)
@@ -289,15 +286,20 @@ def process_partial_wet_grids(
     Ch_out[vertically_partial_wet_nodes] += CM_vert
     Ch_out[vertically_wettest_nodes] -= CM_vert
 
+    # tc.M_horiz = horizontal_direction_wettest * M_horiz
+    # tc.CM_horiz = horizontal_direction_wettest * CM_horiz
+    # tc.M_vert = vertical_direction_wettest * M_vert
+    # tc.CM_vert = vertical_direction_wettest * CM_vert
+
     ################################################################
     # Calculate time development of variables at partial wet links #
     ################################################################
-    # CfuU = Cf * u[partial_wet_horizontal_links] \
-    #     * np.sqrt(u[partial_wet_horizontal_links]**2
-    #               + v[partial_wet_horizontal_links]**2)
-    # CfvU = Cf * v[partial_wet_vertical_links] \
-    #     * np.sqrt(u[partial_wet_vertical_links]**2
-    #               + v[partial_wet_vertical_links]**2)
+    CfuU = Cf * u[partial_wet_horizontal_links] \
+        * np.sqrt(u[partial_wet_horizontal_links]**2
+                  + v[partial_wet_horizontal_links]**2)
+    CfvU = Cf * v[partial_wet_vertical_links] \
+        * np.sqrt(u[partial_wet_vertical_links]**2
+                  + v[partial_wet_vertical_links]**2)
 
     hdw = horizontal_direction_wettest
     vdw = vertical_direction_wettest
@@ -306,13 +308,41 @@ def process_partial_wet_grids(
         partial_wet_horizontal_links] \
         + hdw * gamma * np.sqrt(2.0 * R * g
         * Ch_out[horizontally_wettest_nodes]) \
-        # - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
+        - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
 
     v_out[partial_wet_vertical_links] = v[
         partial_wet_vertical_links] \
         + vdw * gamma * np.sqrt(2.0 * R * g
         * Ch_out[vertically_wettest_nodes]) \
-        # - CfvU / (h[vertically_wettest_nodes] / 2) * dt
+        - CfvU / (h[vertically_wettest_nodes] / 2) * dt
+
+    #######################################
+    # Update gradient terms of velocities #
+    #######################################
+    # update_gradient_terms(u,
+    #                       u_out,
+    #                       tc.dudx,
+    #                       tc.dudy,
+    #                       tc.wet_pwet_horizontal_links,
+    #                       tc.link_north[tc.wet_pwet_horizontal_links],
+    #                       tc.link_south[tc.wet_pwet_horizontal_links],
+    #                       tc.link_east[tc.wet_pwet_horizontal_links],
+    #                       tc.link_west[tc.wet_pwet_horizontal_links],
+    #                       tc.grid.dx,
+    #                       out_dfdx=tc.dudx_temp,
+    #                       out_dfdy=tc.dudy_temp)
+    # update_gradient_terms(tc.v,
+    #                       v_out,
+    #                       tc.dvdx,
+    #                       tc.dvdy,
+    #                       tc.wet_pwet_vertical_links,
+    #                       tc.link_north[tc.wet_pwet_vertical_links],
+    #                       tc.link_south[tc.wet_pwet_vertical_links],
+    #                       tc.link_east[tc.wet_pwet_vertical_links],
+    #                       tc.link_west[tc.wet_pwet_vertical_links],
+    #                       tc.grid.dx,
+    #                       out_dfdx=tc.dvdx_temp,
+    #                       out_dfdy=tc.dvdy_temp)
 
 
 def calc_overspill_velocity(h, Ch, gamma, R, g, dx, dt):
