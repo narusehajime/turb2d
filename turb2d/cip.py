@@ -377,3 +377,28 @@ def shock_dissipation(
                              (out[core] - out[south]))
 
     return out
+
+
+def update_gradient(f,
+                    f_new,
+                    dfdx,
+                    dfdy,
+                    core,
+                    north,
+                    south,
+                    east,
+                    west,
+                    dx,
+                    out_dfdx=None,
+                    out_dfdy=None):
+    """Update gradients when main variables are updated
+    """
+    if out_dfdx is None:
+        out_dfdx = np.zeros(dfdx.shape[0], dtype=np.float)
+    if out_dfdy is None:
+        out_dfdx = np.zeros(dfdy.shape[0], dtype=np.float)
+
+    out_dfdx[core] = dfdx[core] + 1 / (2 * dx) * (f_new[east] - f_new[west] -
+                                                  f[east] + f[west])
+    out_dfdy[core] = dfdy[core] + 1 / (2 * dx) * (f_new[north] - f_new[south] -
+                                                  f[north] + f[south])
