@@ -571,7 +571,7 @@ class TurbidityCurrent2D(Component):
         """Calculate advection phase of the model
            Advection of flow velocities is calculated by CIP
         """
-        cip_2d_M_advection(
+        rcip_2d_M_advection(
             self.u,
             self.dudx,
             self.dudy,
@@ -588,7 +588,7 @@ class TurbidityCurrent2D(Component):
             out_dfdx=self.dudx_temp,
             out_dfdy=self.dudy_temp)
 
-        cip_2d_M_advection(
+        rcip_2d_M_advection(
             self.v,
             self.dvdx,
             self.dvdy,
@@ -634,42 +634,48 @@ class TurbidityCurrent2D(Component):
             self.calc_G_v(self.h_temp, self.h_link_temp, self.u_temp,
                           self.v_temp, self.Ch_temp, self.Ch_link_temp,
                           self.eta_temp, self.U_temp, self.wet_vertical_links)
+            self.u_temp[self.wet_horizontal_links] = self.u[
+                self.wet_horizontal_links] + self.G_u[
+                    self.wet_horizontal_links] * self.dt_local
+            self.v_temp[self.wet_vertical_links] = self.v[
+                self.wet_vertical_links] + self.G_v[
+                    self.wet_vertical_links] * self.dt_local
 
-            cip_2d_nonadvection(
-                self.u,
-                self.dudx,
-                self.dudy,
-                self.G_u,
-                self.u_temp,
-                self.v_temp,
-                self.wet_horizontal_links,
-                self.horizontal_up_links[self.wet_horizontal_links],
-                self.horizontal_down_links[self.wet_horizontal_links],
-                self.vertical_up_links[self.wet_horizontal_links],
-                self.vertical_down_links[self.wet_horizontal_links],
-                self.grid.dx,
-                self.dt_local,
-                out_f=self.u_temp,
-                out_dfdx=self.dudx_temp,
-                out_dfdy=self.dudy_temp)
+            # cip_2d_nonadvection(
+            #     self.u,
+            #     self.dudx,
+            #     self.dudy,
+            #     self.G_u,
+            #     self.u_temp,
+            #     self.v_temp,
+            #     self.wet_horizontal_links,
+            #     self.horizontal_up_links[self.wet_horizontal_links],
+            #     self.horizontal_down_links[self.wet_horizontal_links],
+            #     self.vertical_up_links[self.wet_horizontal_links],
+            #     self.vertical_down_links[self.wet_horizontal_links],
+            #     self.grid.dx,
+            #     self.dt_local,
+            #     out_f=self.u_temp,
+            #     out_dfdx=self.dudx_temp,
+            #     out_dfdy=self.dudy_temp)
 
-            cip_2d_nonadvection(
-                self.v,
-                self.dvdx,
-                self.dvdy,
-                self.G_v,
-                self.u_temp,
-                self.v_temp,
-                self.wet_vertical_links,
-                self.horizontal_up_links[self.wet_vertical_links],
-                self.horizontal_down_links[self.wet_vertical_links],
-                self.vertical_up_links[self.wet_vertical_links],
-                self.vertical_down_links[self.wet_vertical_links],
-                self.grid.dx,
-                self.dt_local,
-                out_f=self.v_temp,
-                out_dfdx=self.dvdx_temp,
-                out_dfdy=self.dvdy_temp)
+            # cip_2d_nonadvection(
+            #     self.v,
+            #     self.dvdx,
+            #     self.dvdy,
+            #     self.G_v,
+            #     self.u_temp,
+            #     self.v_temp,
+            #     self.wet_vertical_links,
+            #     self.horizontal_up_links[self.wet_vertical_links],
+            #     self.horizontal_down_links[self.wet_vertical_links],
+            #     self.vertical_up_links[self.wet_vertical_links],
+            #     self.vertical_down_links[self.wet_vertical_links],
+            #     self.grid.dx,
+            #     self.dt_local,
+            #     out_f=self.v_temp,
+            #     out_dfdx=self.dvdx_temp,
+            #     out_dfdy=self.dvdy_temp)
 
             map_links_to_nodes(
                 self,
@@ -716,6 +722,22 @@ class TurbidityCurrent2D(Component):
 
         if count == self.implicit_num:
             print('Implicit calculation did not converge')
+
+        # update gradient terms
+        update_gradient(self.u, self.u_temp, self.dudx, self.dudy,
+                        self.wet_pwet_horizontal_links,
+                        self.link_north[self.wet_pwet_horizontal_links],
+                        self.link_south[self.wet_pwet_horizontal_links],
+                        self.link_east[self.wet_pwet_horizontal_links],
+                        self.link_south[self.wet_pwet_horizontal_links],
+                        self.grid.dx, self.dudx_temp, self.dudy_temp)
+        update_gradient(self.v, self.v_temp, self.dvdx, self.dvdy,
+                        self.wet_pwet_vertical_links,
+                        self.link_north[self.wet_pwet_vertical_links],
+                        self.link_south[self.wet_pwet_vertical_links],
+                        self.link_east[self.wet_pwet_vertical_links],
+                        self.link_south[self.wet_pwet_vertical_links],
+                        self.grid.dx, self.dvdx_temp, self.dvdy_temp)
 
         # Find wet and partial wet grids
         find_wet_grids(self, self.h_temp)
