@@ -12,11 +12,11 @@ from landlab.io.netcdf import write_netcdf, read_netcdf
 from landlab.io.native_landlab import load_grid, save_grid
 
 grid = create_topography(
-    length=5000,
+    length=8000,
     width=2000,
     spacing=10,
     slope_outside=0.2,
-    slope_inside=0.05,
+    slope_inside=0.1,
     slope_basin_break=2000,
     canyon_basin_break=2200,
     canyon_center=1000,
@@ -30,8 +30,8 @@ grid = create_topography(
 create_init_flow_region(
     grid,
     initial_flow_concentration=0.01,
-    initial_flow_thickness=100,
-    initial_region_radius=100,
+    initial_flow_thickness=200,
+    initial_region_radius=200,
     initial_region_center=[1000, 4000],
 )
 # create_init_flow_region(
@@ -46,12 +46,12 @@ create_init_flow_region(
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
                         alpha=0.05,
-                        kappa=0.001,
+                        kappa=0.01,
                         Ds=80 * 10**-6,
-                        h_init=0.00001,
-                        h_w=0.01,
-                        C_init=0.00001,
-                        implicit_num=20,
+                        h_init=0.0,
+                        h_w=0.001,
+                        C_init=0.0,
+                        implicit_num=30,
                         r0=1.5)
 
 # start calculation

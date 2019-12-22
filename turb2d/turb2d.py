@@ -88,8 +88,6 @@ from landlab import Component, FieldError, RasterModelGrid
 import numpy as np
 import time
 from osgeo import gdal, gdalconst
-import ipdb
-ipdb.set_trace()
 
 
 class TurbidityCurrent2D(Component):
@@ -1097,14 +1095,13 @@ class TurbidityCurrent2D(Component):
         ew_link = self.ew_link[link_horiz]
         u_star_2 = self.Cf * u[link_horiz] * U_horiz_link
 
-        self.G_u[link_horiz] = -Rg * Ch_link[link_horiz] * eta_grad_x \
-            / h_link[link_horiz] \
-            - 0.5 * Rg * (
-            (Ch[node_east] * h[node_east]
-             - Ch[node_west] * h[node_west])
-            / dx) / h_link[link_horiz] \
-            - u_star_2 \
-            - ew_link * U_horiz_link * u[link_horiz] / h_link[link_horiz]
+        self.G_u[link_horiz] = (
+            -Rg * Ch_link[link_horiz] * eta_grad_x \
+            - 0.5 * Rg *
+            (Ch[node_east] * h[node_east] - Ch[node_west] * h[node_west])
+             / dx - u_star_2
+            - ew_link * U_horiz_link * u[link_horiz]) \
+            / h_link[link_horiz]
 
     def calc_G_v(self, h, h_link, u, v, Ch, Ch_link, eta, U, link_vert):
         """Calculate non-advection term for v
@@ -1124,14 +1121,13 @@ class TurbidityCurrent2D(Component):
         ew_link = self.ew_link[link_vert]
         v_star_2 = self.Cf * v[link_vert] * U_vert_link
 
-        self.G_v[link_vert] = -Rg * Ch_link[link_vert] * eta_grad_y \
-            / h_link[link_vert] \
-            - 0.5 * Rg * (
-            Ch[node_north] * h[node_north]
-            - Ch[node_south] * h[node_south]) \
-            / dx / h_link[link_vert]\
-            - v_star_2 \
-            - ew_link * U_vert_link * v[link_vert] / h_link[link_vert]
+        self.G_v[link_vert] = (
+            -Rg * Ch_link[link_vert] * eta_grad_y
+            - 0.5 * Rg *
+            (Ch[node_north] * h[node_north] - Ch[node_south] * h[node_south])
+            /dx - v_star_2
+            - ew_link * U_vert_link * v[link_vert]) \
+            / h_link[link_vert]
 
     def calc_G_eta(
             self,
