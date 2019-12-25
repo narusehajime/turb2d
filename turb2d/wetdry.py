@@ -259,12 +259,12 @@ def process_partial_wet_grids(
     # CM_horiz = Ch[horizontally_wettest_nodes] * overspill_velocity_x
     # CM_vert = Ch[vertically_wettest_nodes] * overspill_velocity_y
 
-    M_horiz, CM_horiz = calc_overspill_velocity(h[horizontally_wettest_nodes],
-                                                Ch[horizontally_wettest_nodes],
-                                                gamma, R, g, dx, dt)
-    M_vert, CM_vert = calc_overspill_velocity(h[vertically_wettest_nodes],
-                                              Ch[vertically_wettest_nodes],
-                                              gamma, R, g, dx, dt)
+    horizontal_overspill_velocity, M_horiz, CM_horiz = calc_overspill_velocity(
+        h[horizontally_wettest_nodes], Ch[horizontally_wettest_nodes], gamma,
+        R, g, dx, dt)
+    vertical_overspill_velocity, M_vert, CM_vert = calc_overspill_velocity(
+        h[vertically_wettest_nodes], Ch[vertically_wettest_nodes], gamma, R, g,
+        dx, dt)
 
     ################################################################
     # Calculate time development of variables at partial wet nodes #
@@ -274,21 +274,21 @@ def process_partial_wet_grids(
     half_dry = h_out[horizontally_wettest_nodes] < 8.0 * M_horiz
     M_horiz[half_dry] = h_out[horizontally_wettest_nodes][half_dry] / 8.0
     h_out[horizontally_partial_wet_nodes] += M_horiz
-    h_out[horizontally_wettest_nodes] -= M_horiz
+    # h_out[horizontally_wettest_nodes] -= M_horiz
     c_half_dry = Ch_out[horizontally_wettest_nodes] < 8.0 * CM_horiz
     CM_horiz[c_half_dry] = Ch_out[horizontally_wettest_nodes][c_half_dry] / 8.0
     Ch_out[horizontally_partial_wet_nodes] += CM_horiz
-    Ch_out[horizontally_wettest_nodes] -= CM_horiz
+    # Ch_out[horizontally_wettest_nodes] -= CM_horiz
 
     # overspilling vertically
     half_dry = h_out[vertically_wettest_nodes] < 8.0 * M_vert
     M_vert[half_dry] = h_out[vertically_wettest_nodes][half_dry] / 8.0
     h_out[vertically_partial_wet_nodes] += M_vert
-    h_out[vertically_wettest_nodes] -= M_vert
+    # h_out[vertically_wettest_nodes] -= M_vert
     c_half_dry = Ch_out[vertically_wettest_nodes] < 8.0 * CM_vert
     CM_vert[c_half_dry] = Ch_out[vertically_wettest_nodes][c_half_dry] / 8.0
     Ch_out[vertically_partial_wet_nodes] += CM_vert
-    Ch_out[vertically_wettest_nodes] -= CM_vert
+    # Ch_out[vertically_wettest_nodes] -= CM_vert
 
     ################################################################
     # Calculate time development of variables at partial wet links #
@@ -303,18 +303,21 @@ def process_partial_wet_grids(
     hdw = horizontal_direction_wettest
     vdw = vertical_direction_wettest
 
-    u_out[partial_wet_horizontal_links] = u[
-        partial_wet_horizontal_links] \
-        + hdw * gamma * np.sqrt(2.0 * R * g
-        * Ch_out[horizontally_wettest_nodes]) \
-        - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
+    # u_out[partial_wet_horizontal_links] = u[
+    #     partial_wet_horizontal_links] \
+    #     + hdw * horizontal_overspill_velocity \
+    #     - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
 
+    u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity
 
-    v_out[partial_wet_vertical_links] = v[
-        partial_wet_vertical_links] \
-        + vdw * gamma * np.sqrt(2.0 * R * g
-        * Ch_out[vertically_wettest_nodes]) \
-        - CfvU / (h[vertically_wettest_nodes] / 2) * dt
+    # v_out[partial_wet_vertical_links] = v[
+    #     partial_wet_vertical_links] \
+    #     + vdw * vertical_overspill_velocity \
+    #     - CfvU / (h[vertically_wettest_nodes] / 2) * dt
+    v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity
+
+    tc.horizontal_overspill_velocity = hdw * horizontal_overspill_velocity
+    tc.vertical_overspill_velocity = vdw * vertical_overspill_velocity
 
     update_gradient(u,
                     u_out,
@@ -339,8 +342,34 @@ def process_partial_wet_grids(
                     tc.link_east[tc.wet_pwet_vertical_links],
                     tc.link_west[tc.wet_pwet_vertical_links],
                     tc.grid.dx,
-                    out_dfdx=tc.dvdx_temp,
-                    out_dfdy=tc.dvdy_temp)
+                    out_dfdx=tc.dvdx,
+                    out_dfdy=tc.dvdy)
+
+    update_gradient(tc.h,
+                    h_out,
+                    tc.dhdx,
+                    tc.dhdy,
+                    tc.wet_nodes,
+                    tc.node_north[tc.wet_nodes],
+                    tc.node_south[tc.wet_nodes],
+                    tc.node_east[tc.wet_nodes],
+                    tc.node_west[tc.wet_nodes],
+                    tc.grid.dx,
+                    out_dfdx=tc.dhdx_temp,
+                    out_dfdy=tc.dhdy_temp)
+
+    update_gradient(tc.Ch,
+                    Ch_out,
+                    tc.dChdx,
+                    tc.dChdy,
+                    tc.wet_nodes,
+                    tc.node_north[tc.wet_nodes],
+                    tc.node_south[tc.wet_nodes],
+                    tc.node_east[tc.wet_nodes],
+                    tc.node_west[tc.wet_nodes],
+                    tc.grid.dx,
+                    out_dfdx=tc.dChdx_temp,
+                    out_dfdy=tc.dChdy_temp)
 
 
 def calc_overspill_velocity(h, Ch, gamma, R, g, dx, dt):
@@ -386,25 +415,26 @@ def calc_overspill_velocity(h, Ch, gamma, R, g, dx, dt):
     # horizontal and vertical flow discharge between wet #
     # and partial wet nodes                              #
     ######################################################
-    overspill_velocity1 = gamma * np.sqrt(2.0 * R * g * Ch) / dx
-    M1 = h * overspill_velocity1
-    CM1 = Ch * overspill_velocity1
+    overspill_velocity1 = gamma * np.sqrt(2.0 * R * g * Ch)
+    M1 = h * overspill_velocity1 / dx * dt
+    CM1 = Ch * overspill_velocity1 / dx * dt
 
-    overspill_velocity2 = gamma * np.sqrt(2.0 * R * g *
-                                          (Ch - CM1 * dt / 2.0)) / dx
-    M2 = (h - M1 * dt / 2.0) * overspill_velocity2
-    CM2 = (Ch - CM1 * dt / 2.0) * overspill_velocity2
+    overspill_velocity2 = gamma * np.sqrt(2.0 * R * g * (Ch - CM1 / 2.0))
+    M2 = (h - M1 * dt / 2.0) * overspill_velocity2 / dx * dt
+    CM2 = (Ch - CM1 * dt / 2.0) * overspill_velocity2 / dx * dt
 
-    overspill_velocity3 = gamma * np.sqrt(2.0 * R * g *
-                                          (Ch - CM2 * dt / 2.0)) / dx
-    M3 = (h - M2 * dt / 2.0) * overspill_velocity3
-    CM3 = (Ch - CM2 * dt / 2.0) * overspill_velocity3
+    overspill_velocity3 = gamma * np.sqrt(2.0 * R * g * (Ch - CM2 / 2.0))
+    M3 = (h - M2 * dt / 2.0) * overspill_velocity3 / dx * dt
+    CM3 = (Ch - CM2 * dt / 2.0) * overspill_velocity3 / dx * dt
 
-    overspill_velocity4 = gamma * np.sqrt(2.0 * R * g * (Ch - CM3 * dt)) / dx
-    M4 = (h - M3 * dt / 2.0) * overspill_velocity4
-    CM4 = (Ch - CM3 * dt / 2.0) * overspill_velocity4
+    overspill_velocity4 = gamma * np.sqrt(2.0 * R * g * (Ch - CM3 * dt))
+    M4 = (h - M3 * dt / 2.0) * overspill_velocity4 / dx * dt
+    CM4 = (Ch - CM3 * dt / 2.0) * overspill_velocity4 / dx * dt
 
+    overspill_velocity = 1 / 6.0 * (
+        overspill_velocity1 + 2.0 * overspill_velocity2 +
+        2.0 * overspill_velocity3 + overspill_velocity4) * dt
     M = 1 / 6.0 * (M1 + 2.0 * M2 + 2.0 * M3 + M4) * dt
     CM = 1 / 6.0 * (CM1 + 2.0 * CM2 + 2.0 * CM3 + CM4) * dt
 
-    return M, CM
+    return overspill_velocity, M, CM
