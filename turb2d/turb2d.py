@@ -78,7 +78,8 @@ from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
 from .gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from .wetdry import find_wet_grids, process_partial_wet_grids
 from .sediment_func import get_es, get_ew, get_ws
-from .cip import cip_2d_diffusion, shock_dissipation, update_gradient
+from .cip import cip_2d_diffusion, shock_dissipation
+from .cip import update_gradient, update_gradient2
 from .cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_M_advection
 from landlab.io.native_landlab import save_grid, load_grid
 from landlab.io.netcdf import write_netcdf
@@ -576,12 +577,15 @@ class TurbidityCurrent2D(Component):
             # Calculate diffusion term of momentum
             self._diffusion_phase()
 
+            # apply the shock dissipation scheme
+            self._shock_dissipation_phase()
+
+            # update gradient terms
+            self.update_gradients2()
+
             # calculation of advecton terms of momentum (u and v) equations
             # by CIP method
             self._advection_phase()
-
-            # apply the shock dissipation scheme
-            self._shock_dissipation_phase()
 
             #the end of the loop of one local time step
             self.first_step = False
@@ -634,6 +638,13 @@ class TurbidityCurrent2D(Component):
             out_f=self.v_temp,
             out_dfdx=self.dvdx_temp,
             out_dfdy=self.dvdy_temp)
+
+        # wettest = np.unique(
+        #     np.concatenate([
+        #         self.horizontally_wettest_nodes, self.vertically_wettest_nodes
+        #     ]))
+        # self.u_node[wettest] = 0
+        # self.v_node[wettest] = 0
 
         rcip_2d_M_advection(self.h,
                             self.dhdx,
@@ -798,6 +809,7 @@ class TurbidityCurrent2D(Component):
         h_link_south = self.h_link[self.south_link_at_node[self.wet_nodes]]
         h_link_east = self.h_link[self.east_link_at_node[self.wet_nodes]]
         h_link_west = self.h_link[self.west_link_at_node[self.wet_nodes]]
+
         while err > 1.0 * 10**-10:
             a = -Rg * (1 / h_link_east + 1 / h_link_west) / dx**2 - Rg * (
                 1 / h_link_north +
@@ -816,6 +828,7 @@ class TurbidityCurrent2D(Component):
             p_south = p_new[self.node_south[self.wet_nodes]]
             p_east = p_new[self.node_east[self.wet_nodes]]
             p_west = p_new[self.node_west[self.wet_nodes]]
+
             count += 1
 
             if count == self.implicit_num:
@@ -837,14 +850,19 @@ class TurbidityCurrent2D(Component):
                         self.wet_vertical_links]] -
                     p_new[self.south_node_at_vertical_link[
                         self.wet_vertical_links]]) / dy * dt
-        u = self.u_temp.copy()
-        v = self.v_temp.copy()
-        # u[self.partial_wet_horizontal_links] = 0
-        # v[self.partial_wet_vertical_links] = 0
-        div = (u[self.east_link_at_node[self.wet_nodes]] -
-               u[self.west_link_at_node[self.wet_nodes]]) / dx + (
-                   v[self.north_link_at_node[self.wet_nodes]] -
-                   v[self.south_link_at_node[self.wet_nodes]]) / dy
+        div = (self.u_temp[self.east_link_at_node[self.wet_nodes]] -
+               self.u_temp[self.west_link_at_node[self.wet_nodes]]) / dx + (
+                   self.v_temp[self.north_link_at_node[self.wet_nodes]] -
+                   self.v_temp[self.south_link_at_node[self.wet_nodes]]) / dy
+        # p_new[self.
+        #       wet_nodes] = p[self.wet_nodes] - 2 * p[self.wet_nodes] * div * dt
+        # self.h_temp[self.wet_nodes] = np.sqrt(self.h[self.wet_nodes] *
+        #                                       p_new[self.wet_nodes] /
+        #                                       self.Ch[self.wet_nodes])
+        # self.Ch_temp[self.wet_nodes] = np.sqrt(self.Ch[self.wet_nodes] *
+        #                                        p_new[self.wet_nodes] /
+        #                                        self.h[self.wet_nodes])
+
         self.h_temp[self.wet_nodes] = self.h[
             self.wet_nodes] - self.h[self.wet_nodes] * div * dt
         self.Ch_temp[self.wet_nodes] = self.Ch[
@@ -863,43 +881,21 @@ class TurbidityCurrent2D(Component):
         self.calc_G_v(self.h_temp, self.h_link_temp, self.u_temp, self.v_temp,
                       self.Ch_temp, self.Ch_link_temp, self.eta_temp,
                       self.U_temp, self.wet_vertical_links)
-        self.u_temp += self.G_u * self.dt_local
-        self.v_temp += self.G_v * self.dt_local
         self.calc_G_h(self.h_temp, self.h_link_temp, self.u_temp,
                       self.u_node_temp, self.v_temp, self.v_node_temp,
                       self.Ch_temp, self.U_node_temp, self.wet_nodes)
         self.calc_G_Ch(self.Ch_temp, self.Ch_link_temp, self.u_temp,
                        self.v_temp, self.wet_nodes)
-        self.h_temp += self.G_h * self.dt_local
-        self.Ch_temp += self.G_Ch * self.dt_local
+        self.u_temp[self.wet_horizontal_links] += self.G_u[
+            self.wet_horizontal_links] * self.dt_local
+        self.v_temp[self.wet_vertical_links] += self.G_v[
+            self.wet_vertical_links] * self.dt_local
+        self.h_temp[self.wet_nodes] += self.G_h[self.wet_nodes] * self.dt_local
+        self.Ch_temp[
+            self.wet_nodes] += self.G_Ch[self.wet_nodes] * self.dt_local
 
         # update gradient terms
-        update_gradient(self.u, self.u_temp, self.dudx, self.dudy,
-                        self.wet_pwet_horizontal_links,
-                        self.link_north[self.wet_pwet_horizontal_links],
-                        self.link_south[self.wet_pwet_horizontal_links],
-                        self.link_east[self.wet_pwet_horizontal_links],
-                        self.link_south[self.wet_pwet_horizontal_links],
-                        self.grid.dx, self.dudx_temp, self.dudy_temp)
-        update_gradient(self.v, self.v_temp, self.dvdx, self.dvdy,
-                        self.wet_pwet_vertical_links,
-                        self.link_north[self.wet_pwet_vertical_links],
-                        self.link_south[self.wet_pwet_vertical_links],
-                        self.link_east[self.wet_pwet_vertical_links],
-                        self.link_south[self.wet_pwet_vertical_links],
-                        self.grid.dx, self.dvdx_temp, self.dvdy_temp)
-        update_gradient(self.h, self.h_temp, self.dhdx, self.dhdy,
-                        self.wet_nodes, self.node_north[self.wet_nodes],
-                        self.node_south[self.wet_nodes],
-                        self.node_east[self.wet_nodes],
-                        self.node_south[self.wet_nodes], self.grid.dx,
-                        self.dhdx_temp, self.dhdy_temp)
-        update_gradient(self.Ch, self.Ch_temp, self.dChdx, self.dChdy,
-                        self.wet_nodes, self.node_north[self.wet_nodes],
-                        self.node_south[self.wet_nodes],
-                        self.node_east[self.wet_nodes],
-                        self.node_south[self.wet_nodes], self.grid.dx,
-                        self.dChdx_temp, self.dChdy_temp)
+        self.update_gradients()
 
         # Find wet and partial wet grids
         # find_wet_grids(self, self.h_temp)
@@ -943,31 +939,8 @@ class TurbidityCurrent2D(Component):
                          out_u=self.u_temp,
                          out_v=self.v_temp)
 
-        update_gradient(self.u,
-                        self.u_temp,
-                        self.dudx,
-                        self.dudy,
-                        self.wet_pwet_horizontal_links,
-                        self.link_north[self.wet_pwet_horizontal_links],
-                        self.link_south[self.wet_pwet_horizontal_links],
-                        self.link_east[self.wet_pwet_horizontal_links],
-                        self.link_west[self.wet_pwet_horizontal_links],
-                        self.grid.dx,
-                        out_dfdx=self.dudx_temp,
-                        out_dfdy=self.dudy_temp)
-
-        update_gradient(self.v,
-                        self.v_temp,
-                        self.dvdx,
-                        self.dvdy,
-                        self.wet_pwet_vertical_links,
-                        self.link_north[self.wet_pwet_vertical_links],
-                        self.link_south[self.wet_pwet_vertical_links],
-                        self.link_east[self.wet_pwet_vertical_links],
-                        self.link_west[self.wet_pwet_vertical_links],
-                        self.grid.dx,
-                        out_dfdx=self.dvdx_temp,
-                        out_dfdy=self.dvdy_temp)
+        # update gradient terms
+        self.update_gradients()
 
         # update values
         self.update_values()
@@ -977,10 +950,19 @@ class TurbidityCurrent2D(Component):
     def _process_wet_dry_boundary(self):
         """Calculate processes at wet and dry boundary
         """
-        process_partial_wet_grids(self, self.h, self.u, self.v, self.Ch,
-                                  self.h_temp, self.u_temp, self.v_temp,
-                                  self.Ch_temp)
+        process_partial_wet_grids(self,
+                                  self.h,
+                                  self.u,
+                                  self.v,
+                                  self.Ch,
+                                  h_out=self.h_temp,
+                                  u_out=self.u_temp,
+                                  v_out=self.v_temp,
+                                  Ch_out=self.Ch_temp)
         update_up_down_links_and_nodes(self)
+
+        # update gradient terms
+        self.update_gradients()
 
         # update values
         self.update_values()
@@ -1035,8 +1017,24 @@ class TurbidityCurrent2D(Component):
                           self.kappa,
                           out=self.h_temp)
 
+        # update gradient terms
+        self.update_gradients()
+
+        # Reset our field values with the newest flow depth and
+        # discharge.
+        self.update_values()
+        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
+                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
+                   self.U_node)
+        update_up_down_links_and_nodes(self)
+
+    def update_gradients(self):
+        """update gradient terms when main variables were changed
+        """
         update_gradient(self.u,
                         self.u_temp,
+                        self.u_temp,
+                        self.v_temp,
                         self.dudx,
                         self.dudy,
                         self.wet_pwet_horizontal_links,
@@ -1045,10 +1043,12 @@ class TurbidityCurrent2D(Component):
                         self.link_east[self.wet_pwet_horizontal_links],
                         self.link_west[self.wet_pwet_horizontal_links],
                         self.grid.dx,
+                        self.dt_local,
                         out_dfdx=self.dudx_temp,
                         out_dfdy=self.dudy_temp)
-
         update_gradient(self.v,
+                        self.v_temp,
+                        self.u_temp,
                         self.v_temp,
                         self.dvdx,
                         self.dvdy,
@@ -1058,11 +1058,13 @@ class TurbidityCurrent2D(Component):
                         self.link_east[self.wet_pwet_vertical_links],
                         self.link_west[self.wet_pwet_vertical_links],
                         self.grid.dx,
+                        self.dt_local,
                         out_dfdx=self.dvdx_temp,
                         out_dfdy=self.dvdy_temp)
-
         update_gradient(self.h,
                         self.h_temp,
+                        self.u_temp,
+                        self.v_temp,
                         self.dhdx,
                         self.dhdy,
                         self.wet_pwet_nodes,
@@ -1071,11 +1073,13 @@ class TurbidityCurrent2D(Component):
                         self.node_east[self.wet_pwet_nodes],
                         self.node_west[self.wet_pwet_nodes],
                         self.grid.dx,
+                        self.dt_local,
                         out_dfdx=self.dhdx_temp,
                         out_dfdy=self.dhdy_temp)
-
         update_gradient(self.Ch,
                         self.Ch_temp,
+                        self.u_temp,
+                        self.v_temp,
                         self.dChdx,
                         self.dChdy,
                         self.wet_pwet_nodes,
@@ -1084,16 +1088,66 @@ class TurbidityCurrent2D(Component):
                         self.node_east[self.wet_pwet_nodes],
                         self.node_west[self.wet_pwet_nodes],
                         self.grid.dx,
+                        self.dt_local,
                         out_dfdx=self.dChdx_temp,
                         out_dfdy=self.dChdy_temp)
 
-        # Reset our field values with the newest flow depth and
-        # discharge.
+    def update_gradients2(self):
+        """update gradient terms for df/dx du/dy
+        """
+        update_gradient2(self.dudx,
+                         self.dudy,
+                         self.u,
+                         self.v,
+                         self.wet_pwet_horizontal_links,
+                         self.link_north[self.wet_pwet_horizontal_links],
+                         self.link_south[self.wet_pwet_horizontal_links],
+                         self.link_east[self.wet_pwet_horizontal_links],
+                         self.link_west[self.wet_pwet_horizontal_links],
+                         self.grid.dx,
+                         self.dt_local,
+                         out_dfdx=self.dudx_temp,
+                         out_dfdy=self.dudy_temp)
+        update_gradient2(self.dvdx,
+                         self.dvdy,
+                         self.u,
+                         self.v,
+                         self.wet_pwet_vertical_links,
+                         self.link_north[self.wet_pwet_vertical_links],
+                         self.link_south[self.wet_pwet_vertical_links],
+                         self.link_east[self.wet_pwet_vertical_links],
+                         self.link_west[self.wet_pwet_vertical_links],
+                         self.grid.dx,
+                         self.dt_local,
+                         out_dfdx=self.dvdx_temp,
+                         out_dfdy=self.dvdy_temp)
+        update_gradient2(self.dhdx,
+                         self.dhdy,
+                         self.u_node,
+                         self.v_node,
+                         self.wet_pwet_nodes,
+                         self.node_north[self.wet_pwet_nodes],
+                         self.node_south[self.wet_pwet_nodes],
+                         self.node_east[self.wet_pwet_nodes],
+                         self.node_west[self.wet_pwet_nodes],
+                         self.grid.dx,
+                         self.dt_local,
+                         out_dfdx=self.dhdx_temp,
+                         out_dfdy=self.dhdy_temp)
+        update_gradient2(self.dChdx,
+                         self.dChdy,
+                         self.u_node,
+                         self.v_node,
+                         self.wet_pwet_nodes,
+                         self.node_north[self.wet_pwet_nodes],
+                         self.node_south[self.wet_pwet_nodes],
+                         self.node_east[self.wet_pwet_nodes],
+                         self.node_west[self.wet_pwet_nodes],
+                         self.grid.dx,
+                         self.dt_local,
+                         out_dfdx=self.dChdx_temp,
+                         out_dfdy=self.dChdy_temp)
         self.update_values()
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
-        update_up_down_links_and_nodes(self)
 
     def calc_deposition(self,
                         h,
@@ -1152,12 +1206,20 @@ class TurbidityCurrent2D(Component):
 
     def copy_values_to_temp(self):
         self.h_temp[:] = self.h[:]
+        self.dhdx_temp[:] = self.dhdx[:]
+        self.dhdy_temp[:] = self.dhdy[:]
         self.h_link_temp[:] = self.h_link[:]
         self.u_temp[:] = self.u[:]
+        self.dudx_temp[:] = self.dudx[:]
+        self.dudy_temp[:] = self.dudy[:]
         self.u_node_temp[:] = self.u_node[:]
         self.v_temp[:] = self.v[:]
+        self.dvdx_temp[:] = self.dvdx[:]
+        self.dvdy_temp[:] = self.dvdy[:]
         self.v_node_temp[:] = self.v_node[:]
         self.Ch_temp[:] = self.Ch[:]
+        self.dChdx_temp[:] = self.dChdx[:]
+        self.dChdy_temp[:] = self.dChdy[:]
         self.Ch_link_temp[:] = self.Ch_link[:]
         self.eta_temp[:] = self.eta[:]
         self.U_temp[:] = self.U[:]

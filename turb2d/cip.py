@@ -381,6 +381,8 @@ def shock_dissipation(
 
 def update_gradient(f,
                     f_new,
+                    u,
+                    v,
                     dfdx,
                     dfdy,
                     core,
@@ -389,16 +391,53 @@ def update_gradient(f,
                     east,
                     west,
                     dx,
+                    dt,
                     out_dfdx=None,
                     out_dfdy=None):
     """Update gradients when main variables are updated
     """
+
     if out_dfdx is None:
         out_dfdx = np.zeros(dfdx.shape[0], dtype=np.float)
     if out_dfdy is None:
         out_dfdx = np.zeros(dfdy.shape[0], dtype=np.float)
 
-    out_dfdx[core] = dfdx[core] + 1 / (2 * dx) * (f_new[east] - f_new[west] -
-                                                  f[east] + f[west])
-    out_dfdy[core] = dfdy[core] + 1 / (2 * dx) * (f_new[north] - f_new[south] -
-                                                  f[north] + f[south])
+    # non-advection term
+    out_dfdx[core] = dfdx[core] + ((f_new[east] - f[east]) -
+                                   (f_new[west] - f[west])) / (2 * dx)
+    # - dfdx[core] * (
+    #         xi_x[h_down] - xi_x[h_up]) / (2 * D_x[core])
+
+    out_dfdy[core] = dfdy[core] + ((f_new[north] - f[north]) -
+                                   (f_new[south] - f[south])) / (2 * dx)
+    # - dfdy[core] * (
+    #         xi_y[v_down] - xi_y[v_up]) / (2 * D_y[core])
+
+
+def update_gradient2(dfdx,
+                     dfdy,
+                     u,
+                     v,
+                     core,
+                     north,
+                     south,
+                     east,
+                     west,
+                     dx,
+                     dt,
+                     out_dfdx=None,
+                     out_dfdy=None):
+    """Update gradients when main variables are updated
+    """
+
+    if out_dfdx is None:
+        out_dfdx = np.zeros(dfdx.shape[0], dtype=np.float)
+    if out_dfdy is None:
+        out_dfdx = np.zeros(dfdy.shape[0], dtype=np.float)
+
+    # non-advection term
+    out_dfdx[core] = dfdx[core] - dfdx[core] * (u[east] - u[west]) / (2 *
+                                                                      dx) * dt
+
+    out_dfdy[core] = dfdy[core] - dfdy[core] * (v[north] -
+                                                v[south]) / (2 * dx) * dt
