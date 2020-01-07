@@ -17,7 +17,7 @@ grid = create_topography(
     width=2000,
     spacing=10,
     slope_outside=0.2,
-    slope_inside=0.1,
+    slope_inside=0.03,
     slope_basin_break=1000,  #2000
     canyon_basin_break=1200,  #2200
     canyon_center=1000,
@@ -36,7 +36,7 @@ create_init_flow_region(
     initial_region_center=[1000, 4000],
 )
 
-grid.set_closed_boundaries_at_grid_edges(False, False, False, True)
+grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
 # create_init_flow_region(
 #     grid,
 #     initial_flow_concentration=0.01,
@@ -48,13 +48,13 @@ grid.set_closed_boundaries_at_grid_edges(False, False, False, True)
 # making turbidity current object
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
-                        alpha=0.05,
+                        alpha=0.1,
                         kappa=0.01,
                         Ds=80 * 10**-6,
-                        h_init=0.0,
+                        h_init=0.0001,
                         h_w=0.001,
-                        C_init=0.0,
-                        implicit_num=30,
+                        C_init=0.0001,
+                        implicit_num=50,
                         r0=1.5)
 
 # start calculation

@@ -4,14 +4,13 @@
 """
 
 import numpy as np
-from .cip import update_gradient
 
 
 def find_wet_grids(tc, h):
-    """Find wet and partial wet nodes and links
+    """Find wet and partial wet nodes and links on the basis of pressure
            In this model, "dry" nodes are not subject to calculate.
            Only "wet nodes" are considered in the model
-           calculation. "wet" is judged by the flow depth (> h_w).
+           calculation. "wet" is judged by the water pressure (> p_w).
            The "partial wet node" is a dry node but the upcurrent
            node is wet. Flow depth and velocity at partial wet
            nodes are calculated by the YANG's model (YANG et al.,
@@ -21,9 +20,6 @@ def find_wet_grids(tc, h):
            --------------------------
            tc : TurbidityCurrent2D
                TurbidityCurrent2D object to be checked
-
-           h : ndarray
-               flow height values for detecting wet and dry grids
 
            Values set in TurbidityCurrent2D object
            -------------------------
@@ -84,6 +80,7 @@ def find_wet_grids(tc, h):
     #############################
     # Copy parameters from self #
     #############################
+    Ch = tc.Ch
     core = tc.core_nodes
     horiz_links = tc.horizontal_active_links
     vert_links = tc.vertical_active_links
@@ -100,6 +97,7 @@ def find_wet_grids(tc, h):
     north_nodes_at_link = tc.north_node_at_vertical_link[vert_links]
     south_nodes_at_link = tc.south_node_at_vertical_link[vert_links]
     h_w = tc.h_w
+    Ch_w = tc.h_w * tc.C_init
 
     ############################
     # find wet nodes and links #
@@ -276,7 +274,7 @@ def process_partial_wet_grids(
     h_out[horizontally_partial_wet_nodes] += M_horiz
     # h_out[horizontally_wettest_nodes] -= M_horiz
     # c_half_dry = Ch_out[horizontally_wettest_nodes] < 8.0 * CM_horiz
-    # CM_horiz[c_half_dry] = Ch_out[horizontally_wettest_nodes][c_half_dry] / 8.0
+    # CM_horiz[c_half_dry] = Ch_out[horizontally_wettest_nodes][c_half_dry] / 8.
     Ch_out[horizontally_partial_wet_nodes] += CM_horiz
     # Ch_out[horizontally_wettest_nodes] -= CM_horiz
 
@@ -303,21 +301,31 @@ def process_partial_wet_grids(
     hdw = horizontal_direction_wettest
     vdw = vertical_direction_wettest
 
-    # # u_out[partial_wet_horizontal_links] = u[
-    # #     partial_wet_horizontal_links] \
-    # #     + hdw * horizontal_overspill_velocity \
-    # #     - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
+    u_out[partial_wet_horizontal_links] = u[
+        partial_wet_horizontal_links] \
+        + hdw * horizontal_overspill_velocity \
+        - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
 
-    u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity
+    # u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity
 
-    # # v_out[partial_wet_vertical_links] = v[
-    # #     partial_wet_vertical_links] \
-    # #     + vdw * vertical_overspill_velocity \
-    # #     - CfvU / (h[vertically_wettest_nodes] / 2) * dt
-    v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity
+    v_out[partial_wet_vertical_links] = v[
+        partial_wet_vertical_links] \
+        + vdw * vertical_overspill_velocity \
+        - CfvU / (h[vertically_wettest_nodes] / 2) * dt
+
+    # v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity
 
     tc.horizontal_overspill_velocity = hdw * horizontal_overspill_velocity
     tc.vertical_overspill_velocity = vdw * vertical_overspill_velocity
+
+    # h_out[horizontally_partial_wet_nodes] += u_out[
+    #     partial_wet_horizontal_links] * h[horizontally_wettest_nodes] * dt
+    # Ch_out[horizontally_partial_wet_nodes] += u_out[
+    #     partial_wet_horizontal_links] * Ch[horizontally_wettest_nodes] * dt
+    # h_out[vertically_partial_wet_nodes] += u_out[
+    #     partial_wet_vertical_links] * h[vertically_wettest_nodes] * dt
+    # Ch_out[vertically_partial_wet_nodes] += u_out[
+    #     partial_wet_vertical_links] * Ch[vertically_wettest_nodes] * dt
 
     return h_out, u_out, v_out, Ch_out
 

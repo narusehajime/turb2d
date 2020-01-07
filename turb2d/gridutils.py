@@ -233,6 +233,9 @@ def map_nodes_to_links(tc, h, Ch, eta, h_link, Ch_link):
     # remove illeagal values
     # h[h < tc.h_init] = tc.h_init
     # Ch[Ch < tc.C_init * tc.h_init] = tc.C_init * tc.h_init
+    h[tc.dry_nodes] = tc.h_init
+    Ch[tc.dry_nodes] = tc.h_init * tc.C_init
+
     north_node_at_vertical_link = tc.north_node_at_vertical_link[
         tc.wet_pwet_vertical_links]
     south_node_at_vertical_link = tc.south_node_at_vertical_link[
@@ -278,6 +281,8 @@ def map_mean_of_link_nodes_to_link(f,
                             f[west_node_at_horizontal_link]) / 2.0
     out[vertical_link] = (f[north_node_at_vertical_link] +
                           f[south_node_at_vertical_link]) / 2.0
+
+    return out
 
 
 def find_horizontal_up_down_nodes(tc, u, out_up=None, out_down=None):
