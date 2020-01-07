@@ -167,7 +167,7 @@ class TurbidityCurrent2D(Component):
     def __init__(self,
                  grid,
                  h_init=0.0001,
-                 h_w=0.01,
+                 p_w=10**(-6),
                  alpha=0.05,
                  Cf=0.004,
                  g=9.81,
@@ -190,8 +190,8 @@ class TurbidityCurrent2D(Component):
         h_init: float, optional
             Thickness of initial thin layer of flow to prevent divide by zero
             errors(m).
-        h_w: float, optional
-            Thickness of flow to judge "wet" nodes and links(m).
+        p_w: float, optional
+            Water pressure (Ch^2) to judge "wet" nodes and links(m^2).
         alpha: float, optional
             Time step coefficient
         Cf: float, optional
@@ -234,7 +234,7 @@ class TurbidityCurrent2D(Component):
         self.g = g
         self.R = R
         self.Ds = Ds
-        self.h_w = h_w
+        self.p_w = p_w
         self.nu = nu
         self.kappa = kappa
         self.r0 = r0
@@ -559,7 +559,7 @@ class TurbidityCurrent2D(Component):
         self.Ch = self.C * self.h
 
         # map node values to links, and link values to nodes.
-        find_wet_grids(self, self.h)
+        find_wet_grids(self)
         map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
                    self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
                    self.U_node)
@@ -578,7 +578,7 @@ class TurbidityCurrent2D(Component):
             self.dt_local = dt_local
 
             # Find wet and partial wet grids
-            find_wet_grids(self, self.h)
+            find_wet_grids(self)
 
             # Process partial wet grids
             self._process_wet_dry_boundary()

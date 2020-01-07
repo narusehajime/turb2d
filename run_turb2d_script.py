@@ -13,11 +13,11 @@ from landlab.io.native_landlab import load_grid, save_grid
 from tqdm import tqdm
 
 grid = create_topography(
-    length=5000,
+    length=8000,
     width=2000,
     spacing=10,
     slope_outside=0.2,
-    slope_inside=0.03,
+    slope_inside=0.05,
     slope_basin_break=1000,  #2000
     canyon_basin_break=1200,  #2200
     canyon_center=1000,
@@ -31,8 +31,8 @@ grid = create_topography(
 create_init_flow_region(
     grid,
     initial_flow_concentration=0.01,
-    initial_flow_thickness=100,
-    initial_region_radius=100,
+    initial_flow_thickness=200,
+    initial_region_radius=200,
     initial_region_center=[1000, 4000],
 )
 
@@ -51,9 +51,9 @@ tc = TurbidityCurrent2D(grid,
                         alpha=0.1,
                         kappa=0.01,
                         Ds=80 * 10**-6,
-                        h_init=0.0001,
-                        h_w=0.001,
-                        C_init=0.0001,
+                        h_init=0.0,
+                        p_w=10**(-7),
+                        C_init=0.0,
                         implicit_num=50,
                         r0=1.5)
 
