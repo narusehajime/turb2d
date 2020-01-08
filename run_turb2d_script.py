@@ -8,12 +8,10 @@ from turb2d import create_topography
 from turb2d import create_init_flow_region, create_topography_from_geotiff
 from turb2d import TurbidityCurrent2D
 import time
-from landlab.io.netcdf import write_netcdf, read_netcdf
-from landlab.io.native_landlab import load_grid, save_grid
 from tqdm import tqdm
 
 grid = create_topography(
-    length=8000,
+    length=5000,
     width=2000,
     spacing=10,
     slope_outside=0.2,
@@ -31,8 +29,8 @@ grid = create_topography(
 create_init_flow_region(
     grid,
     initial_flow_concentration=0.01,
-    initial_flow_thickness=200,
-    initial_region_radius=200,
+    initial_flow_thickness=100,
+    initial_region_radius=100,
     initial_region_center=[1000, 4000],
 )
 
@@ -52,7 +50,7 @@ tc = TurbidityCurrent2D(grid,
                         kappa=0.01,
                         Ds=80 * 10**-6,
                         h_init=0.0,
-                        p_w=10**(-7),
+                        p_w=10**(-5),
                         C_init=0.0,
                         implicit_num=50,
                         r0=1.5)
