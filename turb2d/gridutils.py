@@ -40,46 +40,26 @@ def set_up_neighbor_arrays(tc):
     tc.south_node_at_vertical_link = tc.grid.nodes_at_link[:, 0].copy()
     tc.north_node_at_vertical_link = tc.grid.nodes_at_link[:, 1].copy()
 
-    # Process boundary nodes and links
-    # Neumann boundary condition (gradient = 0) is assumed
-    bound_node_north = np.where(tc.grid.node_is_boundary(tc.node_north))
-    bound_node_south = np.where(tc.grid.node_is_boundary(tc.node_south))
-    bound_node_east = np.where(tc.grid.node_is_boundary(tc.node_east))
-    bound_node_west = np.where(tc.grid.node_is_boundary(tc.node_west))
-    tc.node_north[bound_node_north] = bound_node_north
-    tc.node_south[bound_node_south] = bound_node_south
-    tc.node_east[bound_node_east] = bound_node_east
-    tc.node_west[bound_node_west] = bound_node_west
-
-    bound_link_north = np.where(tc.link_north == -1)
-    bound_link_south = np.where(tc.link_south == -1)
-    bound_link_east = np.where(tc.link_east == -1)
-    bound_link_west = np.where(tc.link_west == -1)
-    tc.link_north[bound_link_north] = bound_link_north
-    tc.link_south[bound_link_south] = bound_link_south
-    tc.link_east[bound_link_east] = bound_link_east
-    tc.link_west[bound_link_west] = bound_link_west
-
-    bound_node_north_at_link = np.where(
-        tc.grid.node_is_boundary(tc.north_node_at_vertical_link))
-    bound_node_south_at_link = np.where(
-        tc.grid.node_is_boundary(tc.south_node_at_vertical_link))
-    bound_node_east_at_link = np.where(
-        tc.grid.node_is_boundary(tc.east_node_at_horizontal_link))
-    bound_node_west_at_link = np.where(
-        tc.grid.node_is_boundary(tc.west_node_at_horizontal_link))
-    tc.north_node_at_vertical_link[
-        bound_node_north_at_link] = tc.south_node_at_vertical_link[
-            bound_node_north_at_link]
-    tc.south_node_at_vertical_link[
-        bound_node_south_at_link] = tc.north_node_at_vertical_link[
-            bound_node_south_at_link]
-    tc.east_node_at_horizontal_link[
-        bound_node_east_at_link] = tc.west_node_at_horizontal_link[
-            bound_node_east_at_link]
-    tc.west_node_at_horizontal_link[
-        bound_node_west_at_link] = tc.east_node_at_horizontal_link[
-            bound_node_west_at_link]
+    # bound_node_north_at_link = np.where(
+    #     tc.grid.node_is_boundary(tc.north_node_at_vertical_link))
+    # bound_node_south_at_link = np.where(
+    #     tc.grid.node_is_boundary(tc.south_node_at_vertical_link))
+    # bound_node_east_at_link = np.where(
+    #     tc.grid.node_is_boundary(tc.east_node_at_horizontal_link))
+    # bound_node_west_at_link = np.where(
+    #     tc.grid.node_is_boundary(tc.west_node_at_horizontal_link))
+    # tc.north_node_at_vertical_link[
+    #     bound_node_north_at_link] = tc.south_node_at_vertical_link[
+    #         bound_node_north_at_link]
+    # tc.south_node_at_vertical_link[
+    #     bound_node_south_at_link] = tc.north_node_at_vertical_link[
+    #         bound_node_south_at_link]
+    # tc.east_node_at_horizontal_link[
+    #     bound_node_east_at_link] = tc.west_node_at_horizontal_link[
+    #         bound_node_east_at_link]
+    # tc.west_node_at_horizontal_link[
+    #     bound_node_west_at_link] = tc.east_node_at_horizontal_link[
+    #         bound_node_west_at_link]
 
     # Find obliquely neighbor vertical links from horizontal links
     # and obliquely neighbor horizontal links from vertical links
@@ -356,3 +336,165 @@ def find_vertical_up_down_links(tc, u, out_up=None, out_down=None):
     out_down[negative_u_index] = tc.link_south[negative_u_index]
 
     return out_up, out_down
+
+
+def find_boundary_links_nodes(tc):
+    """find and record boundary links and nodes
+    """
+    grid = tc.grid
+
+    # Boundary Types
+    FIXED_GRADIENT = grid.BC_NODE_IS_FIXED_GRADIENT
+    FIXED_VALUE = grid.BC_NODE_IS_FIXED_VALUE
+    CLOSED = grid.BC_NODE_IS_CLOSED
+
+    # Find boundary and edge links
+    bound_link_north = tc.south_link_at_node[grid.nodes_at_top_edge]
+    bound_link_south = tc.north_link_at_node[grid.nodes_at_bottom_edge]
+    bound_link_east = tc.west_link_at_node[grid.nodes_at_right_edge]
+    bound_link_west = tc.east_link_at_node[grid.nodes_at_left_edge]
+    edge_link_north = links.top_edge_horizontal_ids(grid.shape)
+    edge_link_south = links.bottom_edge_horizontal_ids(grid.shape)
+    edge_link_east = links.right_edge_vertical_ids(grid.shape)
+    edge_link_west = links.left_edge_vertical_ids(grid.shape)
+    tc.bound_links = np.unique(
+        np.concatenate([
+            bound_link_north, bound_link_south, bound_link_east,
+            bound_link_west
+        ]))
+    tc.edge_links = np.unique(
+        np.concatenate(
+            [edge_link_north, edge_link_south, edge_link_east,
+             edge_link_west]))
+
+    ##################################
+    # fixed gradient nodes and links #
+    ##################################
+    fixed_grad_link_at_north = bound_link_north[grid.node_is_boundary(
+        tc.north_node_at_vertical_link[bound_link_north],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_link_at_south = bound_link_south[grid.node_is_boundary(
+        tc.south_node_at_vertical_link[bound_link_south],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_link_at_east = bound_link_east[grid.node_is_boundary(
+        tc.east_node_at_horizontal_link[bound_link_east],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_link_at_west = bound_link_west[grid.node_is_boundary(
+        tc.west_node_at_horizontal_link[bound_link_west],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_edge_link_at_north = edge_link_north[grid.node_is_boundary(
+        tc.east_node_at_horizontal_link[edge_link_north],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_edge_link_at_south = edge_link_south[grid.node_is_boundary(
+        tc.east_node_at_horizontal_link[edge_link_south],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_edge_link_at_east = edge_link_east[grid.node_is_boundary(
+        tc.north_node_at_vertical_link[edge_link_east],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_edge_link_at_west = edge_link_west[grid.node_is_boundary(
+        tc.north_node_at_vertical_link[edge_link_west],
+        boundary_flag=FIXED_GRADIENT)]
+    fixed_grad_anchor_link_at_north = tc.link_south[fixed_grad_link_at_north]
+    fixed_grad_anchor_link_at_south = tc.link_north[fixed_grad_link_at_south]
+    fixed_grad_anchor_link_at_east = tc.link_west[fixed_grad_link_at_east]
+    fixed_grad_anchor_link_at_west = tc.link_east[fixed_grad_link_at_west]
+    fixed_grad_anchor_edge_link_at_north = tc.link_south[
+        fixed_grad_edge_link_at_north]
+    fixed_grad_anchor_edge_link_at_south = tc.link_north[
+        fixed_grad_edge_link_at_south]
+    fixed_grad_anchor_edge_link_at_east = tc.link_west[
+        fixed_grad_edge_link_at_east]
+    fixed_grad_anchor_edge_link_at_west = tc.link_east[
+        fixed_grad_edge_link_at_west]
+
+    # Fixed gradient nodes and adjacent nodes (anchor)
+    tc.fixed_grad_nodes = grid.fixed_gradient_boundary_nodes
+    tc.fixed_grad_anchor_nodes = grid.fixed_gradient_boundary_node_anchor_node
+
+    # Fixed gradient links and adjacent links (anchor)
+    tc.fixed_grad_links = np.concatenate([
+        fixed_grad_link_at_north, fixed_grad_link_at_south,
+        fixed_grad_link_at_east, fixed_grad_link_at_west,
+        fixed_grad_edge_link_at_north, fixed_grad_edge_link_at_south,
+        fixed_grad_edge_link_at_east, fixed_grad_edge_link_at_west
+    ])
+    tc.fixed_grad_anchor_links = np.concatenate([
+        fixed_grad_anchor_link_at_north, fixed_grad_anchor_link_at_south,
+        fixed_grad_anchor_link_at_east, fixed_grad_anchor_link_at_west,
+        fixed_grad_anchor_edge_link_at_north,
+        fixed_grad_anchor_edge_link_at_south,
+        fixed_grad_anchor_edge_link_at_east,
+        fixed_grad_anchor_edge_link_at_west
+    ])
+
+    ###############################
+    # fixed value nodes and links #
+    ###############################
+    fixed_value_nodes_at_north = tc.north_node_at_vertical_link[
+        bound_link_north][grid.node_is_boundary(
+            tc.north_node_at_vertical_link[bound_link_north],
+            boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_south = tc.south_node_at_vertical_link[
+        bound_link_south][grid.node_is_boundary(
+            tc.south_node_at_vertical_link[bound_link_south],
+            boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_east = tc.east_node_at_horizontal_link[
+        bound_link_east][grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[bound_link_east],
+            boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_west = tc.west_node_at_horizontal_link[
+        bound_link_west][grid.node_is_boundary(
+            tc.west_node_at_horizontal_link[bound_link_west],
+            boundary_flag=FIXED_VALUE)]
+    fixed_value_link_at_north = bound_link_north[grid.node_is_boundary(
+        tc.north_node_at_vertical_link[bound_link_north],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_link_at_south = bound_link_south[grid.node_is_boundary(
+        tc.south_node_at_vertical_link[bound_link_south],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_link_at_east = bound_link_east[grid.node_is_boundary(
+        tc.east_node_at_horizontal_link[bound_link_east],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_link_at_west = bound_link_west[grid.node_is_boundary(
+        tc.west_node_at_horizontal_link[bound_link_west],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_anchor_link_at_north = tc.link_south[fixed_value_link_at_north]
+    fixed_value_anchor_link_at_south = tc.link_north[fixed_value_link_at_south]
+    fixed_value_anchor_link_at_east = tc.link_west[fixed_value_link_at_east]
+    fixed_value_anchor_link_at_west = tc.link_east[fixed_value_link_at_west]
+    fixed_value_edge_link_at_north = edge_link_north[grid.node_is_boundary(
+        tc.east_node_at_horizontal_link[edge_link_north],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_edge_link_at_south = edge_link_south[grid.node_is_boundary(
+        tc.east_node_at_horizontal_link[edge_link_south],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_edge_link_at_east = edge_link_east[grid.node_is_boundary(
+        tc.north_node_at_vertical_link[edge_link_east],
+        boundary_flag=FIXED_VALUE)]
+    fixed_value_edge_link_at_west = edge_link_west[grid.node_is_boundary(
+        tc.north_node_at_vertical_link[edge_link_west],
+        boundary_flag=FIXED_VALUE)]
+
+    # To avoid referreing indeces that do not exist
+    tc.link_north[fixed_value_link_at_north] = fixed_value_link_at_north
+    tc.link_south[fixed_value_link_at_south] = fixed_value_link_at_south
+    tc.link_east[fixed_value_link_at_east] = fixed_value_link_at_east
+    tc.link_west[fixed_value_link_at_west] = fixed_value_link_at_west
+
+    # Record fixed value nodes and links with anchor and edge links
+    tc.fixed_value_nodes = np.concatenate([
+        fixed_value_nodes_at_north, fixed_value_nodes_at_south,
+        fixed_value_nodes_at_east, fixed_value_nodes_at_west
+    ])
+    tc.fixed_value_links = np.concatenate([
+        fixed_value_link_at_north, fixed_value_link_at_south,
+        fixed_value_link_at_east, fixed_value_link_at_west
+    ])
+    tc.fixed_value_anchor_links = np.concatenate([
+        fixed_value_anchor_link_at_north, fixed_value_anchor_link_at_south,
+        fixed_value_anchor_link_at_east, fixed_value_anchor_link_at_west
+    ])
+    tc.fixed_value_edge_links = np.concatenate([
+        fixed_value_edge_link_at_north, fixed_value_edge_link_at_south,
+        fixed_value_edge_link_at_east, fixed_value_edge_link_at_west
+    ])

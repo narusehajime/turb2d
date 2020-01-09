@@ -6,6 +6,7 @@ os.environ['OMP_NUM_THREADS'] = '6'
 import numpy as np
 from turb2d import create_topography
 from turb2d import create_init_flow_region, create_topography_from_geotiff
+from landlab import RasterModelGrid
 from turb2d import TurbidityCurrent2D
 import time
 from tqdm import tqdm
@@ -26,6 +27,11 @@ grid = create_topography(
 #                                       ylim=[400, 1200],
 #                                       spacing=500)
 
+grid.status_at_node[grid.nodes_at_top_edge] = grid.BC_NODE_IS_FIXED_VALUE
+grid.status_at_node[grid.nodes_at_bottom_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
+grid.status_at_node[grid.nodes_at_left_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
+grid.status_at_node[grid.nodes_at_right_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
+
 create_init_flow_region(
     grid,
     initial_flow_concentration=0.01,
@@ -34,7 +40,6 @@ create_init_flow_region(
     initial_region_center=[1000, 4000],
 )
 
-grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
 # create_init_flow_region(
 #     grid,
 #     initial_flow_concentration=0.01,
