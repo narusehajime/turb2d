@@ -2,6 +2,7 @@
 """
 import numpy as np
 from landlab.grid.structured_quad import links
+from .cip import cubic_interp_1d, rcubic_interp_1d
 
 
 def set_up_neighbor_arrays(tc):
@@ -110,17 +111,19 @@ def update_up_down_links_and_nodes(tc):
                                 out_down=tc.vertical_down_links)
 
 
-def map_values(tc, h, u, v, Ch, eta, h_link, u_node, v_node, Ch_link, U,
-               U_node):
+def map_values(tc, h, dhdx, dhdy, u, dudx, v, dvdy, Ch, dChdx, dChdy, eta,
+               h_link, u_node, v_node, Ch_link, U, U_node):
     """map parameters at nodes to links, and those at links to nodes
     """
-    map_links_to_nodes(tc, u, v, u_node, v_node, U, U_node)
-    map_nodes_to_links(tc, h, Ch, eta, h_link, Ch_link)
+    map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node)
+    map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
+                       Ch_link)
 
 
-def map_links_to_nodes(tc, u, v, u_node, v_node, U, U_node):
+def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
     """map parameters at links to nodes
     """
+    dx = tc.grid.dx
     dry_links = tc.dry_links
     dry_nodes = tc.dry_nodes
     wet_pwet_nodes = tc.wet_pwet_nodes
@@ -162,20 +165,34 @@ def map_links_to_nodes(tc, u, v, u_node, v_node, U, U_node):
     U[wet_pwet_links] = np.sqrt(u[wet_pwet_links]**2 + v[wet_pwet_links]**2)
 
     # map link values (u, v) to nodes
-    map_mean_of_links_to_node(u,
-                              wet_pwet_nodes,
-                              north_link_at_node,
-                              south_link_at_node,
-                              east_link_at_node,
-                              west_link_at_node,
-                              out=u_node)
-    map_mean_of_links_to_node(v,
-                              wet_pwet_nodes,
-                              north_link_at_node,
-                              south_link_at_node,
-                              east_link_at_node,
-                              west_link_at_node,
-                              out=v_node)
+    cubic_interp_1d(u,
+                    dudx,
+                    wet_pwet_nodes,
+                    east_link_at_node,
+                    west_link_at_node,
+                    dx,
+                    out=u_node)
+    cubic_interp_1d(v,
+                    dvdy,
+                    wet_pwet_nodes,
+                    north_link_at_node,
+                    south_link_at_node,
+                    dx,
+                    out=v_node)
+    # map_mean_of_links_to_node(u,
+    #                           wet_pwet_nodes,
+    #                           north_link_at_node,
+    #                           south_link_at_node,
+    #                           east_link_at_node,
+    #                           west_link_at_node,
+    #                           out=u_node)
+    # map_mean_of_links_to_node(v,
+    #                           wet_pwet_nodes,
+    #                           north_link_at_node,
+    #                           south_link_at_node,
+    #                           east_link_at_node,
+    #                           west_link_at_node,
+    #                           out=v_node)
     map_mean_of_links_to_node(U,
                               wet_pwet_nodes,
                               north_link_at_node,
@@ -206,7 +223,8 @@ def map_mean_of_links_to_node(f,
     return out
 
 
-def map_nodes_to_links(tc, h, Ch, eta, h_link, Ch_link):
+def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
+                       Ch_link):
     """map parameters at nodes to links
     """
 
@@ -224,24 +242,54 @@ def map_nodes_to_links(tc, h, Ch, eta, h_link, Ch_link):
         tc.wet_pwet_horizontal_links]
     west_node_at_horizontal_link = tc.west_node_at_horizontal_link[
         tc.wet_pwet_horizontal_links]
+    dx = tc.grid.dx
 
     # map node values (h, C, eta) to links
-    map_mean_of_link_nodes_to_link(h,
-                                   tc.wet_pwet_horizontal_links,
-                                   tc.wet_pwet_vertical_links,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=h_link)
-    map_mean_of_link_nodes_to_link(Ch,
-                                   tc.wet_pwet_horizontal_links,
-                                   tc.wet_pwet_vertical_links,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=Ch_link)
+    rcubic_interp_1d(h,
+                     dhdx,
+                     tc.wet_pwet_horizontal_links,
+                     east_node_at_horizontal_link,
+                     west_node_at_horizontal_link,
+                     dx,
+                     out=h_link)
+    rcubic_interp_1d(h,
+                     dhdy,
+                     tc.wet_pwet_vertical_links,
+                     north_node_at_vertical_link,
+                     south_node_at_vertical_link,
+                     dx,
+                     out=h_link)
+    rcubic_interp_1d(Ch,
+                     dChdx,
+                     tc.wet_pwet_horizontal_links,
+                     east_node_at_horizontal_link,
+                     west_node_at_horizontal_link,
+                     dx,
+                     out=Ch_link)
+    rcubic_interp_1d(Ch,
+                     dChdy,
+                     tc.wet_pwet_vertical_links,
+                     north_node_at_vertical_link,
+                     south_node_at_vertical_link,
+                     dx,
+                     out=Ch_link)
+
+    # map_mean_of_link_nodes_to_link(h,
+    #                                tc.wet_pwet_horizontal_links,
+    #                                tc.wet_pwet_vertical_links,
+    #                                north_node_at_vertical_link,
+    #                                south_node_at_vertical_link,
+    #                                east_node_at_horizontal_link,
+    #                                west_node_at_horizontal_link,
+    #                                out=h_link)
+    # map_mean_of_link_nodes_to_link(Ch,
+    #                                tc.wet_pwet_horizontal_links,
+    #                                tc.wet_pwet_vertical_links,
+    #                                north_node_at_vertical_link,
+    #                                south_node_at_vertical_link,
+    #                                east_node_at_horizontal_link,
+    #                                west_node_at_horizontal_link,
+    #                                out=Ch_link)
 
 
 def map_mean_of_link_nodes_to_link(f,
@@ -430,22 +478,24 @@ def find_boundary_links_nodes(tc):
     ###############################
     # fixed value nodes and links #
     ###############################
-    fixed_value_nodes_at_north = tc.north_node_at_vertical_link[
-        bound_link_north][grid.node_is_boundary(
-            tc.north_node_at_vertical_link[bound_link_north],
-            boundary_flag=FIXED_VALUE)]
-    fixed_value_nodes_at_south = tc.south_node_at_vertical_link[
-        bound_link_south][grid.node_is_boundary(
-            tc.south_node_at_vertical_link[bound_link_south],
-            boundary_flag=FIXED_VALUE)]
-    fixed_value_nodes_at_east = tc.east_node_at_horizontal_link[
-        bound_link_east][grid.node_is_boundary(
-            tc.east_node_at_horizontal_link[bound_link_east],
-            boundary_flag=FIXED_VALUE)]
-    fixed_value_nodes_at_west = tc.west_node_at_horizontal_link[
-        bound_link_west][grid.node_is_boundary(
-            tc.west_node_at_horizontal_link[bound_link_west],
-            boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_north = tc.grid.nodes_at_top_edge[
+        grid.node_is_boundary(tc.grid.nodes_at_top_edge,
+                              boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_south = tc.grid.nodes_at_bottom_edge[
+        grid.node_is_boundary(tc.grid.nodes_at_bottom_edge,
+                              boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_east = tc.grid.nodes_at_right_edge[
+        grid.node_is_boundary(tc.grid.nodes_at_right_edge,
+                              boundary_flag=FIXED_VALUE)]
+    fixed_value_nodes_at_west = tc.grid.nodes_at_left_edge[
+        grid.node_is_boundary(tc.grid.nodes_at_left_edge,
+                              boundary_flag=FIXED_VALUE)]
+    fixed_value_anchor_nodes_at_north = tc.node_south[
+        fixed_value_nodes_at_north]
+    fixed_value_anchor_nodes_at_south = tc.node_north[
+        fixed_value_nodes_at_south]
+    fixed_value_anchor_nodes_at_east = tc.node_west[fixed_value_nodes_at_east]
+    fixed_value_anchor_nodes_at_west = tc.node_east[fixed_value_nodes_at_west]
     fixed_value_link_at_north = bound_link_north[grid.node_is_boundary(
         tc.north_node_at_vertical_link[bound_link_north],
         boundary_flag=FIXED_VALUE)]
@@ -485,6 +535,10 @@ def find_boundary_links_nodes(tc):
     tc.fixed_value_nodes = np.concatenate([
         fixed_value_nodes_at_north, fixed_value_nodes_at_south,
         fixed_value_nodes_at_east, fixed_value_nodes_at_west
+    ])
+    tc.fixed_value_anchor_nodes = np.concatenate([
+        fixed_value_anchor_nodes_at_north, fixed_value_anchor_nodes_at_south,
+        fixed_value_anchor_nodes_at_east, fixed_value_anchor_nodes_at_west
     ])
     tc.fixed_value_links = np.concatenate([
         fixed_value_link_at_north, fixed_value_link_at_south,

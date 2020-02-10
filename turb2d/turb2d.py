@@ -89,6 +89,8 @@ from landlab import Component, FieldError, RasterModelGrid
 import numpy as np
 import time
 from osgeo import gdal, gdalconst
+from scipy.signal import medfilt
+
 import ipdb
 ipdb.set_trace()
 
@@ -179,6 +181,9 @@ class TurbidityCurrent2D(Component):
                  implicit_num=50,
                  C_init=0.0,
                  gamma=0.35,
+                 water_entrainment=True,
+                 suspension=True,
+                 bedload=True,
                  **kwds):
         """Create a component of turbidity current 
 
@@ -241,6 +246,9 @@ class TurbidityCurrent2D(Component):
         self.implicit_num = implicit_num
         self.C_init = C_init
         self.gamma = gamma
+        self.water_entrainment = water_entrainment
+        self.suspension = suspension
+        self.bedload = bedload
 
         # Now setting up fields at nodes and links
         try:
@@ -460,6 +468,7 @@ class TurbidityCurrent2D(Component):
         self.fixed_grad_links = None
         self.fixed_grad_anchor_links = None
         self.fixed_value_nodes = None
+        self.fixed_value_anchor_nodes = None
         self.fixed_value_links = None
         self.fixed_value_anchor_links = None
         self.fixed_value_edge_links = None
@@ -559,20 +568,21 @@ class TurbidityCurrent2D(Component):
         self.eta = self.grid['node']['topographic__elevation']
         self.u = self.grid['link']['flow__horizontal_velocity']
         self.v = self.grid['link']['flow__vertical_velocity']
+        self.u_node = self.grid['node']['flow__horizontal_velocity_at_node']
+        self.v_node = self.grid['node']['flow__vertical_velocity_at_node']
         self.C = self.grid['node']['flow__sediment_concentration']
         self.Ch = self.C * self.h
 
         # Initialize boundary conditions and wet/dry grids
         find_boundary_links_nodes(self)
         find_wet_grids(self)
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
-        self.copy_values_to_temp()
-        update_up_down_links_and_nodes(self)
-
-        # update boundary conditions
+        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
+                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
+                   self.eta, self.h_link, self.u_node, self.v_node,
+                   self.Ch_link, self.U, self.U_node)
         self.update_boundary_conditions()
+        update_up_down_links_and_nodes(self)
+        self.copy_values_to_temp()
 
         # continue calculation until the prescribed time elapsed
         while local_elapsed_time < dt:
@@ -587,6 +597,10 @@ class TurbidityCurrent2D(Component):
 
             # Find wet and partial wet grids
             find_wet_grids(self)
+            map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
+                       self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
+                       self.eta, self.h_link, self.u_node, self.v_node,
+                       self.Ch_link, self.U, self.U_node)
 
             # Process partial wet grids
             self._process_wet_dry_boundary()
@@ -600,12 +614,11 @@ class TurbidityCurrent2D(Component):
             # Calculate diffusion term of momentum
             self._diffusion_phase()
 
+            # calculate advection terms using cip method
+            self._advection_phase()
+
             # # apply the shock dissipation scheme
             self._shock_dissipation_phase()
-
-            # calculation of advecton terms of momentum (u and v) equations
-            # by CIP method
-            self._advection_phase()
 
             #the end of the loop of one local time step
             self.first_step = False
@@ -687,9 +700,10 @@ class TurbidityCurrent2D(Component):
         # update values after calculating advection terms
         # map node values to links, and link values to nodes.
         self.update_values()
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
+        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
+                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
+                   self.eta, self.h_link, self.u_node, self.v_node,
+                   self.Ch_link, self.U, self.U_node)
         update_up_down_links_and_nodes(self)
 
     def _nonadvection_phase(self):
@@ -763,46 +777,83 @@ class TurbidityCurrent2D(Component):
                     p_new[self.south_node_at_vertical_link[
                         self.wet_vertical_links]]) / dy * dt
 
-        div = (self.u_temp[self.east_link_at_node[self.wet_nodes]] -
-               self.u_temp[self.west_link_at_node[self.wet_nodes]]) / (dx) + (
-                   self.v_temp[self.north_link_at_node[self.wet_nodes]] -
-                   self.v_temp[self.south_link_at_node[self.wet_nodes]]) / (dy)
+        # p_new[self.
+        #       wet_nodes] = p[self.wet_nodes] - 2 * p[self.wet_nodes] * div * dt
 
-        p_new[self.
-              wet_nodes] = p[self.wet_nodes] - 2 * p[self.wet_nodes] * div * dt
-
-        self.h_temp[self.wet_nodes] = np.sqrt(self.h[self.wet_nodes] /
-                                              self.Ch[self.wet_nodes] *
-                                              p_new[self.wet_nodes])
-        self.Ch_temp[self.wet_nodes] = np.sqrt(self.Ch[self.wet_nodes] /
-                                               self.h[self.wet_nodes] *
-                                               p_new[self.wet_nodes])
+        # self.h_temp[self.wet_nodes] = np.sqrt(self.h[self.wet_nodes] /
+        #                                       self.Ch[self.wet_nodes] *
+        #                                       p_new[self.wet_nodes])
+        # self.Ch_temp[self.wet_nodes] = np.sqrt(self.Ch[self.wet_nodes] /
+        #                                        self.h[self.wet_nodes] *
+        #                                        p_new[self.wet_nodes])
 
         # map values
-        map_values(self, self.h_temp, self.u_temp, self.v_temp, self.Ch_temp,
+        map_values(self, self.h_temp, self.dhdx_temp, self.dhdy_temp,
+                   self.u_temp, self.dudx_temp, self.v_temp, self.dvdy,
+                   self.Ch_temp, self.dChdx_temp, self.dChdy_temp,
                    self.eta_temp, self.h_link_temp, self.u_node_temp,
                    self.v_node_temp, self.Ch_link_temp, self.U_temp,
                    self.U_node_temp)
 
         # calculate gravity force, friction and water entrainment
-        self.calc_G_u(self.h_temp, self.h_link_temp, self.u_temp, self.v_temp,
-                      self.Ch_temp, self.Ch_link_temp, self.eta_temp,
-                      self.U_temp, self.wet_horizontal_links)
-        self.calc_G_v(self.h_temp, self.h_link_temp, self.u_temp, self.v_temp,
-                      self.Ch_temp, self.Ch_link_temp, self.eta_temp,
-                      self.U_temp, self.wet_vertical_links)
-        self.calc_G_h(self.h_temp, self.h_link_temp, self.u_temp,
-                      self.u_node_temp, self.v_temp, self.v_node_temp,
-                      self.Ch_temp, self.U_node_temp, self.wet_nodes)
-        self.calc_G_Ch(self.Ch_temp, self.Ch_link_temp, self.u_temp,
-                       self.v_temp, self.wet_nodes)
-        self.u_temp[self.wet_horizontal_links] += self.G_u[
-            self.wet_horizontal_links] * self.dt_local
-        self.v_temp[self.wet_vertical_links] += self.G_v[
-            self.wet_vertical_links] * self.dt_local
-        self.h_temp[self.wet_nodes] += self.G_h[self.wet_nodes] * self.dt_local
-        self.Ch_temp[
-            self.wet_nodes] += self.G_Ch[self.wet_nodes] * self.dt_local
+        u_temp2 = self.u_temp.copy()
+        v_temp2 = self.v_temp.copy()
+        h_temp2 = self.h_temp.copy()
+        Ch_temp2 = self.Ch_temp.copy()
+        err2 = 10.0
+        h_prev = self.h_temp.copy()
+        count = 0
+        while err2 > 1.0 * 10**-2:
+            div = (
+                self.u_temp[self.east_link_at_node[self.wet_nodes]] -
+                self.u_temp[self.west_link_at_node[self.wet_nodes]]) / (dx) + (
+                    self.v_temp[self.north_link_at_node[self.wet_nodes]] -
+                    self.v_temp[self.south_link_at_node[self.wet_nodes]]) / (
+                        dy)
+            self.calc_G_h(self.h_temp, self.h_link_temp, self.u_temp,
+                          self.u_node_temp, self.v_temp, self.v_node_temp,
+                          self.Ch_temp, self.U_node_temp, self.wet_nodes)
+            self.calc_G_Ch(self.Ch_temp, self.Ch_link_temp, self.u_temp,
+                           self.v_temp, self.wet_nodes)
+            self.h_temp[self.wet_nodes] = h_temp2[self.wet_nodes] + (
+                self.G_h[self.wet_nodes] -
+                self.h_temp[self.wet_nodes] * div) * self.dt_local
+            self.Ch_temp[self.wet_nodes] = Ch_temp2[self.wet_nodes] + (
+                self.G_Ch[self.wet_nodes] -
+                self.Ch_temp[self.wet_nodes] * div) * self.dt_local
+            map_nodes_to_links(self, self.h_temp, self.dhdx_temp,
+                               self.dhdy_temp, self.Ch_temp, self.dChdx_temp,
+                               self.dChdy_temp, self.eta_temp,
+                               self.h_link_temp, self.Ch_link_temp)
+
+            self.calc_G_u(self.h_temp, self.h_link_temp, self.u_temp,
+                          self.v_temp, self.Ch_temp, self.Ch_link_temp,
+                          self.eta_temp, self.U_temp,
+                          self.wet_horizontal_links)
+            self.calc_G_v(self.h_temp, self.h_link_temp, self.u_temp,
+                          self.v_temp, self.Ch_temp, self.Ch_link_temp,
+                          self.eta_temp, self.U_temp, self.wet_vertical_links)
+            self.u_temp[self.wet_horizontal_links] = u_temp2[
+                self.wet_horizontal_links] + self.G_u[
+                    self.wet_horizontal_links] * self.dt_local
+            self.v_temp[self.wet_vertical_links] = v_temp2[
+                self.wet_vertical_links] + self.G_v[
+                    self.wet_vertical_links] * self.dt_local
+            map_links_to_nodes(self, self.u_temp, self.dudx_temp, self.v_temp,
+                               self.dvdx_temp, self.u_node_temp,
+                               self.v_node_temp, self.U_temp, self.U_node_temp)
+
+            err2 = np.linalg.norm(self.h_temp[self.wet_nodes] -
+                                  h_prev[self.wet_nodes])
+            h_prev = self.h_temp.copy()
+
+        # map values
+        map_values(self, self.h_temp, self.dhdx_temp, self.dhdy_temp,
+                   self.u_temp, self.dudx_temp, self.v_temp, self.dvdy,
+                   self.Ch_temp, self.dChdx_temp, self.dChdy_temp,
+                   self.eta_temp, self.h_link_temp, self.u_node_temp,
+                   self.v_node_temp, self.Ch_link_temp, self.U_temp,
+                   self.U_node_temp)
 
         # update gradient terms
         self.update_gradients()
@@ -810,26 +861,38 @@ class TurbidityCurrent2D(Component):
         # Find wet and partial wet grids
         # find_wet_grids(self, self.h_temp)
 
+        # self.h_temp[self.horizontally_wettest_nodes] = self.h[
+        #     self.horizontally_wettest_nodes]
+        # self.h_temp[self.vertically_wettest_nodes] = self.h[
+        #     self.vertically_wettest_nodes]
+        # self.Ch_temp[self.horizontally_wettest_nodes] = self.Ch[
+        #     self.horizontally_wettest_nodes]
+        # self.Ch_temp[self.vertically_wettest_nodes] = self.Ch[
+        #     self.vertically_wettest_nodes]
+
         # update values
         self.update_values()
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
+        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
+                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
+                   self.eta, self.h_link, self.u_node, self.v_node,
+                   self.Ch_link, self.U, self.U_node)
         update_up_down_links_and_nodes(self)
 
     def _deposition_phase(self):
         """Calculate depositional and erosional processes
         """
-        self.calc_deposition(self.h,
-                             self.Ch,
-                             self.u_node,
-                             self.v_node,
-                             self.eta,
-                             self.U_node,
-                             out_Ch=self.Ch_temp,
-                             out_eta=self.eta_temp)
+        if self.suspension is True:
+            self.calc_deposition(self.h,
+                                 self.Ch,
+                                 self.u_node,
+                                 self.v_node,
+                                 self.eta,
+                                 self.U_node,
+                                 out_Ch=self.Ch_temp,
+                                 out_eta=self.eta_temp)
         self.update_values()
-        map_nodes_to_links(self, self.h, self.Ch, self.eta, self.h_link,
+        map_nodes_to_links(self, self.h, self.dhdx, self.dhdy, self.Ch,
+                           self.dChdx, self.dChdy, self.eta, self.h_link,
                            self.Ch_link)
 
     def _diffusion_phase(self):
@@ -855,8 +918,8 @@ class TurbidityCurrent2D(Component):
 
         # update values
         self.update_values()
-        map_links_to_nodes(self, self.u, self.v, self.u_node, self.v_node,
-                           self.U, self.U_node)
+        map_links_to_nodes(self, self.u, self.dudx, self.v, self.dvdy,
+                           self.u_node, self.v_node, self.U, self.U_node)
 
     def _process_wet_dry_boundary(self):
         """Calculate processes at wet and dry boundary
@@ -877,9 +940,10 @@ class TurbidityCurrent2D(Component):
 
         # update values
         self.update_values()
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
+        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
+                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
+                   self.eta, self.h_link, self.u_node, self.v_node,
+                   self.Ch_link, self.U, self.U_node)
 
     def _shock_dissipation_phase(self):
         """Calculate shock dissipation phase of the model
@@ -934,9 +998,10 @@ class TurbidityCurrent2D(Component):
         # Reset our field values with the newest flow depth and
         # discharge.
         self.update_values()
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
+        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
+                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
+                   self.eta, self.h_link, self.u_node, self.v_node,
+                   self.Ch_link, self.U, self.U_node)
         update_up_down_links_and_nodes(self)
 
     def initialize_gradients(self):
@@ -1201,8 +1266,8 @@ class TurbidityCurrent2D(Component):
         self.grid.at_link['flow__horizontal_velocity'] = self.u
         self.grid.at_link['flow__vertical_velocity'] = self.v
         self.C[:] = self.C_init
-        self.C[self.wet_pwet_nodes] = self.Ch[self.wet_pwet_nodes] / self.h[
-            self.wet_pwet_nodes]
+        all_wet_nodes = np.where(self.h > self.C_init)
+        self.C[all_wet_nodes] = self.Ch[all_wet_nodes] / self.h[all_wet_nodes]
         self.grid.at_node['flow__sediment_concentration'] = self.C
         self.grid.at_node['topographic__elevation'] = self.eta
         self.grid.at_node['bed__thickness'] = self.bed_thick
@@ -1282,8 +1347,10 @@ class TurbidityCurrent2D(Component):
         """Calculate non-advection term for h
         """
 
-        ew_node = get_ew(U_node, Ch, self.R, self.g, 0.1)
-        # ew_node = self.ew_node
+        if self.water_entrainment is True:
+            ew_node = get_ew(U_node, Ch, self.R, self.g, 0.1)
+        else:
+            ew_node = self.ew_node
 
         self.G_h[core_nodes] = ew_node[core_nodes] * U_node[core_nodes]
 
@@ -1301,9 +1368,11 @@ class TurbidityCurrent2D(Component):
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
         eta_grad_x = eta_grad_at_link[link_horiz]
         U_horiz_link = U[link_horiz]
-        ew_link = get_ew(U_horiz_link, Ch_link[link_horiz], self.R, self.g,
-                         0.1)
-        # ew_link = self.ew_link[link_horiz]
+        if self.water_entrainment is True:
+            ew_link = get_ew(U_horiz_link, Ch_link[link_horiz], self.R, self.g,
+                             0.1)
+        else:
+            ew_link = self.ew_link[link_horiz]
         u_star_2 = self.Cf * u[link_horiz] * U_horiz_link
 
         self.G_u[link_horiz] = (
@@ -1320,8 +1389,11 @@ class TurbidityCurrent2D(Component):
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
         eta_grad_y = eta_grad_at_link[link_vert]
         U_vert_link = U[link_vert]
-        ew_link = get_ew(U_vert_link, Ch_link[link_vert], self.R, self.g, 0.1)
-        # ew_link = self.ew_link[link_vert]
+        if self.water_entrainment is True:
+            ew_link = get_ew(U_vert_link, Ch_link[link_vert], self.R, self.g,
+                             0.1)
+        else:
+            ew_link = self.ew_link[link_vert]
         v_star_2 = self.Cf * v[link_vert] * U_vert_link
 
         self.G_v[link_vert] = (
@@ -1351,6 +1423,8 @@ class TurbidityCurrent2D(Component):
         self.es = get_es(self.R, self.g, self.Ds, self.nu, u_star_at_node)
 
         out_geta[core] = ws * (r0 * Ch[core] / h[core] - self.es)
+
+        return out_geta
 
         # remove too large gradients
         # maxC = 0.05
@@ -1406,6 +1480,8 @@ class TurbidityCurrent2D(Component):
             self.fixed_grad_anchor_nodes]
         self.v_node[self.fixed_grad_nodes] = self.v_node[
             self.fixed_grad_anchor_nodes]
+        # self.eta[self.fixed_grad_nodes] = self.eta[
+        #     self.fixed_grad_anchor_nodes]
         self.u[self.fixed_grad_links] = self.u[self.fixed_grad_anchor_links]
         self.v[self.fixed_grad_links] = self.v[self.fixed_grad_anchor_links]
         self.h_link[self.fixed_grad_links] = self.h_link[
@@ -1415,11 +1491,13 @@ class TurbidityCurrent2D(Component):
 
         # Process fixed value boundary conditions
         self.h_link[self.fixed_value_links] = (
-            2. / 3.) * self.h[self.fixed_value_nodes] + (
-                1. / 3.) * self.h_link[self.fixed_value_anchor_links]
+            self.h[self.fixed_value_nodes] +
+            self.h[self.fixed_value_anchor_nodes]) / 2.0
         self.Ch_link[self.fixed_value_links] = (
-            2. / 3.) * self.Ch[self.fixed_value_nodes] + (
-                1. / 3.) * self.Ch_link[self.fixed_value_anchor_links]
+            self.Ch[self.fixed_value_nodes] +
+            self.Ch[self.fixed_value_anchor_nodes]) / 2.0
+        # self.u[self.fixed_value_links] = self.u_node[self.fixed_value_nodes]
+        # self.v[self.fixed_value_links] = self.v_node[self.fixed_value_nodes]
         self.u[self.fixed_value_links] = (
             2. / 3.) * self.u_node[self.fixed_value_nodes] + (
                 1. / 3.) * self.u[self.fixed_value_anchor_links]
@@ -1457,6 +1535,8 @@ def create_topography(
     grid = RasterModelGrid((lgrids, wgrids), spacing=spacing)
     grid.add_zeros('flow__depth', at='node')
     grid.add_zeros('topographic__elevation', at='node')
+    grid.add_zeros('flow__horizontal_velocity_at_node', at='node')
+    grid.add_zeros('flow__vertical_velocity_at_node', at='node')
     grid.add_zeros('flow__horizontal_velocity', at='link')
     grid.add_zeros('flow__vertical_velocity', at='link')
     grid.add_zeros('flow__sediment_concentration', at='node')
@@ -1510,6 +1590,9 @@ def create_topography_from_geotiff(geotiff_filename,
     topo_data = topo_file.GetRasterBand(1).ReadAsArray()
     if (xlim is not None) and (ylim is not None):
         topo_data = topo_data[xlim[0]:xlim[1], ylim[0]:ylim[1]]
+
+    # Smoothing by median filter
+    topo_data = medfilt(topo_data)
 
     grid = RasterModelGrid(topo_data.shape, spacing=spacing)
     grid.add_zeros('flow__depth', at='node')

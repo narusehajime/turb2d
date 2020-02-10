@@ -581,3 +581,87 @@ def cip_2d_advection(f,
                       (d1 * XX + f1)) * YY + (c1 * XX + g1) * XX + dfdy[core]
 
     return out_f, out_dfdx, out_dfdy
+
+
+def cubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
+    """interpolate values to links or nodes by cubic function
+       
+       Interplated values at the grid between "iplus" and "iminus" is returned.
+       
+       Parameters
+       --------------------------
+       f : ndarray, float
+           values to be interpolated
+       dfdx : ndarray, float
+           spatial gradient of f
+       iplus : ndarray, int
+           grid id of (i + dx / 2)
+       iminus : ndarray, int
+           grid id of (i - dx / 2)
+       dx : ndarray, float
+           grid spacing
+       out : ndarray, float
+            interpolated values between grids of iplus and iminus
+    """
+    if out is None:
+        out = np.empty(iplus.shape)
+
+    # interplation by cubic function
+    D_x = -dx
+    xi_x = -dx / 2.
+    a = (dfdx[iplus] + dfdx[iminus]) / (D_x ** 2)\
+        + 2.0 * (f[iplus] - f[iminus]) / (D_x ** 3)
+    b = 3.0 * (f[iminus] - f[iplus]) / (D_x ** 2)\
+        - (2.0 * dfdx[iplus] + dfdx[iminus]) / D_x
+    out[core] = a * (xi_x ** 3) + b * (xi_x ** 2)\
+        + dfdx[iplus] * xi_x + f[iplus]
+
+    return out
+
+
+def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
+    """interpolate values to links or nodes by cubic function
+       
+       Interplated values at the grid between "iplus" and "iminus" is returned.
+       
+       Parameters
+       --------------------------
+       f : ndarray, float
+           values to be interpolated
+       dfdx : ndarray, float
+           spatial gradient of f
+       iplus : ndarray, int
+           grid id of (i + dx / 2)
+       iminus : ndarray, int
+           grid id of (i - dx / 2)
+       dx : ndarray, float
+           grid spacing
+       out : ndarray, float
+            interpolated values between grids of iplus and iminus
+    """
+    if out is None:
+        out = np.zeros(f.shape)
+
+    # advection phase
+    D = -dx
+    xi = -dx / 2.
+    BB = np.ones(core.shape, dtype=float)
+    alpha = np.zeros(core.shape, dtype=float)
+    S = (f[iminus] - f[iplus]) / D
+    dz_index = (dfdx[iminus] - S) == 0.0
+    BB[dz_index] = -1.0 / D
+    BB[~dz_index] = (np.abs(
+        (S[~dz_index] - dfdx[iplus][~dz_index]) /
+        (dfdx[iminus][~dz_index] - S[~dz_index] + 1.e-10)) - 1.0) / D
+    alpha[(S - dfdx[iplus]) / (dfdx[iminus] - S + 1.e-10) >= 0.0] = 1.0
+
+    a = (dfdx[iplus] - S + (dfdx[iminus] - S) *
+         (1.0 + alpha * BB * D)) / (D**2)
+    b = S * alpha * BB + (S - dfdx[iplus]) / D - a * D
+    c = dfdx[iplus] + f[iplus] * alpha * BB
+
+    out[core] = (((a * xi + b) * xi + c)
+                   * xi + f[iplus]) \
+        / (1.0 + alpha * BB * xi)
+
+    return out
