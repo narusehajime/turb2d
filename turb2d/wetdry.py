@@ -291,26 +291,30 @@ def process_partial_wet_grids(
     ################################################################
     # Calculate time development of variables at partial wet links #
     ################################################################
-    # CfuU = Cf * u[partial_wet_horizontal_links] \
-    #     * np.sqrt(u[partial_wet_horizontal_links]**2
-    #               + v[partial_wet_horizontal_links]**2)
-    # CfvU = Cf * v[partial_wet_vertical_links] \
-    #     * np.sqrt(u[partial_wet_vertical_links]**2
-    #               + v[partial_wet_vertical_links]**2)
+    CfuU = Cf * np.sqrt(u[partial_wet_horizontal_links]**2 +
+                        v[partial_wet_horizontal_links]**2) / (
+                            h[horizontally_wettest_nodes] +
+                            h[horizontally_partial_wet_nodes]) * 2
+    CfvU = Cf * np.sqrt(u[partial_wet_vertical_links]**2 +
+                        v[partial_wet_vertical_links]**2) / (
+                            h[vertically_wettest_nodes] +
+                            h[vertically_partial_wet_nodes]) * 2
 
     hdw = horizontal_direction_wettest
     vdw = vertical_direction_wettest
 
     u_out[partial_wet_horizontal_links] = u[partial_wet_horizontal_links]\
-                                          + hdw * horizontal_overspill_velocity
-    # - CfuU / h[horizontally_wettest_nodes] * dt\
+                        + hdw * horizontal_overspill_velocity
+
+    u_out[partial_wet_horizontal_links] *= 1 / (1 + CfuU * dt)
 
     # - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
     # u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity
 
-    v_out[partial_wet_vertical_links] = v[partial_wet_vertical_links]\
+    v_out[partial_wet_vertical_links] = v[partial_wet_vertical_links] \
             + vdw * vertical_overspill_velocity
-    # - CfvU / h[vertically_wettest_nodes] * dt\
+
+    v_out[partial_wet_vertical_links] *= 1 / (1 + CfvU * dt)
 
     # - CfvU / (h[vertically_wettest_nodes] / 2) * dt
     # v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity
