@@ -106,6 +106,18 @@ def find_wet_grids(tc):
         (p[west_nodes_at_link] > p_w) & (p[east_nodes_at_link] > p_w))]
     tc.wet_vertical_links = vert_links[np.where(
         (p[north_nodes_at_link] > p_w) & (p[south_nodes_at_link] > p_w))]
+    # tc.wet_nodes = core[np.where((tc.h[core] > 0.01)
+    #                              & (tc.Ch[core] > 1.0 * 10**-4))]
+    # tc.wet_horizontal_links = horiz_links[np.where(
+    #     (tc.h[west_nodes_at_link] > 0.01)
+    #     & (tc.Ch[west_nodes_at_link] > 1.0 * 10**-4)
+    #     & (tc.h[east_nodes_at_link] > 0.01)
+    #     & (tc.Ch[east_nodes_at_link] > 1.0 * 10**-4))]
+    # tc.wet_vertical_links = vert_links[np.where(
+    #     (tc.h[north_nodes_at_link] > 0.01)
+    #     & (tc.Ch[north_nodes_at_link] > 1.0 * 10**-4)
+    #     & (tc.h[south_nodes_at_link] > 0.01)
+    #     & (tc.Ch[south_nodes_at_link] > 1.0 * 10**-4))]
 
     ######################################################
     #find partial wet nodes and links in horizontal axis #
@@ -305,7 +317,6 @@ def process_partial_wet_grids(
 
     u_out[partial_wet_horizontal_links] = u[partial_wet_horizontal_links]\
                         + hdw * horizontal_overspill_velocity
-
     u_out[partial_wet_horizontal_links] *= 1 / (1 + CfuU * dt)
 
     # - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
@@ -313,14 +324,13 @@ def process_partial_wet_grids(
 
     v_out[partial_wet_vertical_links] = v[partial_wet_vertical_links] \
             + vdw * vertical_overspill_velocity
-
     v_out[partial_wet_vertical_links] *= 1 / (1 + CfvU * dt)
 
     # - CfvU / (h[vertically_wettest_nodes] / 2) * dt
     # v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity
 
-    tc.horizontal_overspill_velocity = hdw * horizontal_overspill_velocity
-    tc.vertical_overspill_velocity = vdw * vertical_overspill_velocity
+    # tc.horizontal_overspill_velocity[partial_wet_horizontal_links] = h_out[partial_wet_vertical_links]
+    # tc.vertical_overspill_velocity[partial_wet_vertical_links] = v_out[partial_wet_vertical_links]
 
     # h_out[horizontally_partial_wet_nodes] += u_out[
     #     partial_wet_horizontal_links] * h[horizontally_wettest_nodes] * dt

@@ -91,8 +91,8 @@ import time
 from osgeo import gdal, gdalconst
 from scipy.ndimage import median_filter
 
-import ipdb
-ipdb.set_trace()
+# import ipdb
+# ipdb.set_trace()
 
 
 class TurbidityCurrent2D(Component):
@@ -184,6 +184,7 @@ class TurbidityCurrent2D(Component):
                  water_entrainment=True,
                  suspension=True,
                  bedload=True,
+                 sed_entrainment_func='GP1991field',
                  **kwds):
         """Create a component of turbidity current 
 
@@ -221,6 +222,15 @@ class TurbidityCurrent2D(Component):
             Minimum value of sediment concentration.
         gamma: float, optional
             Coefficient for calculating velocity of flow front 
+        suspension: boolean, optional
+            turn on the function for entrainment/settling of suspension
+        bedload: boolean, optional
+            turn on the function for bedload
+        water_entrainment: boolean, optional
+            turn on the function for ambient water entrainment
+        sed_entrainment_func: string, optional
+            Choose the function to be used for sediment entrainment. Default
+            is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'.
 
         """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
@@ -249,6 +259,7 @@ class TurbidityCurrent2D(Component):
         self.water_entrainment = water_entrainment
         self.suspension = suspension
         self.bedload = bedload
+        self.sed_entrainment_func = sed_entrainment_func
 
         # Now setting up fields at nodes and links
         try:
@@ -744,14 +755,28 @@ class TurbidityCurrent2D(Component):
                    self.v_node_temp, self.Ch_link_temp, self.U_temp,
                    self.U_node_temp)
 
+        # water entrainment
+        if self.water_entrainment is True:
+            self.ew_link[self.wet_horizontal_links] = get_ew(
+                self.U_temp[self.wet_horizontal_links],
+                self.Ch_link_temp[self.wet_horizontal_links], self.R, self.g)
+            self.ew_link[self.wet_vertical_links] = get_ew(
+                self.U_temp[self.wet_vertical_links],
+                self.Ch_link_temp[self.wet_vertical_links], self.R, self.g)
+        else:
+            self.ew_link[self.wet_horizontal_links] = 0
+            self.ew_link[self.wet_vertical_links] = 0
+
         # calculate friction terms using semi-implicit scheme
         self.u_temp[self.wet_horizontal_links] = (
-            1 / (1 + self.Cf * self.U_temp[self.wet_horizontal_links] *
-                 self.dt_local / self.h_link[self.wet_horizontal_links])
+            1 / (1 + (self.Cf + self.ew_link[self.wet_horizontal_links]) *
+                 self.U_temp[self.wet_horizontal_links] * self.dt_local /
+                 self.h_link[self.wet_horizontal_links])
         ) * self.u_temp[self.wet_horizontal_links]
         self.v_temp[self.wet_vertical_links] = (
-            1 / (1 + self.Cf * self.U_temp[self.wet_vertical_links] *
-                 self.dt_local / self.h_link[self.wet_vertical_links])
+            1 / (1 + (self.Cf + self.ew_link[self.wet_vertical_links]) *
+                 self.U_temp[self.wet_vertical_links] * self.dt_local /
+                 self.h_link[self.wet_vertical_links])
         ) * self.v_temp[self.wet_vertical_links]
 
         # CCUP method
@@ -833,10 +858,12 @@ class TurbidityCurrent2D(Component):
         # self.Ch_temp[self.wet_nodes] = np.sqrt(self.Ch[self.wet_nodes] /
         #                                        self.h[self.wet_nodes] *
         #                                        p_new[self.wet_nodes])
+
         # self.h_temp[self.wet_nodes] = self.h_temp[
         #     self.wet_nodes] - self.h_temp[self.wet_nodes] * div * dt
         # self.Ch_temp[self.wet_nodes] = self.Ch_temp[
         #     self.wet_nodes] - self.Ch_temp[self.wet_nodes] * div * dt
+
         self.h_temp[self.wet_nodes] = self.h_temp[self.wet_nodes] / (1 +
                                                                      div * dt)
         self.Ch_temp[
@@ -1343,16 +1370,16 @@ class TurbidityCurrent2D(Component):
         """
 
         if self.water_entrainment is True:
-            ew_node = get_ew(U_node, Ch, self.R, self.g, 0.1)
+            self.ew_node[core_nodes] = get_ew(U_node[core_nodes],
+                                              Ch[core_nodes], self.R, self.g)
         else:
-            ew_node = self.ew_node
+            self.ew_node[core_nodes] = 0
 
-        self.G_h[core_nodes] = ew_node[core_nodes] * U_node[core_nodes]
+        self.G_h[core_nodes] = self.ew_node[core_nodes] * U_node[core_nodes]
 
     def calc_G_Ch(self, Ch, Ch_link, u, v, core_nodes):
         """Calculate non-advection term for Ch
         """
-
         self.G_Ch[core_nodes] = 0
 
     def calc_G_u(self, h, h_link, u, v, Ch, Ch_link, eta, U, link_horiz):
@@ -1363,11 +1390,6 @@ class TurbidityCurrent2D(Component):
         eta_grad_at_link = self.grid.calc_grad_at_link(eta)
         eta_grad_x = eta_grad_at_link[link_horiz]
         U_horiz_link = U[link_horiz]
-        if self.water_entrainment is True:
-            ew_link = get_ew(U_horiz_link, Ch_link[link_horiz], self.R, self.g,
-                             0.1)
-        else:
-            ew_link = self.ew_link[link_horiz]
         # u_star_2 = self.Cf * u[link_horiz] * U_horiz_link
         h_link_mod = h_link[link_horiz]
         # h_link_mod[h_link_mod < 0.5] = 0.5
@@ -1390,10 +1412,10 @@ class TurbidityCurrent2D(Component):
         eta_grad_y = eta_grad_at_link[link_vert]
         U_vert_link = U[link_vert]
         if self.water_entrainment is True:
-            self.ew_link = get_ew(U_vert_link, Ch_link[link_vert], self.R,
-                                  self.g, 0.1)
+            self.ew_link[link_vert] = get_ew(U_vert_link, Ch_link[link_vert],
+                                             self.R, self.g)
         else:
-            self.ew_link = np.zeros(self.ew_link.shape)
+            self.ew_link[link_vert] = 0
 
         # v_star_2 = self.Cf * v[link_vert] * U_vert_link
         h_link_mod = h_link[link_vert]
@@ -1426,7 +1448,12 @@ class TurbidityCurrent2D(Component):
         ws = self.ws
         r0 = self.r0
         u_star_at_node = np.sqrt(self.Cf * U_node[core]**2)
-        self.es = get_es(self.R, self.g, self.Ds, self.nu, u_star_at_node)
+        self.es = get_es(self.R,
+                         self.g,
+                         self.Ds,
+                         self.nu,
+                         u_star_at_node,
+                         function=self.sed_entrainment_func)
 
         out_geta[core] = ws * (r0 * Ch[core] / h[core] - self.es)
 
@@ -1473,7 +1500,18 @@ class TurbidityCurrent2D(Component):
            clobber : boolean
                Overwrite an existing file
         """
-        write_netcdf(filename, self.grid)
+        write_netcdf(filename,
+                     self.grid,
+                     names=[
+                         'topographic__elevation',
+                         'flow__depth',
+                         'flow__horizontal_velocity_at_node',
+                         'flow__vertical_velocity_at_node',
+                         'flow__surface_elevation',
+                         'flow__sediment_concentration',
+                         'bed__thickness',
+                     ],
+                     at='node')
 
     def update_boundary_conditions(self):
         """Update boundary conditions
@@ -1486,8 +1524,8 @@ class TurbidityCurrent2D(Component):
             self.fixed_grad_anchor_nodes]
         self.v_node[self.fixed_grad_nodes] = self.v_node[
             self.fixed_grad_anchor_nodes]
-        # self.eta[self.fixed_grad_nodes] = self.eta[
-        #     self.fixed_grad_anchor_nodes]
+        self.eta[self.fixed_grad_nodes] = self.eta[
+            self.fixed_grad_anchor_nodes]
         self.u[self.fixed_grad_links] = self.u[self.fixed_grad_anchor_links]
         self.v[self.fixed_grad_links] = self.v[self.fixed_grad_anchor_links]
         self.h_link[self.fixed_grad_links] = self.h_link[
@@ -1496,6 +1534,8 @@ class TurbidityCurrent2D(Component):
             self.fixed_grad_anchor_links]
 
         # Process fixed value boundary conditions
+        self.eta[self.fixed_value_nodes] = self.eta[
+            self.fixed_value_anchor_nodes]
         self.h_link[self.fixed_value_links] = (
             self.h[self.fixed_value_nodes] +
             self.h[self.fixed_value_anchor_nodes]) / 2.0

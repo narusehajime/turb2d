@@ -1,4 +1,5 @@
 import numpy as np
+import ipdb
 
 
 def cip_2d_M_advection(f,
@@ -641,7 +642,7 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     """
     if out is None:
         out = np.zeros(f.shape)
-
+    ipdb.set_trace()
     # advection phase
     D = -dx
     xi = -dx / 2.

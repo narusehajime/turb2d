@@ -9,6 +9,7 @@ from turb2d import create_init_flow_region, create_topography_from_geotiff
 from landlab import RasterModelGrid
 from turb2d import TurbidityCurrent2D
 import time
+from landlab import FIXED_GRADIENT_BOUNDARY, FIXED_VALUE_BOUNDARY
 from tqdm import tqdm
 
 # grid = create_topography(
@@ -27,10 +28,10 @@ grid = create_topography_from_geotiff('depth500.tif',
                                       ylim=[400, 1200],
                                       spacing=500)
 
-grid.status_at_node[grid.nodes_at_top_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
-grid.status_at_node[grid.nodes_at_bottom_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
-grid.status_at_node[grid.nodes_at_left_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
-grid.status_at_node[grid.nodes_at_right_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
+grid.status_at_node[grid.nodes_at_top_edge] = FIXED_GRADIENT_BOUNDARY
+grid.status_at_node[grid.nodes_at_bottom_edge] = FIXED_GRADIENT_BOUNDARY
+grid.status_at_node[grid.nodes_at_left_edge] = FIXED_GRADIENT_BOUNDARY
+grid.status_at_node[grid.nodes_at_right_edge] = FIXED_GRADIENT_BOUNDARY
 
 # inlet = np.where((grid.x_of_node > 800)
 #                  & (grid.x_of_node < 1200) & (grid.y_of_node > 4970))
