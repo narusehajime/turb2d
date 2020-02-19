@@ -107,7 +107,7 @@ def find_wet_grids(tc):
     # tc.wet_vertical_links = vert_links[np.where(
     #     (p[north_nodes_at_link] > p_w) & (p[south_nodes_at_link] > p_w))]
 
-    wet_nodes = (p > p_w) & (tc.h > 0.001)
+    wet_nodes = (p > p_w) & (tc.h > 0.01)
     tc.wet_nodes = core[wet_nodes[core]]
     tc.wet_horizontal_links = horiz_links[np.where(
         (wet_nodes[west_nodes_at_link]) & (wet_nodes[east_nodes_at_link]))]

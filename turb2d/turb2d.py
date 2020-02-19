@@ -569,8 +569,8 @@ class TurbidityCurrent2D(Component):
         if self.neighbor_flag is False:
             set_up_neighbor_arrays(self)
 
-        if self.first_step is True:
-            self.initialize_gradients()
+        # if self.first_step is True:
+        #     self.initialize_gradients()
 
         # In case another component has added data to the fields, we just
         # reset our water depths, topographic elevations and water
@@ -803,25 +803,33 @@ class TurbidityCurrent2D(Component):
             self.wet_nodes]]
         h_link_east = self.h_link_temp[self.east_link_at_node[self.wet_nodes]]
         h_link_west = self.h_link_temp[self.west_link_at_node[self.wet_nodes]]
+        a = np.empty(self.wet_nodes.shape)
+        b = np.empty(self.wet_nodes.shape)
+        c = np.empty(self.wet_nodes.shape)
+        d = np.empty(self.wet_nodes.shape)
+        e = np.empty(self.wet_nodes.shape)
+        g = np.empty(self.wet_nodes.shape)
+        w = np.empty(self.wet_nodes.shape)
 
         while err > 1.0 * 10**-10:
-            a = -Rg * (1 / h_link_east + 1 / h_link_west) / dx**2 - Rg * (
+            a[:] = -Rg * (1 / h_link_east + 1 / h_link_west) / dx**2 - Rg * (
                 1 / h_link_north +
                 1 / h_link_south) / dy**2 - 1 / (2 * p[self.wet_nodes] * dt**2)
-            b = Rg / (dx**2 * h_link_east)
-            c = Rg / (dx**2 * h_link_west)
-            d = Rg / (dx**2 * h_link_north)
-            e = Rg / (dx**2 * h_link_south)
-            g = -1 / (2 * dt**2) + ((u_east - u_west) / dx +
-                                    (v_north - v_south) / dy) / dt
-            w = (g - b * p_east - c * p_west - d * p_north - e * p_south) / a
+            b[:] = Rg / (dx**2 * h_link_east)
+            c[:] = Rg / (dx**2 * h_link_west)
+            d[:] = Rg / (dx**2 * h_link_north)
+            e[:] = Rg / (dx**2 * h_link_south)
+            g[:] = -1 / (2 * dt**2) + ((u_east - u_west) / dx +
+                                       (v_north - v_south) / dy) / dt
+            w[:] = (g - b * p_east - c * p_west - d * p_north -
+                    e * p_south) / a
             err = np.linalg.norm(w - p_new[self.wet_nodes])
             p_new[self.
                   wet_nodes] = p_new[self.wet_nodes] * (1 - alpha) + alpha * w
-            p_north = p_new[self.node_north[self.wet_nodes]]
-            p_south = p_new[self.node_south[self.wet_nodes]]
-            p_east = p_new[self.node_east[self.wet_nodes]]
-            p_west = p_new[self.node_west[self.wet_nodes]]
+            p_north[:] = p_new[self.node_north[self.wet_nodes]]
+            p_south[:] = p_new[self.node_south[self.wet_nodes]]
+            p_east[:] = p_new[self.node_east[self.wet_nodes]]
+            p_west[:] = p_new[self.node_west[self.wet_nodes]]
 
             count += 1
 
@@ -852,6 +860,7 @@ class TurbidityCurrent2D(Component):
 
         # p_new[self.
         #       wet_nodes] = p[self.wet_nodes] - 2 * p[self.wet_nodes] * div * dt
+        # p_new[self.wet_nodes][p_new[self.wet_nodes] < 0] = 0
         # self.h_temp[self.wet_nodes] = np.sqrt(self.h[self.wet_nodes] /
         #                                       self.Ch[self.wet_nodes] *
         #                                       p_new[self.wet_nodes])
