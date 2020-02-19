@@ -682,7 +682,7 @@ class TurbidityCurrent2D(Component):
                             self.dhdy,
                             self.u_node,
                             self.v_node,
-                            self.wet_nodes,
+                            self.wet_pwet_nodes,
                             self.horizontal_up_nodes,
                             self.vertical_up_nodes,
                             self.grid.dx,
@@ -696,7 +696,7 @@ class TurbidityCurrent2D(Component):
                             self.dChdy,
                             self.u_node,
                             self.v_node,
-                            self.wet_nodes,
+                            self.wet_pwet_nodes,
                             self.horizontal_up_nodes,
                             self.vertical_up_nodes,
                             self.grid.dx,
@@ -1660,12 +1660,6 @@ if __name__ == '__main__':
     import os
     os.environ['MKL_NUM_THREADS'] = '6'
     os.environ['OMP_NUM_THREADS'] = '6'
-    import numpy as np
-    from turb2d import create_topography
-    from turb2d import create_init_flow_region, create_topography_from_geotiff
-    from landlab import RasterModelGrid
-    from turb2d import TurbidityCurrent2D
-    import time
     from landlab import FIXED_GRADIENT_BOUNDARY, FIXED_VALUE_BOUNDARY
     from tqdm import tqdm
 
