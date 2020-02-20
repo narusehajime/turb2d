@@ -1,5 +1,4 @@
 import numpy as np
-import ipdb
 
 
 def cip_2d_M_advection(f,
@@ -643,7 +642,7 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     if out is None:
         out = np.zeros(f.shape)
 
-    # interplate using r-cubic function
+    # advection phase
     D = -dx
     xi = -dx / 2.
     BB = np.ones(core.shape, dtype=float)
@@ -664,6 +663,9 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     out[core] = (((a * xi + b) * xi + c)
                    * xi + f[iplus]) \
         / (1.0 + alpha * BB * xi)
+    negative_value = out[core] < 0
+    out[core][negative_value] = (f[iplus][negative_value] +
+                                 f[iminus][negative_value]) / 2.0
 
     # adjust negative values
     negative_id = np.where(out[core] < 0)[0]
