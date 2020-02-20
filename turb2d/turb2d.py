@@ -569,8 +569,8 @@ class TurbidityCurrent2D(Component):
         if self.neighbor_flag is False:
             set_up_neighbor_arrays(self)
 
-        if self.first_step is True:
-            self.initialize_gradients()
+        # if self.first_step is True:
+        #     self.initialize_gradients()
 
         # In case another component has added data to the fields, we just
         # reset our water depths, topographic elevations and water

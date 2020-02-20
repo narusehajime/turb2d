@@ -642,8 +642,8 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     """
     if out is None:
         out = np.zeros(f.shape)
-    ipdb.set_trace()
-    # advection phase
+
+    # interplate using r-cubic function
     D = -dx
     xi = -dx / 2.
     BB = np.ones(core.shape, dtype=float)
@@ -664,5 +664,10 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     out[core] = (((a * xi + b) * xi + c)
                    * xi + f[iplus]) \
         / (1.0 + alpha * BB * xi)
+
+    # adjust negative values
+    negative_id = np.where(out[core] < 0)[0]
+    out[core[negative_id]] = (f[iplus[negative_id]] +
+                              f[iminus[negative_id]]) / 2.0
 
     return out

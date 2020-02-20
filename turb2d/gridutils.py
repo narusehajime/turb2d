@@ -148,6 +148,8 @@ def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
     v[dry_links] = 0
     u_node[dry_nodes] = 0
     v_node[dry_nodes] = 0
+    dudx[dry_links] = 0
+    dvdy[dry_links] = 0
 
     # Map values of horizontal links to vertical links, and
     # values of vertical links to horizontal links.
@@ -229,10 +231,14 @@ def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
     """
 
     # remove illeagal values
-    # h[h < tc.h_init] = tc.h_init
-    # Ch[Ch < tc.C_init * tc.h_init] = tc.C_init * tc.h_init
+    h[h < tc.h_init] = tc.h_init
+    Ch[Ch < tc.C_init * tc.h_init] = tc.C_init * tc.h_init
     h[tc.dry_nodes] = tc.h_init
     Ch[tc.dry_nodes] = tc.h_init * tc.C_init
+    dhdx[tc.dry_nodes] = 0
+    dhdy[tc.dry_nodes] = 0
+    dChdx[tc.dry_nodes] = 0
+    dChdy[tc.dry_nodes] = 0
 
     north_node_at_vertical_link = tc.north_node_at_vertical_link[
         tc.wet_pwet_vertical_links]
@@ -245,51 +251,51 @@ def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
     dx = tc.grid.dx
 
     # map node values (h, C, eta) to links
-    # rcubic_interp_1d(h,
-    #                  dhdx,
-    #                  tc.wet_pwet_horizontal_links,
-    #                  east_node_at_horizontal_link,
-    #                  west_node_at_horizontal_link,
-    #                  dx,
-    #                  out=h_link)
-    # rcubic_interp_1d(h,
-    #                  dhdy,
-    #                  tc.wet_pwet_vertical_links,
-    #                  north_node_at_vertical_link,
-    #                  south_node_at_vertical_link,
-    #                  dx,
-    #                  out=h_link)
-    # rcubic_interp_1d(Ch,
-    #                  dChdx,
-    #                  tc.wet_pwet_horizontal_links,
-    #                  east_node_at_horizontal_link,
-    #                  west_node_at_horizontal_link,
-    #                  dx,
-    #                  out=Ch_link)
-    # rcubic_interp_1d(Ch,
-    #                  dChdy,
-    #                  tc.wet_pwet_vertical_links,
-    #                  north_node_at_vertical_link,
-    #                  south_node_at_vertical_link,
-    #                  dx,
-    #                  out=Ch_link)
+    rcubic_interp_1d(h,
+                     dhdx,
+                     tc.wet_pwet_horizontal_links,
+                     east_node_at_horizontal_link,
+                     west_node_at_horizontal_link,
+                     dx,
+                     out=h_link)
+    rcubic_interp_1d(h,
+                     dhdy,
+                     tc.wet_pwet_vertical_links,
+                     north_node_at_vertical_link,
+                     south_node_at_vertical_link,
+                     dx,
+                     out=h_link)
+    rcubic_interp_1d(Ch,
+                     dChdx,
+                     tc.wet_pwet_horizontal_links,
+                     east_node_at_horizontal_link,
+                     west_node_at_horizontal_link,
+                     dx,
+                     out=Ch_link)
+    rcubic_interp_1d(Ch,
+                     dChdy,
+                     tc.wet_pwet_vertical_links,
+                     north_node_at_vertical_link,
+                     south_node_at_vertical_link,
+                     dx,
+                     out=Ch_link)
 
-    map_mean_of_link_nodes_to_link(h,
-                                   tc.wet_pwet_horizontal_links,
-                                   tc.wet_pwet_vertical_links,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=h_link)
-    map_mean_of_link_nodes_to_link(Ch,
-                                   tc.wet_pwet_horizontal_links,
-                                   tc.wet_pwet_vertical_links,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=Ch_link)
+    # map_mean_of_link_nodes_to_link(h,
+    #                                tc.wet_pwet_horizontal_links,
+    #                                tc.wet_pwet_vertical_links,
+    #                                north_node_at_vertical_link,
+    #                                south_node_at_vertical_link,
+    #                                east_node_at_horizontal_link,
+    #                                west_node_at_horizontal_link,
+    #                                out=h_link)
+    # map_mean_of_link_nodes_to_link(Ch,
+    #                                tc.wet_pwet_horizontal_links,
+    #                                tc.wet_pwet_vertical_links,
+    #                                north_node_at_vertical_link,
+    #                                south_node_at_vertical_link,
+    #                                east_node_at_horizontal_link,
+    #                                west_node_at_horizontal_link,
+    #                                out=Ch_link)
 
 
 def map_mean_of_link_nodes_to_link(f,
