@@ -622,11 +622,14 @@ class TurbidityCurrent2D(Component):
             # calculate advection terms using cip method
             self._advection_phase()
 
-            # calculate deposition/erosion
-            self._deposition_phase()
-
             # Calculate diffusion term of momentum
             self._diffusion_phase()
+
+            # # re-check wet grids
+            find_wet_grids(self)
+
+            # calculate deposition/erosion
+            self._deposition_phase()
 
             # # apply the shock dissipation scheme
             self._shock_dissipation_phase()
@@ -682,7 +685,7 @@ class TurbidityCurrent2D(Component):
                             self.dhdy,
                             self.u_node,
                             self.v_node,
-                            self.wet_nodes,
+                            self.wet_pwet_nodes,
                             self.horizontal_up_nodes,
                             self.vertical_up_nodes,
                             self.grid.dx,
@@ -696,7 +699,7 @@ class TurbidityCurrent2D(Component):
                             self.dChdy,
                             self.u_node,
                             self.v_node,
-                            self.wet_nodes,
+                            self.wet_pwet_nodes,
                             self.horizontal_up_nodes,
                             self.vertical_up_nodes,
                             self.grid.dx,
@@ -717,9 +720,6 @@ class TurbidityCurrent2D(Component):
                    self.Ch_link, self.U, self.U_node)
         update_up_down_links_and_nodes(self)
 
-        # # re-check wet grids
-        find_wet_grids(self)
-
     def _nonadvection_phase(self):
         """Calculate non-advection phase of the model
            Pressure terms for velocities and mass conservation equations
@@ -727,7 +727,7 @@ class TurbidityCurrent2D(Component):
         """
         self.copy_values_to_temp()
 
-        # calculate gravity force and water entrainment
+        # calculate gravity force
         self.calc_G_u(self.h_temp, self.h_link_temp, self.u_temp, self.v_temp,
                       self.Ch_temp, self.Ch_link_temp, self.eta_temp,
                       self.U_temp, self.wet_horizontal_links)
