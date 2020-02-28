@@ -97,6 +97,7 @@ def find_wet_grids(tc):
     north_nodes_at_link = tc.north_node_at_vertical_link[vert_links]
     south_nodes_at_link = tc.south_node_at_vertical_link[vert_links]
     p_w = tc.p_w
+    h_w = tc.h_w
 
     ############################
     # find wet nodes and links #
@@ -107,7 +108,7 @@ def find_wet_grids(tc):
     # tc.wet_vertical_links = vert_links[np.where(
     #     (p[north_nodes_at_link] > p_w) & (p[south_nodes_at_link] > p_w))]
 
-    wet_nodes = (p > p_w) & (tc.h > 0.001)
+    wet_nodes = (p > p_w) & (tc.h > h_w)
     tc.wet_nodes = core[wet_nodes[core]]
     tc.wet_horizontal_links = horiz_links[np.where(
         (wet_nodes[west_nodes_at_link]) & (wet_nodes[east_nodes_at_link]))]
@@ -328,16 +329,18 @@ def process_partial_wet_grids(
     hdw = horizontal_direction_wettest
     vdw = vertical_direction_wettest
 
-    u_out[partial_wet_horizontal_links] = u[partial_wet_horizontal_links]\
-                        + hdw * horizontal_overspill_velocity
+    u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity \
+     + u[partial_wet_horizontal_links]
+
     u_out[partial_wet_horizontal_links] *= 1 / (1 + CfuU * dt)
     u_out[dry_links] = 0
 
     # - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
     # u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity
 
-    v_out[partial_wet_vertical_links] = v[partial_wet_vertical_links] \
-            + vdw * vertical_overspill_velocity
+    v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity \
+     + v[partial_wet_vertical_links]
+
     v_out[partial_wet_vertical_links] *= 1 / (1 + CfvU * dt)
     v_out[dry_links] = 0
 
@@ -364,10 +367,11 @@ def process_partial_wet_grids(
             u_out[west_link_at_node[partial_wet_nodes]]) / dx +
            (v_out[north_link_at_node[partial_wet_nodes]] -
             v_out[south_link_at_node[partial_wet_nodes]]) / dx)
-    h_out[partial_wet_nodes] -= h[partial_wet_nodes] * div * dt
-    Ch_out[partial_wet_nodes] -= Ch[partial_wet_nodes] * div * dt
-    # h_out[partial_wet_nodes] = h[partial_wet_nodes] / (1 + div * dt)
-    # Ch_out[partial_wet_nodes] = Ch[partial_wet_nodes] / (1 + div * dt)
+    # h_out[partial_wet_nodes] -= h[partial_wet_nodes] * div * dt
+    # Ch_out[partial_wet_nodes] -= Ch[partial_wet_nodes] * div * dt
+
+    h_out[partial_wet_nodes] = h[partial_wet_nodes] / (1 + div * dt)
+    Ch_out[partial_wet_nodes] = Ch[partial_wet_nodes] / (1 + div * dt)
 
     # h_out[partial_wet_nodes] += -(
     #     (u_out[east_link_at_node[partial_wet_nodes]] *
