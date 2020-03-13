@@ -331,49 +331,30 @@ def process_partial_wet_grids(
 
     u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity \
      + u[partial_wet_horizontal_links]
-
     u_out[partial_wet_horizontal_links] *= 1 / (1 + CfuU * dt)
     u_out[dry_links] = 0
 
-    # - CfuU / (h[horizontally_wettest_nodes] / 2) * dt
-    # u_out[partial_wet_horizontal_links] = hdw * horizontal_overspill_velocity
-
     v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity \
      + v[partial_wet_vertical_links]
-
     v_out[partial_wet_vertical_links] *= 1 / (1 + CfvU * dt)
     v_out[dry_links] = 0
-
-    # - CfvU / (h[vertically_wettest_nodes] / 2) * dt
-    # v_out[partial_wet_vertical_links] = vdw * vertical_overspill_velocity
-
-    # tc.horizontal_overspill_velocity[partial_wet_horizontal_links] = h_out[partial_wet_vertical_links]
-    # tc.vertical_overspill_velocity[partial_wet_vertical_links] = v_out[partial_wet_vertical_links]
-
-    # h_out[horizontally_partial_wet_nodes] += u_out[
-    #     partial_wet_horizontal_links] * h[horizontally_wettest_nodes] * dt
-    # Ch_out[horizontally_partial_wet_nodes] += u_out[
-    #     partial_wet_horizontal_links] * Ch[horizontally_wettest_nodes] * dt
-    # h_out[vertically_partial_wet_nodes] += u_out[
-    #     partial_wet_vertical_links] * h[vertically_wettest_nodes] * dt
-    # Ch_out[vertically_partial_wet_nodes] += u_out[
-    #     partial_wet_vertical_links] * Ch[vertically_wettest_nodes] * dt
 
     ################################################################
     # Calculate time development of variables at partial wet nodes #
     ################################################################
 
-    div = ((u_out[east_link_at_node[partial_wet_nodes]] -
-            u_out[west_link_at_node[partial_wet_nodes]]) / dx +
-           (v_out[north_link_at_node[partial_wet_nodes]] -
-            v_out[south_link_at_node[partial_wet_nodes]]) / dx)
+    # div = ((u_out[east_link_at_node[partial_wet_nodes]] -
+    #         u_out[west_link_at_node[partial_wet_nodes]]) / dx +
+    #        (v_out[north_link_at_node[partial_wet_nodes]] -
+    #         v_out[south_link_at_node[partial_wet_nodes]]) / dx)
+
     # h_out[partial_wet_nodes] -= h[partial_wet_nodes] * div * dt
     # Ch_out[partial_wet_nodes] -= Ch[partial_wet_nodes] * div * dt
 
-    h_out[partial_wet_nodes] = h[partial_wet_nodes] / (1 + div * dt)
-    Ch_out[partial_wet_nodes] = Ch[partial_wet_nodes] / (1 + div * dt)
+    # h_out[partial_wet_nodes] = h[partial_wet_nodes] / (1 + div * dt)
+    # Ch_out[partial_wet_nodes] = Ch[partial_wet_nodes] / (1 + div * dt)
 
-    # h_out[partial_wet_nodes] += -(
+    # h_out[partial_wet_nodes] -= (
     #     (u_out[east_link_at_node[partial_wet_nodes]] *
     #      h_link[east_link_at_node[partial_wet_nodes]] -
     #      u_out[west_link_at_node[partial_wet_nodes]] *
@@ -383,7 +364,7 @@ def process_partial_wet_grids(
     #      v_out[south_link_at_node[partial_wet_nodes]] *
     #      h_link[south_link_at_node[partial_wet_nodes]]) / dx) * dt
 
-    # Ch_out[partial_wet_nodes] += -(
+    # Ch_out[partial_wet_nodes] -= (
     #     (u_out[east_link_at_node[partial_wet_nodes]] *
     #      Ch_link[east_link_at_node[partial_wet_nodes]] -
     #      u_out[west_link_at_node[partial_wet_nodes]] *
@@ -392,46 +373,6 @@ def process_partial_wet_grids(
     #      Ch_link[north_link_at_node[partial_wet_nodes]] -
     #      v_out[south_link_at_node[partial_wet_nodes]] *
     #      Ch_link[south_link_at_node[partial_wet_nodes]]) / dx) * dt
-
-    # overspilling horizontally
-    # half_dry = h_out[horizontally_wettest_nodes] < 8.0 * M_horiz
-    # M_horiz[half_dry] = h_out[horizontally_wettest_nodes][half_dry] / 8.0
-
-    # h_out[horizontally_partial_wet_nodes] += h_out[
-    #     horizontally_wettest_nodes] * hdw * u_out[
-    #         partial_wet_horizontal_links] * dt / dx
-    # h_out[horizontally_partial_wet_nodes] += M_horiz
-
-    # h_out[horizontally_wettest_nodes] -= M_horiz
-    # c_half_dry = Ch_out[horizontally_wettest_nodes] < 8.0 * CM_horiz
-    # CM_horiz[c_half_dry] = Ch_out[horizontally_wettest_nodes][c_half_dry] / 8.
-
-    # Ch_out[horizontally_partial_wet_nodes] += Ch[
-    #     horizontally_wettest_nodes] * hdw * u_out[
-    #         partial_wet_horizontal_links] * dt / dx
-
-    # Ch_out[horizontally_partial_wet_nodes] += CM_horiz
-    # Ch_out[horizontally_wettest_nodes] -= CM_horiz
-
-    # overspilling vertically
-    # half_dry = h_out[vertically_wettest_nodes] < 8.0 * M_vert
-    # M_vert[half_dry] = h_out[vertically_wettest_nodes][half_dry] / 8.0
-
-    # h_out[vertically_partial_wet_nodes] += h_out[
-    #     vertically_wettest_nodes] * vdw * v_out[
-    #         partial_wet_vertical_links] * dt / dx
-
-    # h_out[vertically_partial_wet_nodes] += M_vert
-    # h_out[vertically_wettest_nodes] -= M_vert
-    # c_half_dry = Ch_out[vertically_wettest_nodes] < 8.0 * CM_vert
-    # CM_vert[c_half_dry] = Ch_out[vertically_wettest_nodes][c_half_dry] / 8.0
-
-    # Ch_out[vertically_partial_wet_nodes] += Ch_out[
-    #     vertically_wettest_nodes] * vdw * v_out[
-    #         partial_wet_vertical_links] * dt / dx
-
-    # Ch_out[vertically_partial_wet_nodes] += CM_vert
-    # Ch_out[vertically_wettest_nodes] -= CM_vert
 
     return h_out, u_out, v_out, Ch_out
 

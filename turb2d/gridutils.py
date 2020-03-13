@@ -2,7 +2,7 @@
 """
 import numpy as np
 from landlab.grid.structured_quad import links
-from .cip import cubic_interp_1d, rcubic_interp_1d
+from .cip import cubic_interp_1d, rcubic_interp_1d, forester_filter
 
 
 def set_up_neighbor_arrays(tc):
@@ -167,34 +167,34 @@ def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
     U[wet_pwet_links] = np.sqrt(u[wet_pwet_links]**2 + v[wet_pwet_links]**2)
 
     # map link values (u, v) to nodes
-    cubic_interp_1d(u,
-                    dudx,
-                    wet_pwet_nodes,
-                    east_link_at_node,
-                    west_link_at_node,
-                    dx,
-                    out=u_node)
-    cubic_interp_1d(v,
-                    dvdy,
-                    wet_pwet_nodes,
-                    north_link_at_node,
-                    south_link_at_node,
-                    dx,
-                    out=v_node)
-    # map_mean_of_links_to_node(u,
-    #                           wet_pwet_nodes,
-    #                           north_link_at_node,
-    #                           south_link_at_node,
-    #                           east_link_at_node,
-    #                           west_link_at_node,
-    #                           out=u_node)
-    # map_mean_of_links_to_node(v,
-    #                           wet_pwet_nodes,
-    #                           north_link_at_node,
-    #                           south_link_at_node,
-    #                           east_link_at_node,
-    #                           west_link_at_node,
-    #                           out=v_node)
+    # cubic_interp_1d(u,
+    #                 dudx,
+    #                 wet_pwet_nodes,
+    #                 east_link_at_node,
+    #                 west_link_at_node,
+    #                 dx,
+    #                 out=u_node)
+    # cubic_interp_1d(v,
+    #                 dvdy,
+    #                 wet_pwet_nodes,
+    #                 north_link_at_node,
+    #                 south_link_at_node,
+    #                 dx,
+    #                 out=v_node)
+    map_mean_of_links_to_node(u,
+                              wet_pwet_nodes,
+                              north_link_at_node,
+                              south_link_at_node,
+                              east_link_at_node,
+                              west_link_at_node,
+                              out=u_node)
+    map_mean_of_links_to_node(v,
+                              wet_pwet_nodes,
+                              north_link_at_node,
+                              south_link_at_node,
+                              east_link_at_node,
+                              west_link_at_node,
+                              out=v_node)
     map_mean_of_links_to_node(U,
                               wet_pwet_nodes,
                               north_link_at_node,
@@ -234,8 +234,17 @@ def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
     """
 
     # remove illeagal values
-    h[h < tc.h_init] = tc.h_init
-    Ch[Ch < tc.C_init * tc.h_init] = tc.C_init * tc.h_init
+    # h[h < tc.h_init] = tc.h_init
+    # Ch[Ch < tc.C_init * tc.h_init] = tc.C_init * tc.h_init
+    adjust_negative_values(h,
+                           Ch,
+                           tc.wet_pwet_nodes,
+                           tc.node_east,
+                           tc.node_west,
+                           tc.node_north,
+                           tc.node_south,
+                           out_h=h,
+                           out_Ch=Ch)
     h[tc.dry_nodes] = tc.h_init
     Ch[tc.dry_nodes] = tc.h_init * tc.C_init
     dhdx[tc.dry_nodes] = 0
@@ -561,3 +570,28 @@ def find_boundary_links_nodes(tc):
         fixed_value_edge_link_at_north, fixed_value_edge_link_at_south,
         fixed_value_edge_link_at_east, fixed_value_edge_link_at_west
     ])
+
+
+def adjust_negative_values(h,
+                           Ch,
+                           core,
+                           east,
+                           west,
+                           north,
+                           south,
+                           out_h=None,
+                           out_Ch=None):
+
+    if out_h is None:
+        out_h = h.copy()
+    if out_Ch is None:
+        out_Ch = Ch.copy()
+
+    forester_filter(h, core, east, west, north, south, out_f=out_h)
+    C = np.zeros_like(Ch)
+    h_positive = core[h[core] > 0]
+    C[h_positive] = Ch[h_positive] / h[h_positive]
+    forester_filter(C, h_positive, east, west, north, south, out_f=C)
+    out_Ch[core] = C[core] * h[core]
+
+    return out_h, out_Ch
