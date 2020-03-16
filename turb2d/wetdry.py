@@ -4,6 +4,7 @@
 """
 
 import numpy as np
+from .cip import forester_filter
 
 
 def find_wet_grids(tc):
@@ -338,6 +339,25 @@ def process_partial_wet_grids(
      + v[partial_wet_vertical_links]
     v_out[partial_wet_vertical_links] *= 1 / (1 + CfvU * dt)
     v_out[dry_links] = 0
+
+    ################################################################
+    # Forester filter is applied to partial wet grids              #
+    ################################################################
+
+    forester_filter(h,
+                    partial_wet_nodes,
+                    tc.node_east,
+                    tc.node_west,
+                    tc.node_north,
+                    tc.node_south,
+                    out_f=h_out)
+    forester_filter(Ch,
+                    partial_wet_nodes,
+                    tc.node_east,
+                    tc.node_west,
+                    tc.node_north,
+                    tc.node_south,
+                    out_f=Ch_out)
 
     ################################################################
     # Calculate time development of variables at partial wet nodes #

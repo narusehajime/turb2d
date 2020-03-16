@@ -732,26 +732,17 @@ def forester_filter(f,
         out_f = np.zeros(f.shape[0])
 
     out_f[:] = f[:]
-    negative = core[out_f[core] < 0]
-    counter = 0
 
-    while len(negative) > 0 and counter < loop:
-        east = east_id[negative]
-        west = west_id[negative]
-        north = north_id[negative]
-        south = south_id[negative]
+    east = east_id[core]
+    west = west_id[core]
+    north = north_id[core]
+    south = south_id[core]
 
-        out_f[negative] += (out_f[east] + out_f[west] + out_f[north] +
-                            out_f[south] - 4.0 * out_f[negative]) / 4.0
-        # out_f[east] -= (out_f[east] - out_f[negative]) / 4.0 * dt
-        # out_f[west] -= (out_f[west] - out_f[negative]) / 4.0 * dt
-        # out_f[north] -= (out_f[north] - out_f[negative]) / 4.0 * dt
-        # out_f[south] -= (out_f[south] - out_f[negative]) / 4.0 * dt
-        counter += 1
-        negative = core[out_f[core] < 0]
-
-    if counter == loop:
-        out_f[out_f < 0] = 0
-        print('Forester filter failed to fix negative values')
+    out_f[core] += (f[east] + f[west] + f[north] + f[south] -
+                    4.0 * f[core]) / 4.0
+    out_f[east] -= (f[east] - f[core]) / 4.0
+    out_f[west] -= (f[west] - f[core]) / 4.0
+    out_f[north] -= (f[north] - f[core]) / 4.0
+    out_f[south] -= (f[south] - f[core]) / 4.0
 
     return out_f

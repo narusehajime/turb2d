@@ -2,7 +2,7 @@
 """
 import numpy as np
 from landlab.grid.structured_quad import links
-from .cip import cubic_interp_1d, rcubic_interp_1d, forester_filter
+from .cip import cubic_interp_1d, rcubic_interp_1d, forester_filter, update_gradient
 
 
 def set_up_neighbor_arrays(tc):
@@ -572,26 +572,52 @@ def find_boundary_links_nodes(tc):
     ])
 
 
-def adjust_negative_values(h,
-                           Ch,
-                           core,
-                           east,
-                           west,
-                           north,
-                           south,
-                           out_h=None,
-                           out_Ch=None):
+def adjust_negative_values(
+        h,
+        Ch,
+        core,
+        east_id,
+        west_id,
+        north_id,
+        south_id,
+        out_h=None,
+        out_Ch=None,
+        loop=1000,
+):
 
     if out_h is None:
         out_h = h.copy()
     if out_Ch is None:
         out_Ch = Ch.copy()
 
-    forester_filter(h, core, east, west, north, south, out_f=out_h)
-    C = np.zeros_like(Ch)
-    h_positive = core[h[core] > 0]
-    C[h_positive] = Ch[h_positive] / h[h_positive]
-    forester_filter(C, h_positive, east, west, north, south, out_f=C)
-    out_Ch[core] = C[core] * h[core]
+    h_temp = h.copy()
+    Ch_temp = Ch.copy()
+    to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
+    counter = 0
+
+    while len(to_fix) > 0 and counter < loop:
+        forester_filter(h_temp,
+                        to_fix,
+                        east_id,
+                        west_id,
+                        north_id,
+                        south_id,
+                        out_f=out_h)
+        forester_filter(Ch_temp,
+                        to_fix,
+                        east_id,
+                        west_id,
+                        north_id,
+                        south_id,
+                        out_f=out_Ch)
+        counter += 1
+        to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
+        h_temp[:] = out_h[:]
+        Ch_temp[:] = out_Ch[:]
+
+    if counter == loop:
+        out_h[out_h < 0] = 0
+        out_Ch[out_Ch < 0] = 0
+        print('Forester filter failed to fix negative values')
 
     return out_h, out_Ch
