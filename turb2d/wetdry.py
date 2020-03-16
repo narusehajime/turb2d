@@ -344,20 +344,20 @@ def process_partial_wet_grids(
     # Forester filter is applied to partial wet grids              #
     ################################################################
 
-    forester_filter(h,
-                    partial_wet_nodes,
-                    tc.node_east,
-                    tc.node_west,
-                    tc.node_north,
-                    tc.node_south,
-                    out_f=h_out)
-    forester_filter(Ch,
-                    partial_wet_nodes,
-                    tc.node_east,
-                    tc.node_west,
-                    tc.node_north,
-                    tc.node_south,
-                    out_f=Ch_out)
+    # forester_filter(h,
+    #                 partial_wet_nodes,
+    #                 tc.node_east,
+    #                 tc.node_west,
+    #                 tc.node_north,
+    #                 tc.node_south,
+    #                 out_f=h_out)
+    # forester_filter(Ch,
+    #                 partial_wet_nodes,
+    #                 tc.node_east,
+    #                 tc.node_west,
+    #                 tc.node_north,
+    #                 tc.node_south,
+    #                 out_f=Ch_out)
 
     ################################################################
     # Calculate time development of variables at partial wet nodes #

@@ -177,7 +177,8 @@ class TurbidityCurrent2D(Component):
                  lambda_p=0.4,
                  r0=1.5,
                  nu=1.010 * 10**-6,
-                 kappa=0.02,
+                 kappa2=0.02,
+                 kappa4=0.001,
                  nu_a=0.8,
                  implicit_num=50,
                  implicit_threshold=1.0 * 10**-15,
@@ -216,9 +217,12 @@ class TurbidityCurrent2D(Component):
             Bed sediment porosity(1)
         nu: float, optional
             Kinematic viscosity of water(at 293K)
-        kappa: float, optional
-            Artificial viscosity. This value, alpha and h_w affect to 
-            calculation stability.
+        kappa2: float, optional
+            Second order artificial viscosity. This value, alpha and
+            h_w affect to calculation stability.
+        kappa4: float, optional
+            Forth order artificial viscosity. This value, alpha
+             and h_w affect to calculation stability.
         nu_a: float, optional
             Artificial viscosity coefficient (0.6-1.0). Default is 0.8.
         implicit_num: float, optional
@@ -262,7 +266,8 @@ class TurbidityCurrent2D(Component):
         self.p_w = p_w
         self.h_w = h_w
         self.nu = nu
-        self.kappa = kappa
+        self.kappa2 = kappa2
+        self.kappa4 = kappa4
         self.nu_a = nu_a
         self.r0 = r0
         self.lambda_p = lambda_p
@@ -671,7 +676,7 @@ class TurbidityCurrent2D(Component):
 
             # # apply the shock dissipation scheme
             # if self.scheme == 'CentralDifference':
-            # self._shock_dissipation_phase()
+            self._shock_dissipation_phase()
 
             #the end of the loop of one local time step
             self.first_step = False
@@ -1095,9 +1100,9 @@ class TurbidityCurrent2D(Component):
                                  out_eta=self.eta_temp)
 
         # apply artificial viscosity
-        self._artificial_viscosity(self.h_temp, self.h_link_temp, self.u_temp,
-                                   self.v_temp, self.Ch_temp,
-                                   self.Ch_link_temp)
+        # self._artificial_viscosity(self.h_temp, self.h_link_temp, self.u_temp,
+        #                            self.v_temp, self.Ch_temp,
+        #                            self.Ch_link_temp)
 
         # calculate divergence of velocity
         div = (self.u_temp[self.east_link_at_node[self.wet_pwet_nodes]] - self.
@@ -1290,7 +1295,8 @@ class TurbidityCurrent2D(Component):
                           self.node_east,
                           self.node_west,
                           self.dt_local,
-                          self.kappa,
+                          self.kappa2,
+                          self.kappa4,
                           out=self.Ch_temp)
 
         shock_dissipation(self.u,
@@ -1301,7 +1307,8 @@ class TurbidityCurrent2D(Component):
                           self.link_east,
                           self.link_west,
                           self.dt_local,
-                          self.kappa,
+                          self.kappa2,
+                          self.kappa4,
                           out=self.u_temp)
 
         shock_dissipation(self.v,
@@ -1312,7 +1319,8 @@ class TurbidityCurrent2D(Component):
                           self.link_east,
                           self.link_west,
                           self.dt_local,
-                          self.kappa,
+                          self.kappa2,
+                          self.kappa4,
                           out=self.v_temp)
 
         shock_dissipation(self.h,
@@ -1323,7 +1331,8 @@ class TurbidityCurrent2D(Component):
                           self.node_east,
                           self.node_west,
                           self.dt_local,
-                          self.kappa,
+                          self.kappa2,
+                          self.kappa4,
                           out=self.h_temp)
 
         # update gradient terms

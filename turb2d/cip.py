@@ -324,14 +324,15 @@ def rcip_2d_M_advection(f,
 
 def shock_dissipation(
         f,
-        h,
+        p,
         core,
         north_id,
         south_id,
         east_id,
         west_id,
         dt,
-        kappa,
+        kappa2,
+        kappa4,
         out=None,
 ):
     """ adding artificial viscosity for numerical stability
@@ -358,27 +359,37 @@ def shock_dissipation(
     if out is None:
         out = np.zeros(n)
 
-    eps_i = np.zeros(n, dtype=np.float)
-    eps_i_half = np.zeros(n, dtype=np.float)
+    nu_i = np.zeros(n, dtype=np.float)
+    eps_i_half2 = np.zeros(n, dtype=np.float)
+    eps_i_half4 = np.zeros(n, dtype=np.float)
+    d_i_half = np.zeros(n, dtype=np.float)
     north = north_id[core]
     south = south_id[core]
     east = east_id[core]
     west = west_id[core]
+    easteast = east_id[east]
+    northnorth = north_id[north]
 
     # First, artificial diffusion is applied to east-west direction
-    eps_i[core] = kappa * np.abs(h[east] - 2 * h[core] + h[west]) / \
-        (np.abs(h[east]) + 2 * np.abs(h[core]) + np.abs(h[west]) + 10**-20)
-    eps_i_half[core] = np.max([eps_i[east], eps_i[core]], axis=0)
-    out[core] = f[core] + eps_i_half[core] * (f[east] - f[core]) - \
-        eps_i_half[west] * (f[core] - f[west])
+    nu_i[core] = np.abs(p[east] - 2 * p[core] + p[west]) / \
+        (np.abs(p[east]) + 2 * np.abs(p[core]) + np.abs(p[west]) + 10**-20)
+    eps_i_half2[core] = kappa2 * np.max([nu_i[east], nu_i[core]], axis=0)
+    eps_i_half4[core] = np.max(
+        [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
+    d_i_half[core] = eps_i_half2[core] * (
+        f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
+                                                  3.0 * f[core] - f[west])
+    out[core] = f[core] + d_i_half[core] - d_i_half[west]
 
     # Next, artificial diffusion is applied to north-south direction
-    eps_i[core] = kappa * np.abs(h[north] - 2 * h[core] + h[south]) / (
-        np.abs(h[north]) + 2 * np.abs(h[core]) + np.abs(h[south]) + 10**-20)
-    eps_i_half[core] = np.max([eps_i[north], eps_i[core]], axis=0)
-    out[core] = out[core] + (eps_i_half[core] *
-                             (out[north] - out[core]) - eps_i_half[south] *
-                             (out[core] - out[south]))
+    nu_i[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
+        np.abs(p[north]) + 2 * np.abs(p[core]) + np.abs(p[south]) + 10**-20)
+    eps_i_half2[core] = kappa2 * np.max([nu_i[north], nu_i[core]], axis=0)
+    eps_i_half4[core] = np.max(
+        [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
+    d_i_half[core] = eps_i_half2[core] * (f[north] - f[core]) - eps_i_half4[
+        core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
+    out[core] = f[core] + d_i_half[core] - d_i_half[south]
 
     return out
 
