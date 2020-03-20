@@ -41,26 +41,11 @@ def set_up_neighbor_arrays(tc):
     tc.south_node_at_vertical_link = tc.grid.nodes_at_link[:, 0].copy()
     tc.north_node_at_vertical_link = tc.grid.nodes_at_link[:, 1].copy()
 
-    # bound_node_north_at_link = np.where(
-    #     tc.grid.node_is_boundary(tc.north_node_at_vertical_link))
-    # bound_node_south_at_link = np.where(
-    #     tc.grid.node_is_boundary(tc.south_node_at_vertical_link))
-    # bound_node_east_at_link = np.where(
-    #     tc.grid.node_is_boundary(tc.east_node_at_horizontal_link))
-    # bound_node_west_at_link = np.where(
-    #     tc.grid.node_is_boundary(tc.west_node_at_horizontal_link))
-    # tc.north_node_at_vertical_link[
-    #     bound_node_north_at_link] = tc.south_node_at_vertical_link[
-    #         bound_node_north_at_link]
-    # tc.south_node_at_vertical_link[
-    #     bound_node_south_at_link] = tc.north_node_at_vertical_link[
-    #         bound_node_south_at_link]
-    # tc.east_node_at_horizontal_link[
-    #     bound_node_east_at_link] = tc.west_node_at_horizontal_link[
-    #         bound_node_east_at_link]
-    # tc.west_node_at_horizontal_link[
-    #     bound_node_west_at_link] = tc.east_node_at_horizontal_link[
-    #         bound_node_west_at_link]
+    # nodes indicating outside of grids
+    tc.node_east[tc.grid.nodes_at_right_edge] = tc.grid.nodes_at_right_edge
+    tc.node_west[tc.grid.nodes_at_left_edge] = tc.grid.nodes_at_left_edge
+    tc.node_north[tc.grid.nodes_at_top_edge] = tc.grid.nodes_at_top_edge
+    tc.node_south[tc.grid.nodes_at_bottom_edge] = tc.grid.nodes_at_bottom_edge
 
     # Find obliquely neighbor vertical links from horizontal links
     # and obliquely neighbor horizontal links from vertical links
@@ -209,6 +194,14 @@ def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
         tc.partial_wet_horizontal_links]
     v_node[tc.vertically_partial_wet_nodes] = v[tc.partial_wet_vertical_links]
 
+    # update boundary conditions
+    tc.update_boundary_conditions(
+        u=u,
+        v=v,
+        u_node=u_node,
+        v_node=v_node,
+    )
+
 
 def map_mean_of_links_to_node(f,
                               core,
@@ -308,6 +301,13 @@ def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
                                    east_node_at_horizontal_link,
                                    west_node_at_horizontal_link,
                                    out=Ch_link)
+
+    # update boundary conditions
+    tc.update_boundary_conditions(h=h,
+                                  Ch=Ch,
+                                  h_link=h_link,
+                                  Ch_link=Ch_link,
+                                  eta=eta)
 
 
 def map_mean_of_link_nodes_to_link(f,

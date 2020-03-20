@@ -360,9 +360,13 @@ def shock_dissipation(
         out = np.zeros(n)
 
     nu_i = np.zeros(n, dtype=np.float)
+    nu_j = np.zeros(n, dtype=np.float)
     eps_i_half2 = np.zeros(n, dtype=np.float)
     eps_i_half4 = np.zeros(n, dtype=np.float)
+    eps_j_half2 = np.zeros(n, dtype=np.float)
+    eps_j_half4 = np.zeros(n, dtype=np.float)
     d_i_half = np.zeros(n, dtype=np.float)
+    d_j_half = np.zeros(n, dtype=np.float)
     north = north_id[core]
     south = south_id[core]
     east = east_id[core]
@@ -379,19 +383,112 @@ def shock_dissipation(
     d_i_half[core] = eps_i_half2[core] * (
         f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
                                                   3.0 * f[core] - f[west])
-    out[core] = f[core] + d_i_half[core] - d_i_half[west]
 
     # Next, artificial diffusion is applied to north-south direction
-    nu_i[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
+    nu_j[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
         np.abs(p[north]) + 2 * np.abs(p[core]) + np.abs(p[south]) + 10**-20)
-    eps_i_half2[core] = kappa2 * np.max([nu_i[north], nu_i[core]], axis=0)
-    eps_i_half4[core] = np.max(
-        [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
-    d_i_half[core] = eps_i_half2[core] * (f[north] - f[core]) - eps_i_half4[
+    eps_j_half2[core] = kappa2 * np.max([nu_j[north], nu_j[core]], axis=0)
+    eps_j_half4[core] = np.max(
+        [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
+    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
         core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
-    out[core] = f[core] + d_i_half[core] - d_i_half[south]
+
+    # apply artificial diffusion
+    out[core] = f[core] + d_i_half[core] - d_i_half[west] + d_j_half[
+        core] - d_j_half[south]
 
     return out
+
+
+def jameson_filter(
+        f,
+        p,
+        core,
+        north_id,
+        south_id,
+        east_id,
+        west_id,
+        dt,
+        kappa2,
+        kappa4,
+        out=None,
+):
+    """ adding artificial viscosity for numerical stability
+
+        Parameters
+        ------------------
+        f : ndarray, float
+            parameter for which the artificial viscosity is applied
+        h : ndarray, float
+            flow height
+        core : ndarray, int
+            indeces of core nodes or links
+        north_id : ndarray, int
+            indeces of nodes or links that locate north of core
+        south_id : ndarray, int
+            indeces of nodes or links that locate south of core
+        east_id : ndarray, int
+            indeces of nodes or links that locate east of core
+        west_id : ndarray, int
+            indeces of nodes or links that locate west of core
+    """
+    n = f.shape[0]
+
+    if out is None:
+        out = np.zeros(n)
+
+    nu_i = np.zeros(n, dtype=np.float)
+    nu_j = np.zeros(n, dtype=np.float)
+    eps_i_half2 = np.zeros(n, dtype=np.float)
+    eps_i_half4 = np.zeros(n, dtype=np.float)
+    eps_j_half2 = np.zeros(n, dtype=np.float)
+    eps_j_half4 = np.zeros(n, dtype=np.float)
+    d_i_half = np.zeros(n, dtype=np.float)
+    d_j_half = np.zeros(n, dtype=np.float)
+    north = north_id[core]
+    south = south_id[core]
+    east = east_id[core]
+    west = west_id[core]
+    easteast = east_id[east]
+    northnorth = north_id[north]
+
+    # First, artificial diffusion is applied to east-west direction
+    nu_i[core] = np.abs(p[east] - 2 * p[core] + p[west]) / \
+        (np.abs(p[east]) + 2 * np.abs(p[core]) + np.abs(p[west]) + 10**-20)
+    eps_i_half2[core] = kappa2 * np.max([nu_i[east], nu_i[core]], axis=0)
+    eps_i_half4[core] = np.max(
+        [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
+    d_i_half[core] = eps_i_half2[core] * (
+        f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
+                                                  3.0 * f[core] - f[west])
+
+    # Next, artificial diffusion is applied to north-south direction
+    nu_j[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
+        np.abs(p[north]) + 2 * np.abs(p[core]) + np.abs(p[south]) + 10**-20)
+    eps_j_half2[core] = kappa2 * np.max([nu_j[north], nu_j[core]], axis=0)
+    eps_j_half4[core] = np.max(
+        [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
+    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
+        core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
+
+    # apply artificial diffusion
+    out[core] = f[core] + d_i_half[core] - d_i_half[west] + d_j_half[
+        core] - d_j_half[south]
+
+    return out
+
+
+def _jameson_viscosity(p,
+                       core,
+                       east_node,
+                       west_node,
+                       north_node,
+                       south_node,
+                       out_eps=None):
+    """Calculate aritificial viscosity for Jameson's filter
+    """
+    if out_eps is None:
+        out_eps = np.zeros_like(core)
 
 
 def update_gradient(f,
@@ -614,11 +711,11 @@ def rcip_2d_advection(f,
 
     # tmp = f[core] - f[yup] - f[xup] + f[xyup]
     # tmq = dfdy[xup] - dfdy[core]
-    C11 = (a01 * b01 * f[xup] + (1 + a10 * b10 * Ddx) * dfdy[xup]) / Ddx \
-          + (a10 * b10 * f[yup] + (1 + a01 * b01 * Ddy) * dfdx[yup]) / Ddy \
-          + (C00 - (a10 * b10 * Ddx + a01 * b01 * Ddy) * f[xyup]) / Ddx / Ddy\
-          + C30 * Ddx * Ddx / Ddy + C03 * Ddy * Ddy / Ddx \
-          + C20 * Ddx / Ddy + C02 * Ddy / Ddx
+    C11 = (a01 * b01 * f[xup] + (1.0 + a10 * b10 * Ddx) * dfdy[xup]) / Ddx \
+      + (a10 * b10 * f[yup] + (1.0 + a01 * b01 * Ddy) * dfdx[yup]) / Ddy \
+      + (C00 - (1.0 + a10 * b10 * Ddx + a01 * b01 * Ddy) * f[xyup]) / Ddx / Ddy\
+      + C30 * Ddx * Ddx / Ddy + C03 * Ddy * Ddy / Ddx \
+      + C20 * Ddx / Ddy + C02 * Ddy / Ddx
 
     # C12 = (-tmp - tmq * Ddy) / (Ddx * Ddy * Ddy)
     C12 = (a10 * b10 * f[yup] +
@@ -630,15 +727,17 @@ def rcip_2d_advection(f,
 
     # C11 = (-tmq + C21 * Ddx * Ddx) / (Ddx)
 
-    out_f[core] = (
-        (C30 * XX + C21 * YY + C20) * XX + C11 * YY + dfdx[core]) * XX + (
-            (C03 * YY + C12 * XX + C02) * YY + dfdy[core]) * YY + f[core]
-    out_dfdx[core] = (3.0 * C30 * XX + 2.0 *
-                      (C21 * YY + C20)) * XX + (C12 * YY +
-                                                C11) * YY + dfdx[core]
-    out_dfdy[core] = (3.0 * C03 * YY + 2.0 *
-                      (C12 * XX + C02)) * YY + (C21 * XX +
-                                                C11) * XX + dfdy[core]
+    out_f[core] = (((C30 * XX + C21 * YY + C20) * XX + C11 * YY + C10) * XX +
+                   ((C03 * YY + C12 * XX + C02) * YY + C01) * YY +
+                   C00) / (1 + a10 * b10 * XX + a01 * b01 * YY)
+    out_dfdx[core] = (
+        (3.0 * C30 * XX + 2.0 *
+         (C21 * YY + C20)) * XX + (C12 * YY + C11) * YY + C10 -
+        a10 * b10 * out_f[core]) / (1 + a10 * b10 * XX + a01 * b01 * YY)
+    out_dfdy[core] = (
+        (3.0 * C03 * YY + 2.0 *
+         (C12 * XX + C02)) * YY + (C21 * XX + C11) * XX + C01 -
+        a01 * b01 * out_f[core]) / (1 + a10 * b10 * XX + a01 * b01 * YY)
 
     return out_f, out_dfdx, out_dfdy
 
@@ -727,14 +826,16 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     return out
 
 
-def forester_filter(f,
-                    core,
-                    east_id,
-                    west_id,
-                    north_id,
-                    south_id,
-                    out_f=None,
-                    loop=1000):
+def forester_filter(
+        f,
+        core,
+        east_id,
+        west_id,
+        north_id,
+        south_id,
+        nu_f=1.0,
+        out_f=None,
+):
     """ Forester filter for removing negative values from Concentration and 
         Flow depth
     """
@@ -749,11 +850,11 @@ def forester_filter(f,
     north = north_id[core]
     south = south_id[core]
 
-    out_f[core] += (f[east] + f[west] + f[north] + f[south] -
-                    4.0 * f[core]) / 4.0
-    out_f[east] -= (f[east] - f[core]) / 4.0
-    out_f[west] -= (f[west] - f[core]) / 4.0
-    out_f[north] -= (f[north] - f[core]) / 4.0
-    out_f[south] -= (f[south] - f[core]) / 4.0
+    out_f[core] += nu_f * (f[east] + f[west] + f[north] + f[south] -
+                           4.0 * f[core]) / 4.0
+    # out_f[east] -= nu_f * (f[east] - f[core]) / 4.0
+    # out_f[west] -= nu_f * (f[west] - f[core]) / 4.0
+    # out_f[north] -= nu_f * (f[north] - f[core]) / 4.0
+    # out_f[south] -= nu_f * (f[south] - f[core]) / 4.0
 
     return out_f

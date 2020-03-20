@@ -83,8 +83,10 @@ def find_wet_grids(tc):
     #############################
     p = tc.h * tc.Ch
     core = tc.core_nodes
-    horiz_links = tc.horizontal_active_links
-    vert_links = tc.vertical_active_links
+    # horiz_links = tc.horizontal_active_links
+    horiz_links = tc.grid.horizontal_links
+    # vert_links = tc.vertical_active_links
+    vert_links = tc.grid.vertical_links
     east_nodes_at_node = tc.node_east[core]
     west_nodes_at_node = tc.node_west[core]
     north_nodes_at_node = tc.node_north[core]
@@ -177,6 +179,9 @@ def find_wet_grids(tc):
         np.concatenate([
             tc.horizontally_partial_wet_nodes, tc.vertically_partial_wet_nodes
         ]))
+    tc.wettest_nodes = np.unique(
+        np.concatenate(
+            [tc.horizontally_wettest_nodes, tc.vertically_wettest_nodes]))
     tc.wet_pwet_nodes = np.unique(
         np.concatenate([tc.wet_nodes, tc.partial_wet_nodes]))
     tc.wet_pwet_horizontal_links = np.concatenate(
