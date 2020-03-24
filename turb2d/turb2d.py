@@ -635,7 +635,15 @@ class TurbidityCurrent2D(Component):
                    self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
                    self.eta, self.h_link, self.u_node, self.v_node,
                    self.Ch_link, self.U, self.U_node)
-        self.update_boundary_conditions()
+        self.update_boundary_conditions(h=self.h,
+                                        u=self.u,
+                                        v=self.v,
+                                        Ch=self.Ch,
+                                        h_link=self.h_link,
+                                        Ch_link=self.Ch_link,
+                                        u_node=self.u_node,
+                                        v_node=self.v_node,
+                                        eta=self.eta)
         update_up_down_links_and_nodes(self)
         self.copy_values_to_temp()
 
@@ -973,6 +981,23 @@ class TurbidityCurrent2D(Component):
             self.wet_nodes]]
         h_link_east = self.h_link_temp[self.east_link_at_node[self.wet_nodes]]
         h_link_west = self.h_link_temp[self.west_link_at_node[self.wet_nodes]]
+        Ch_link_north = self.Ch_link_temp[self.north_link_at_node[
+            self.wet_nodes]]
+        Ch_link_south = self.Ch_link_temp[self.south_link_at_node[
+            self.wet_nodes]]
+        Ch_link_east = self.Ch_link_temp[self.east_link_at_node[
+            self.wet_nodes]]
+        Ch_link_west = self.Ch_link_temp[self.west_link_at_node[
+            self.wet_nodes]]
+        eta = self.eta_temp[self.wet_nodes]
+        eta_north = self.eta_temp[self.node_north[self.wet_nodes]]
+        eta_south = self.eta_temp[self.node_south[self.wet_nodes]]
+        eta_east = self.eta_temp[self.node_east[self.wet_nodes]]
+        eta_west = self.eta_temp[self.node_west[self.wet_nodes]]
+        C_link_north = Ch_link_north / h_link_north
+        C_link_south = Ch_link_south / h_link_south
+        C_link_east = Ch_link_east / h_link_east
+        C_link_west = Ch_link_west / h_link_west
         a = np.empty(self.wet_nodes.shape)
         b = np.empty(self.wet_nodes.shape)
         c = np.empty(self.wet_nodes.shape)
@@ -982,25 +1007,34 @@ class TurbidityCurrent2D(Component):
         w = np.empty(self.wet_nodes.shape)
         dx2 = dx * dx
         dy2 = dy * dy
+        dt2 = dt * dt
+
+        a[:] = -Rg * (
+            1 / (2.0 * h_link_east) + 1 / (2.0 * h_link_west)) / dx2 - Rg * (
+                1 / (2.0 * h_link_north) + 1 /
+                (2.0 * h_link_south)) / dy2 - 1 / (2 * p[self.wet_nodes] * dt2)
+        b[:] = Rg / (dx2 * 2.0 * h_link_east)
+        c[:] = Rg / (dx2 * 2.0 * h_link_west)
+        d[:] = Rg / (dx2 * 2.0 * h_link_north)
+        e[:] = Rg / (dx2 * 2.0 * h_link_south)
+        g[:] = -1 / (2 * dt2) + ((u_east - u_west) / dx +
+                                 (v_north - v_south) / dy) / dt - Rg * (
+                                     (C_link_east *
+                                      (eta_east - eta) - C_link_west *
+                                      (eta - eta_west)) / dx2 +
+                                     (C_link_north *
+                                      (eta_north - eta) - C_link_south *
+                                      (eta - eta_south)) / dy2)
 
         while err > self.implicit_threshold:
-            a[:] = -Rg * (1 / (2.0 * h_link_east) + 1 /
-                          (2.0 * h_link_west)) / dx2 - Rg * (
-                              1 / (2.0 * h_link_north) + 1 /
-                              (2.0 * h_link_south)) / dy2 - 1 / (
-                                  2 * p[self.wet_nodes] * dt**2)
-            b[:] = Rg / (dx2 * 2.0 * h_link_east)
-            c[:] = Rg / (dx2 * 2.0 * h_link_west)
-            d[:] = Rg / (dx2 * 2.0 * h_link_north)
-            e[:] = Rg / (dx2 * 2.0 * h_link_south)
-            g[:] = -1 / (2 * dt**2) + ((u_east - u_west) / dx +
-                                       (v_north - v_south) / dy) / dt
             w[:] = (g - b * p_east - c * p_west - d * p_north -
                     e * p_south) / a
             err = np.linalg.norm(w - p_new[self.wet_nodes]) / (wet_nodes_num +
                                                                1.0 * 10**-10)
             p_new[self.
                   wet_nodes] = p_new[self.wet_nodes] * (1 - alpha) + alpha * w
+            self.update_boundary_conditions(p=p_new)
+
             p_north[:] = p_new[self.node_north[self.wet_nodes]]
             p_south[:] = p_new[self.node_south[self.wet_nodes]]
             p_east[:] = p_new[self.node_east[self.wet_nodes]]
@@ -1114,6 +1148,15 @@ class TurbidityCurrent2D(Component):
         self._artificial_viscosity(self.h_temp, self.h_link_temp, self.u_temp,
                                    self.v_temp, self.Ch_temp,
                                    self.Ch_link_temp)
+        self.update_boundary_conditions(h=self.h_temp,
+                                        u=self.u_temp,
+                                        v=self.v_temp,
+                                        Ch=self.Ch_temp,
+                                        h_link=self.h_link_temp,
+                                        Ch_link=self.Ch_link_temp,
+                                        u_node=self.u_node_temp,
+                                        v_node=self.v_node_temp,
+                                        eta=self.eta_temp)
 
         # calculate divergence of velocity
         div = (self.u_temp[self.east_link_at_node[self.wet_pwet_nodes]] - self.
@@ -1715,7 +1758,15 @@ class TurbidityCurrent2D(Component):
         self.U_node[:] = self.U_node_temp[:]
 
         # update boundary conditions
-        self.update_boundary_conditions()
+        self.update_boundary_conditions(h=self.h,
+                                        u=self.u,
+                                        v=self.v,
+                                        Ch=self.Ch,
+                                        h_link=self.h_link,
+                                        Ch_link=self.Ch_link,
+                                        u_node=self.u_node,
+                                        v_node=self.v_node,
+                                        eta=self.eta)
 
     def calc_nu_t(self, u, v, h_link, out=None):
         """Calculate eddy viscosity for horizontal diffusion of momentum
@@ -1926,61 +1977,66 @@ class TurbidityCurrent2D(Component):
             u_node=None,
             v_node=None,
             eta=None,
+            p=None,
     ):
         """Update boundary conditions
         """
-        if h is None:
-            h = self.h
-        if Ch is None:
-            Ch = self.Ch
-        if u is None:
-            u = self.u
-        if v is None:
-            v = self.v
-        if h_link is None:
-            h_link = self.h_link
-        if Ch_link is None:
-            Ch_link = self.Ch_link
-        if u_node is None:
-            u_node = self.u_node
-        if v_node is None:
-            v_node = self.v_node
-        if eta is None:
-            eta = self.eta
-
-        # Process fixed gradient boundary conditions
-        h[self.fixed_grad_nodes] = h[self.fixed_grad_anchor_nodes]
-        Ch[self.fixed_grad_nodes] = Ch[self.fixed_grad_anchor_nodes]
-        u_node[self.fixed_grad_nodes] = u_node[self.fixed_grad_anchor_nodes]
-        v_node[self.fixed_grad_nodes] = v_node[self.fixed_grad_anchor_nodes]
-        eta[self.fixed_grad_nodes] = eta[self.fixed_grad_anchor_nodes]
-        u[self.fixed_grad_links] = u[self.fixed_grad_anchor_links]
-        v[self.fixed_grad_links] = v[self.fixed_grad_anchor_links]
-        h_link[self.fixed_grad_links] = h_link[self.fixed_grad_anchor_links]
-        Ch_link[self.fixed_grad_links] = Ch_link[self.fixed_grad_anchor_links]
-
-        # Process fixed value boundary conditions
-        eta[self.fixed_value_nodes] = eta[self.fixed_value_anchor_nodes]
-        h_link[self.fixed_value_links] = (
-            h[self.fixed_value_nodes] + h[self.fixed_value_anchor_nodes]) / 2.0
-        Ch_link[
-            self.fixed_value_links] = (Ch[self.fixed_value_nodes] +
-                                       Ch[self.fixed_value_anchor_nodes]) / 2.0
-        # u[self.fixed_value_links] = u_node[self.fixed_value_nodes]
-        # v[self.fixed_value_links] = v_node[self.fixed_value_nodes]
-        u[self.
-          fixed_value_links] = (2. / 3.) * u_node[self.fixed_value_nodes] + (
-              1. / 3.) * u[self.fixed_value_anchor_links]
-        v[self.
-          fixed_value_links] = (2. / 3.) * v_node[self.fixed_value_nodes] + (
-              1. / 3.) * v[self.fixed_value_anchor_links]
-
-        # Process fixed value edge links
         edge_nodes = self.grid.nodes_at_link[self.fixed_value_edge_links]
-        h_link[self.fixed_value_edge_links] = np.mean(h[edge_nodes], axis=1)
-        Ch_link[self.fixed_value_edge_links] = np.mean(Ch[edge_nodes], axis=1)
-        u[self.fixed_value_edge_links] = np.mean(u_node[edge_nodes], axis=1)
-        v[self.fixed_value_edge_links] = np.mean(v_node[edge_nodes], axis=1)
+
+        if h is not None:
+            h[self.fixed_grad_nodes] = h[self.fixed_grad_anchor_nodes]
+
+        if Ch is not None:
+            Ch[self.fixed_grad_nodes] = Ch[self.fixed_grad_anchor_nodes]
+
+        if u is not None:
+            u[self.fixed_grad_links] = u[self.fixed_grad_anchor_links]
+            u[self.fixed_value_links] = (
+                2. / 3.) * u_node[self.fixed_value_nodes] + (
+                    1. / 3.) * u[self.fixed_value_anchor_links]
+            u[self.fixed_value_edge_links] = np.mean(u_node[edge_nodes],
+                                                     axis=1)
+
+        if v is not None:
+            v[self.fixed_grad_links] = v[self.fixed_grad_anchor_links]
+            v[self.fixed_value_links] = (
+                2. / 3.) * v_node[self.fixed_value_nodes] + (
+                    1. / 3.) * v[self.fixed_value_anchor_links]
+            v[self.fixed_value_edge_links] = np.mean(v_node[edge_nodes],
+                                                     axis=1)
+
+        if h_link is not None:
+            h_link[self.fixed_grad_links] = h_link[
+                self.fixed_grad_anchor_links]
+            h_link[self.fixed_value_links] = (
+                h[self.fixed_value_nodes] +
+                h[self.fixed_value_anchor_nodes]) / 2.0
+            h_link[self.fixed_value_edge_links] = np.mean(h[edge_nodes],
+                                                          axis=1)
+
+        if Ch_link is not None:
+            Ch_link[self.fixed_grad_links] = Ch_link[
+                self.fixed_grad_anchor_links]
+            Ch_link[self.fixed_value_links] = (
+                Ch[self.fixed_value_nodes] +
+                Ch[self.fixed_value_anchor_nodes]) / 2.0
+            Ch_link[self.fixed_value_edge_links] = np.mean(Ch[edge_nodes],
+                                                           axis=1)
+
+        if u_node is not None:
+            u_node[self.fixed_grad_nodes] = u_node[
+                self.fixed_grad_anchor_nodes]
+
+        if v_node is not None:
+            v_node[self.fixed_grad_nodes] = v_node[
+                self.fixed_grad_anchor_nodes]
+
+        if p is not None:
+            p[self.fixed_grad_nodes] = p[self.fixed_grad_anchor_nodes]
+
+        if eta is not None:
+            eta[self.fixed_grad_nodes] = eta[self.fixed_grad_anchor_nodes]
+            eta[self.fixed_value_nodes] = eta[self.fixed_value_anchor_nodes]
 
 
 def create_topography(

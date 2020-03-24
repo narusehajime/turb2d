@@ -362,36 +362,38 @@ def shock_dissipation(
     nu_i = np.zeros(n, dtype=np.float)
     nu_j = np.zeros(n, dtype=np.float)
     eps_i_half2 = np.zeros(n, dtype=np.float)
-    eps_i_half4 = np.zeros(n, dtype=np.float)
+    # eps_i_half4 = np.zeros(n, dtype=np.float)
     eps_j_half2 = np.zeros(n, dtype=np.float)
-    eps_j_half4 = np.zeros(n, dtype=np.float)
+    # eps_j_half4 = np.zeros(n, dtype=np.float)
     d_i_half = np.zeros(n, dtype=np.float)
     d_j_half = np.zeros(n, dtype=np.float)
     north = north_id[core]
     south = south_id[core]
     east = east_id[core]
     west = west_id[core]
-    easteast = east_id[east]
-    northnorth = north_id[north]
+    # easteast = east_id[east]
+    # northnorth = north_id[north]
 
     # First, artificial diffusion is applied to east-west direction
     nu_i[core] = np.abs(p[east] - 2 * p[core] + p[west]) / \
         (np.abs(p[east]) + 2 * np.abs(p[core]) + np.abs(p[west]) + 10**-20)
     eps_i_half2[core] = kappa2 * np.max([nu_i[east], nu_i[core]], axis=0)
-    eps_i_half4[core] = np.max(
-        [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
-    d_i_half[core] = eps_i_half2[core] * (
-        f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
-                                                  3.0 * f[core] - f[west])
+    # eps_i_half4[core] = np.max(
+    #     [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
+    # d_i_half[core] = eps_i_half2[core] * (
+    #     f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
+    #                                               3.0 * f[core] - f[west])
+    d_i_half[core] = eps_i_half2[core] * (f[east] - f[core])
 
     # Next, artificial diffusion is applied to north-south direction
     nu_j[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
         np.abs(p[north]) + 2 * np.abs(p[core]) + np.abs(p[south]) + 10**-20)
     eps_j_half2[core] = kappa2 * np.max([nu_j[north], nu_j[core]], axis=0)
-    eps_j_half4[core] = np.max(
-        [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
-    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
-        core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
+    # eps_j_half4[core] = np.max(
+    #     [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
+    # d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
+    #     core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
+    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core])
 
     # apply artificial diffusion
     out[core] = f[core] + d_i_half[core] - d_i_half[west] + d_j_half[
@@ -440,36 +442,38 @@ def jameson_filter(
     nu_i = np.zeros(n, dtype=np.float)
     nu_j = np.zeros(n, dtype=np.float)
     eps_i_half2 = np.zeros(n, dtype=np.float)
-    eps_i_half4 = np.zeros(n, dtype=np.float)
+    # eps_i_half4 = np.zeros(n, dtype=np.float)
     eps_j_half2 = np.zeros(n, dtype=np.float)
-    eps_j_half4 = np.zeros(n, dtype=np.float)
+    # eps_j_half4 = np.zeros(n, dtype=np.float)
     d_i_half = np.zeros(n, dtype=np.float)
     d_j_half = np.zeros(n, dtype=np.float)
     north = north_id[core]
     south = south_id[core]
     east = east_id[core]
     west = west_id[core]
-    easteast = east_id[east]
-    northnorth = north_id[north]
+    # easteast = east_id[east]
+    # northnorth = north_id[north]
 
     # First, artificial diffusion is applied to east-west direction
     nu_i[core] = np.abs(p[east] - 2 * p[core] + p[west]) / \
         (np.abs(p[east]) + 2 * np.abs(p[core]) + np.abs(p[west]) + 10**-20)
     eps_i_half2[core] = kappa2 * np.max([nu_i[east], nu_i[core]], axis=0)
-    eps_i_half4[core] = np.max(
-        [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
-    d_i_half[core] = eps_i_half2[core] * (
-        f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
-                                                  3.0 * f[core] - f[west])
+    # eps_i_half4[core] = np.max(
+    #     [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
+    # d_i_half[core] = eps_i_half2[core] * (
+    #     f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
+    #                                               3.0 * f[core] - f[west])
+    d_i_half[core] = eps_i_half2[core] * (f[east] - f[core])
 
     # Next, artificial diffusion is applied to north-south direction
     nu_j[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
         np.abs(p[north]) + 2 * np.abs(p[core]) + np.abs(p[south]) + 10**-20)
     eps_j_half2[core] = kappa2 * np.max([nu_j[north], nu_j[core]], axis=0)
-    eps_j_half4[core] = np.max(
-        [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
-    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
-        core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
+    # eps_j_half4[core] = np.max(
+    #     [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
+    # d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
+    #     core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
+    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core])
 
     # apply artificial diffusion
     out[core] = f[core] + d_i_half[core] - d_i_half[west] + d_j_half[
@@ -841,7 +845,7 @@ def forester_filter(
     """
 
     if out_f is None:
-        out_f = np.zeros(f.shape[0])
+        out_f = np.zeros_like(f)
 
     out_f[:] = f[:]
 
