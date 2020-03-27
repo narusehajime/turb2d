@@ -1079,71 +1079,6 @@ class TurbidityCurrent2D(Component):
         self.v_temp[self.wet_vertical_links] += self.G_v[
             self.wet_vertical_links] * self.dt_local
 
-        # map values
-        map_links_to_nodes(self, self.u_temp, self.dudx_temp, self.v_temp,
-                           self.dvdy_temp, self.u_node_temp, self.v_node_temp,
-                           self.U_temp, self.U_node_temp)
-
-        # water entrainment
-        if self.water_entrainment is True:
-            self.ew_link[self.wet_horizontal_links] = get_ew(
-                self.U[self.wet_horizontal_links],
-                self.Ch_link[self.wet_horizontal_links], self.R, self.g)
-            self.ew_link[self.wet_vertical_links] = get_ew(
-                self.U[self.wet_vertical_links],
-                self.Ch_link[self.wet_vertical_links], self.R, self.g)
-            self.ew_node[self.wet_nodes] = get_ew(self.U_node[self.wet_nodes],
-                                                  self.Ch[self.wet_nodes],
-                                                  self.R, self.g)
-        else:
-            self.ew_link[self.wet_horizontal_links] = 0
-            self.ew_link[self.wet_vertical_links] = 0
-            self.ew_node[self.wet_nodes] = 0
-
-        # calculate friction terms using semi-implicit scheme
-        self.u_temp[self.wet_horizontal_links] *= 1 / (
-            1 + (self.Cf + self.ew_link[self.wet_horizontal_links]) *
-            self.U[self.wet_horizontal_links] * self.dt_local /
-            self.h_link[self.wet_horizontal_links])
-        self.v_temp[self.wet_vertical_links] *= 1 / (
-            1 + (self.Cf + self.ew_link[self.wet_vertical_links]) *
-            self.U[self.wet_vertical_links] * self.dt_local /
-            self.h_link[self.wet_vertical_links])
-
-        # diffusion of momentum
-        self.calc_nu_t(self.u, self.v, self.h_link, out=self.nu_t)
-        self.u_temp[wet_pwet_h_links] += self.nu_t[wet_pwet_h_links] * dt * (
-               (self.u[east_link_at_h_link]
-                - 2 * self.u[wet_pwet_h_links]
-                + self.u[west_link_at_h_link])
-                + (self.u[north_link_at_h_link]
-                   - 2 * self.u[wet_pwet_h_links]
-                   + self.u[south_link_at_h_link]))\
-               / dx**2
-        self.v_temp[wet_pwet_v_links] += self.nu_t[wet_pwet_v_links] * dt * (
-               (self.v[east_link_at_v_link]
-                - 2 * self.v[wet_pwet_v_links]
-                + self.v[west_link_at_v_link])
-                + (self.v[north_link_at_v_link]
-                   - 2 * self.v[wet_pwet_v_links]
-                   + self.v[south_link_at_v_link]))\
-                / dx**2
-
-        # calculate flow expansion by water entrainment
-        self.h_temp[self.wet_nodes] += self.ew_node[
-            self.wet_nodes] * self.U_node[self.wet_nodes] * self.dt_local
-
-        # calculate sediment deposition
-        if self.suspension is True:
-            self.calc_deposition(self.h,
-                                 self.Ch,
-                                 self.u_node,
-                                 self.v_node,
-                                 self.eta,
-                                 self.U_node,
-                                 out_Ch=self.Ch_temp,
-                                 out_eta=self.eta_temp)
-
         # apply artificial viscosity
         self._artificial_viscosity(self.h_temp, self.h_link_temp, self.u_temp,
                                    self.v_temp, self.Ch_temp,
@@ -1166,11 +1101,8 @@ class TurbidityCurrent2D(Component):
                ) / (dy)
 
         # mass conservation
-        self.h_temp[self.wet_pwet_nodes] = self.h_temp[self.wet_pwet_nodes] / (
-            1 + div * dt)
-        self.Ch_temp[self.wet_pwet_nodes] = self.Ch_temp[
-            self.wet_pwet_nodes] / (1 + div * dt)
-
+        self.h_temp[self.wet_pwet_nodes] /= 1 + div * dt
+        self.Ch_temp[self.wet_pwet_nodes] /= 1 + div * dt
         adjust_negative_values(self.h_temp,
                                self.Ch_temp,
                                self.wet_pwet_nodes,
@@ -1180,6 +1112,74 @@ class TurbidityCurrent2D(Component):
                                self.node_south,
                                out_h=self.h_temp,
                                out_Ch=self.Ch_temp)
+
+        # map values
+        map_links_to_nodes(self, self.u_temp, self.dudx_temp, self.v_temp,
+                           self.dvdy_temp, self.u_node_temp, self.v_node_temp,
+                           self.U_temp, self.U_node_temp)
+
+        # water entrainment
+        if self.water_entrainment is True:
+            self.ew_link[self.wet_horizontal_links] = get_ew(
+                self.U[self.wet_horizontal_links],
+                self.Ch_link[self.wet_horizontal_links], self.R, self.g)
+            self.ew_link[self.wet_vertical_links] = get_ew(
+                self.U[self.wet_vertical_links],
+                self.Ch_link[self.wet_vertical_links], self.R, self.g)
+            self.ew_node[self.wet_nodes] = get_ew(self.U_node[self.wet_nodes],
+                                                  self.Ch[self.wet_nodes],
+                                                  self.R, self.g)
+        else:
+            self.ew_link[self.wet_horizontal_links] = 0
+            self.ew_link[self.wet_vertical_links] = 0
+            self.ew_node[self.wet_nodes] = 0
+
+        # calculate friction terms using semi-implicit scheme
+        self.u_temp[self.wet_horizontal_links] /= (
+            1 + (self.Cf + self.ew_link[self.wet_horizontal_links]) *
+            self.U[self.wet_horizontal_links] * self.dt_local /
+            self.h_link[self.wet_horizontal_links])
+        self.v_temp[self.wet_vertical_links] /= (
+            1 + (self.Cf + self.ew_link[self.wet_vertical_links]) *
+            self.U[self.wet_vertical_links] * self.dt_local /
+            self.h_link[self.wet_vertical_links])
+
+        # diffusion of momentum
+        self.calc_nu_t(self.u_temp,
+                       self.v_temp,
+                       self.h_link_temp,
+                       out=self.nu_t)
+        self.u_temp[wet_pwet_h_links] += self.nu_t[wet_pwet_h_links] * dt * (
+               (self.u_temp[east_link_at_h_link]
+                - 2 * self.u_temp[wet_pwet_h_links]
+                + self.u_temp[west_link_at_h_link])
+                + (self.u_temp[north_link_at_h_link]
+                   - 2 * self.u_temp[wet_pwet_h_links]
+                   + self.u_temp[south_link_at_h_link]))\
+               / dx**2
+        self.v_temp[wet_pwet_v_links] += self.nu_t[wet_pwet_v_links] * dt * (
+               (self.v_temp[east_link_at_v_link]
+                - 2 * self.v_temp[wet_pwet_v_links]
+                + self.v_temp[west_link_at_v_link])
+                + (self.v_temp[north_link_at_v_link]
+                   - 2 * self.v_temp[wet_pwet_v_links]
+                   + self.v_temp[south_link_at_v_link]))\
+                / dx**2
+
+        # calculate flow expansion by water entrainment
+        self.h_temp[self.wet_nodes] += self.ew_node[
+            self.wet_nodes] * self.U_node[self.wet_nodes] * self.dt_local
+
+        # calculate sediment deposition
+        if self.suspension is True:
+            self.calc_deposition(self.h_temp,
+                                 self.Ch_temp,
+                                 self.u_node_temp,
+                                 self.v_node_temp,
+                                 self.eta_temp,
+                                 self.U_node_temp,
+                                 out_Ch=self.Ch_temp,
+                                 out_eta=self.eta_temp)
 
     def _artificial_viscosity(self, h, h_link, u, v, Ch, Ch_link):
         """Apply artificial viscosity to flow velocity 
