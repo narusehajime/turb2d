@@ -436,42 +436,46 @@ def find_boundary_links_nodes(tc):
     ##################################
     # fixed gradient nodes and links #
     ##################################
-    fixed_grad_link_at_north = bound_link_north[grid.node_is_boundary(
+    tc.fixed_grad_link_at_north = bound_link_north[grid.node_is_boundary(
         tc.north_node_at_vertical_link[bound_link_north],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_link_at_south = bound_link_south[grid.node_is_boundary(
+    tc.fixed_grad_link_at_south = bound_link_south[grid.node_is_boundary(
         tc.south_node_at_vertical_link[bound_link_south],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_link_at_east = bound_link_east[grid.node_is_boundary(
+    tc.fixed_grad_link_at_east = bound_link_east[grid.node_is_boundary(
         tc.east_node_at_horizontal_link[bound_link_east],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_link_at_west = bound_link_west[grid.node_is_boundary(
+    tc.fixed_grad_link_at_west = bound_link_west[grid.node_is_boundary(
         tc.west_node_at_horizontal_link[bound_link_west],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_edge_link_at_north = edge_link_north[grid.node_is_boundary(
+    tc.fixed_grad_edge_link_at_north = edge_link_north[grid.node_is_boundary(
         tc.east_node_at_horizontal_link[edge_link_north],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_edge_link_at_south = edge_link_south[grid.node_is_boundary(
+    tc.fixed_grad_edge_link_at_south = edge_link_south[grid.node_is_boundary(
         tc.east_node_at_horizontal_link[edge_link_south],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_edge_link_at_east = edge_link_east[grid.node_is_boundary(
+    tc.fixed_grad_edge_link_at_east = edge_link_east[grid.node_is_boundary(
         tc.north_node_at_vertical_link[edge_link_east],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_edge_link_at_west = edge_link_west[grid.node_is_boundary(
+    tc.fixed_grad_edge_link_at_west = edge_link_west[grid.node_is_boundary(
         tc.north_node_at_vertical_link[edge_link_west],
         boundary_flag=FIXED_GRADIENT)]
-    fixed_grad_anchor_link_at_north = tc.link_south[fixed_grad_link_at_north]
-    fixed_grad_anchor_link_at_south = tc.link_north[fixed_grad_link_at_south]
-    fixed_grad_anchor_link_at_east = tc.link_west[fixed_grad_link_at_east]
-    fixed_grad_anchor_link_at_west = tc.link_east[fixed_grad_link_at_west]
-    fixed_grad_anchor_edge_link_at_north = tc.link_south[
-        fixed_grad_edge_link_at_north]
-    fixed_grad_anchor_edge_link_at_south = tc.link_north[
-        fixed_grad_edge_link_at_south]
-    fixed_grad_anchor_edge_link_at_east = tc.link_west[
-        fixed_grad_edge_link_at_east]
-    fixed_grad_anchor_edge_link_at_west = tc.link_east[
-        fixed_grad_edge_link_at_west]
+    tc.fixed_grad_anchor_link_at_north = tc.link_south[
+        tc.fixed_grad_link_at_north]
+    tc.fixed_grad_anchor_link_at_south = tc.link_north[
+        tc.fixed_grad_link_at_south]
+    tc.fixed_grad_anchor_link_at_east = tc.link_west[
+        tc.fixed_grad_link_at_east]
+    tc.fixed_grad_anchor_link_at_west = tc.link_east[
+        tc.fixed_grad_link_at_west]
+    tc.fixed_grad_anchor_edge_link_at_north = tc.link_south[
+        tc.fixed_grad_edge_link_at_north]
+    tc.fixed_grad_anchor_edge_link_at_south = tc.link_north[
+        tc.fixed_grad_edge_link_at_south]
+    tc.fixed_grad_anchor_edge_link_at_east = tc.link_west[
+        tc.fixed_grad_edge_link_at_east]
+    tc.fixed_grad_anchor_edge_link_at_west = tc.link_east[
+        tc.fixed_grad_edge_link_at_west]
 
     # Fixed gradient nodes and adjacent nodes (anchor)
     tc.fixed_grad_nodes = grid.fixed_gradient_boundary_nodes
@@ -479,18 +483,18 @@ def find_boundary_links_nodes(tc):
 
     # Fixed gradient links and adjacent links (anchor)
     tc.fixed_grad_links = np.concatenate([
-        fixed_grad_link_at_north, fixed_grad_link_at_south,
-        fixed_grad_link_at_east, fixed_grad_link_at_west,
-        fixed_grad_edge_link_at_north, fixed_grad_edge_link_at_south,
-        fixed_grad_edge_link_at_east, fixed_grad_edge_link_at_west
+        tc.fixed_grad_link_at_north, tc.fixed_grad_link_at_south,
+        tc.fixed_grad_link_at_east, tc.fixed_grad_link_at_west,
+        tc.fixed_grad_edge_link_at_north, tc.fixed_grad_edge_link_at_south,
+        tc.fixed_grad_edge_link_at_east, tc.fixed_grad_edge_link_at_west
     ])
     tc.fixed_grad_anchor_links = np.concatenate([
-        fixed_grad_anchor_link_at_north, fixed_grad_anchor_link_at_south,
-        fixed_grad_anchor_link_at_east, fixed_grad_anchor_link_at_west,
-        fixed_grad_anchor_edge_link_at_north,
-        fixed_grad_anchor_edge_link_at_south,
-        fixed_grad_anchor_edge_link_at_east,
-        fixed_grad_anchor_edge_link_at_west
+        tc.fixed_grad_anchor_link_at_north, tc.fixed_grad_anchor_link_at_south,
+        tc.fixed_grad_anchor_link_at_east, tc.fixed_grad_anchor_link_at_west,
+        tc.fixed_grad_anchor_edge_link_at_north,
+        tc.fixed_grad_anchor_edge_link_at_south,
+        tc.fixed_grad_anchor_edge_link_at_east,
+        tc.fixed_grad_anchor_edge_link_at_west
     ])
 
     ###############################

@@ -1991,6 +1991,10 @@ class TurbidityCurrent2D(Component):
 
         if u is not None:
             u[self.fixed_grad_links] = u[self.fixed_grad_anchor_links]
+            u[self.fixed_grad_link_at_east[
+                u[self.fixed_grad_link_at_east] < 0]] = 0
+            u[self.fixed_grad_link_at_west[
+                u[self.fixed_grad_link_at_west] > 0]] = 0
             u[self.fixed_value_links] = (
                 2. / 3.) * u_node[self.fixed_value_nodes] + (
                     1. / 3.) * u[self.fixed_value_anchor_links]
@@ -1999,6 +2003,10 @@ class TurbidityCurrent2D(Component):
 
         if v is not None:
             v[self.fixed_grad_links] = v[self.fixed_grad_anchor_links]
+            v[self.fixed_grad_link_at_north[
+                v[self.fixed_grad_link_at_north] < 0]] = 0
+            v[self.fixed_grad_link_at_south[
+                v[self.fixed_grad_link_at_south] > 0]] = 0
             v[self.fixed_value_links] = (
                 2. / 3.) * v_node[self.fixed_value_nodes] + (
                     1. / 3.) * v[self.fixed_value_anchor_links]
