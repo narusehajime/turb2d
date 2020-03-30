@@ -36,6 +36,14 @@ def set_up_neighbor_arrays(tc):
     tc.north_link_at_node = tc.grid.links_at_node[:, 1].copy()
     tc.west_link_at_node = tc.grid.links_at_node[:, 2].copy()
     tc.south_link_at_node = tc.grid.links_at_node[:, 3].copy()
+    tc.east_link_at_node[tc.east_link_at_node == -1] = tc.west_link_at_node[
+        tc.east_link_at_node == -1]
+    tc.west_link_at_node[tc.west_link_at_node == -1] = tc.east_link_at_node[
+        tc.west_link_at_node == -1]
+    tc.north_link_at_node[tc.north_link_at_node == -1] = tc.south_link_at_node[
+        tc.north_link_at_node == -1]
+    tc.south_link_at_node[tc.south_link_at_node == -1] = tc.north_link_at_node[
+        tc.south_link_at_node == -1]
     tc.west_node_at_horizontal_link = tc.grid.nodes_at_link[:, 0].copy()
     tc.east_node_at_horizontal_link = tc.grid.nodes_at_link[:, 1].copy()
     tc.south_node_at_vertical_link = tc.grid.nodes_at_link[:, 0].copy()

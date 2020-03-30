@@ -79,6 +79,7 @@ from .wetdry import find_wet_grids, process_partial_wet_grids
 from .sediment_func import get_es, get_ew, get_ws
 from .cip import cip_2d_diffusion, shock_dissipation
 from .cip import update_gradient, update_gradient2
+from .cip import CIP2D, Jameson, SOR
 from .cip import rcip_2d_M_advection, cip_2d_nonadvection, cip_2d_M_advection
 from .cip import cip_2d_advection, forester_filter, rcip_2d_advection
 from landlab.io.native_landlab import save_grid, load_grid
@@ -177,10 +178,9 @@ class TurbidityCurrent2D(Component):
                  lambda_p=0.4,
                  r0=1.5,
                  nu=1.010 * 10**-6,
-                 kappa2=0.25,
-                 kappa4=0.004,
+                 kappa=0.01,
                  nu_a=0.8,
-                 implicit_num=50,
+                 implicit_num=100,
                  implicit_threshold=1.0 * 10**-15,
                  C_init=0.0,
                  gamma=0.35,
@@ -217,12 +217,9 @@ class TurbidityCurrent2D(Component):
             Bed sediment porosity(1)
         nu: float, optional
             Kinematic viscosity of water(at 293K)
-        kappa2: float, optional
+        kappa: float, optional
             Second order artificial viscosity. This value, alpha and
             h_w affect to calculation stability.
-        kappa4: float, optional
-            Forth order artificial viscosity. This value, alpha
-             and h_w affect to calculation stability.
         nu_a: float, optional
             Artificial viscosity coefficient (0.6-1.0). Default is 0.8.
         implicit_num: float, optional
@@ -266,8 +263,7 @@ class TurbidityCurrent2D(Component):
         self.p_w = p_w
         self.h_w = h_w
         self.nu = nu
-        self.kappa2 = kappa2
-        self.kappa4 = kappa4
+        self.kappa = kappa
         self.nu_a = nu_a
         self.r0 = r0
         self.lambda_p = lambda_p
@@ -305,14 +301,19 @@ class TurbidityCurrent2D(Component):
             self.h = grid.add_zeros('flow__depth',
                                     at='node',
                                     units=self._var_units['flow__depth'])
+        except FieldError:
+            # Field was already set
+            self.h = grid.at_node['flow__depth']
+
+        try:
             self.C = grid.add_zeros(
                 'flow__sediment_concentration',
                 at='node',
                 units=self._var_units['flow__sediment_concentration'])
+            self.Ch = self.C * self.h
 
         except FieldError:
             # Field was already set
-            self.h = grid.at_node['flow__depth']
             self.C = grid.at_node['flow__sediment_concentration']
             self.Ch = self.C * self.h
 
@@ -628,6 +629,22 @@ class TurbidityCurrent2D(Component):
         self.C = self.grid['node']['flow__sediment_concentration']
         self.Ch = self.C * self.h
 
+        # create solvers
+        self.cip2d = CIP2D(self.grid.number_of_links)
+        self.sor = SOR(self.grid.number_of_nodes, self.node_east,
+                       self.node_west, self.node_north, self.node_south,
+                       self.implicit_threshold, self.implicit_num,
+                       self.update_boundary_conditions)
+        self.jameson = Jameson(
+            self.grid.number_of_nodes, self.grid.number_of_links,
+            self.node_east, self.node_west, self.node_north, self.node_south,
+            self.grid.horizontal_links, self.grid.vertical_links,
+            self.east_node_at_horizontal_link,
+            self.west_node_at_horizontal_link,
+            self.north_node_at_vertical_link, self.south_node_at_vertical_link,
+            self.east_link_at_node, self.west_link_at_node,
+            self.north_link_at_node, self.south_link_at_node, self.kappa)
+
         # Initialize boundary conditions and wet/dry grids
         find_boundary_links_nodes(self)
         find_wet_grids(self)
@@ -705,62 +722,62 @@ class TurbidityCurrent2D(Component):
         """Calculate advection phase of the model
            Advection of flow velocities is calculated by CIP
         """
-        cip_2d_advection(self.u,
-                         self.dudx,
-                         self.dudy,
-                         self.u,
-                         self.v,
-                         self.wet_pwet_horizontal_links,
-                         self.horizontal_up_links,
-                         self.vertical_up_links,
-                         self.grid.dx,
-                         self.dt_local,
-                         out_f=self.u_temp,
-                         out_dfdx=self.dudx_temp,
-                         out_dfdy=self.dudy_temp)
+        self.cip2d.run(self.u,
+                       self.dudx,
+                       self.dudy,
+                       self.u,
+                       self.v,
+                       self.wet_pwet_horizontal_links,
+                       self.horizontal_up_links,
+                       self.vertical_up_links,
+                       self.grid.dx,
+                       self.dt_local,
+                       out_f=self.u_temp,
+                       out_dfdx=self.dudx_temp,
+                       out_dfdy=self.dudy_temp)
 
-        cip_2d_advection(self.v,
-                         self.dvdx,
-                         self.dvdy,
-                         self.u,
-                         self.v,
-                         self.wet_pwet_vertical_links,
-                         self.horizontal_up_links,
-                         self.vertical_up_links,
-                         self.grid.dx,
-                         self.dt_local,
-                         out_f=self.v_temp,
-                         out_dfdx=self.dvdx_temp,
-                         out_dfdy=self.dvdy_temp)
+        self.cip2d.run(self.v,
+                       self.dvdx,
+                       self.dvdy,
+                       self.u,
+                       self.v,
+                       self.wet_pwet_vertical_links,
+                       self.horizontal_up_links,
+                       self.vertical_up_links,
+                       self.grid.dx,
+                       self.dt_local,
+                       out_f=self.v_temp,
+                       out_dfdx=self.dvdx_temp,
+                       out_dfdy=self.dvdy_temp)
 
         if self.scheme != 'CentralDifference':
-            cip_2d_advection(self.h,
-                             self.dhdx,
-                             self.dhdy,
-                             self.u_node,
-                             self.v_node,
-                             self.wet_pwet_nodes,
-                             self.horizontal_up_nodes,
-                             self.vertical_up_nodes,
-                             self.grid.dx,
-                             self.dt_local,
-                             out_f=self.h_temp,
-                             out_dfdx=self.dhdx_temp,
-                             out_dfdy=self.dhdy_temp)
+            self.cip2d.run(self.h,
+                           self.dhdx,
+                           self.dhdy,
+                           self.u_node,
+                           self.v_node,
+                           self.wet_pwet_nodes,
+                           self.horizontal_up_nodes,
+                           self.vertical_up_nodes,
+                           self.grid.dx,
+                           self.dt_local,
+                           out_f=self.h_temp,
+                           out_dfdx=self.dhdx_temp,
+                           out_dfdy=self.dhdy_temp)
 
-            cip_2d_advection(self.Ch,
-                             self.dChdx,
-                             self.dChdy,
-                             self.u_node,
-                             self.v_node,
-                             self.wet_pwet_nodes,
-                             self.horizontal_up_nodes,
-                             self.vertical_up_nodes,
-                             self.grid.dx,
-                             self.dt_local,
-                             out_f=self.Ch_temp,
-                             out_dfdx=self.dChdx_temp,
-                             out_dfdy=self.dChdy_temp)
+            self.cip2d.run(self.Ch,
+                           self.dChdx,
+                           self.dChdy,
+                           self.u_node,
+                           self.v_node,
+                           self.wet_pwet_nodes,
+                           self.horizontal_up_nodes,
+                           self.vertical_up_nodes,
+                           self.grid.dx,
+                           self.dt_local,
+                           out_f=self.Ch_temp,
+                           out_dfdx=self.dChdx_temp,
+                           out_dfdy=self.dChdy_temp)
 
         adjust_negative_values(self.h_temp,
                                self.Ch_temp,
@@ -1224,7 +1241,6 @@ class TurbidityCurrent2D(Component):
         nu_a = self.nu_a  # artificial viscosity coefficient
         Rg = self.R * self.g
         Cs = self.Cs
-        # p = Ch[wet_nodes] * h[wet_nodes]
 
         # basic parameters for artificial viscosity
         rho = (2.0 * h[wet_nodes]) / Rg
@@ -1241,21 +1257,6 @@ class TurbidityCurrent2D(Component):
         div_vert = (v[north_link] - v[south_link]) / dy
         div = div_horiz + div_vert
 
-        # horizontal aritificial visocosity
-        # compress_horiz = div_horiz < 0
-        # self.q_x[wet_nodes[~compress_horiz]] = 0
-        # self.q_x[
-        #     wet_nodes[compress_horiz]] = rho[compress_horiz] * nu_a * dx * (
-        #         -Cs[compress_horiz] * div_horiz[compress_horiz] +
-        #         (1.0 + gamma) / 2.0 * div_horiz[compress_horiz]**2 * dx)
-
-        # vertical aritificial visocosity
-        # compress_vert = div_vert < 0
-        # self.q_y[wet_nodes[~compress_vert]] = 0
-        # self.q_y[wet_nodes[compress_vert]] = rho[compress_vert] * nu_a * dy * (
-        #     -Cs[compress_vert] * div_vert[compress_vert] +
-        #     (1.0 + gamma) / 2.0 * div_vert[compress_vert]**2 * dy)
-
         # no directional dependent expression of artificial viscosity
         compress = div < 0
         self.q_x[wet_nodes[~compress]] = 0
@@ -1266,20 +1267,8 @@ class TurbidityCurrent2D(Component):
         # modify flow velocity based on artificial viscosity
         u[wet_horiz] -= (self.q_x[east_node] -
                          self.q_x[west_node]) / dx / rho_link_horiz * dt
-        # v[wet_vert] -= (self.q_y[north_node] -
-        #                 self.q_y[south_node]) / dy / rho_link_vert * dt
         v[wet_vert] -= (self.q_x[north_node] -
                         self.q_x[south_node]) / dy / rho_link_vert * dt
-
-        # # # modify pressure
-        # p -= (gamma - 1.0) * self.q[wet_nodes] * div * dt
-
-        # # # modify h and Ch
-        # C = Ch[wet_nodes] / h[wet_nodes]
-        # h[wet_nodes] = np.sqrt(p / C)
-        # Ch[wet_nodes] = np.sqrt(p * C)
-        # # # h[wet_nodes] -= h[wet_nodes] * self.q[wet_nodes] * div
-        # # # Ch[wet_nodes] -= Ch[wet_nodes] * self.q[wet_nodes] * div
 
     def _deposition_phase(self):
         """Calculate depositional and erosional processes
@@ -1351,53 +1340,13 @@ class TurbidityCurrent2D(Component):
     def _shock_dissipation_phase(self):
         """Calculate shock dissipation phase of the model
         """
-        shock_dissipation(self.Ch,
-                          self.R * self.g * self.Ch * self.h,
-                          self.core_nodes,
-                          self.node_north,
-                          self.node_south,
-                          self.node_east,
-                          self.node_west,
-                          self.dt_local,
-                          self.kappa2,
-                          self.kappa4,
-                          out=self.Ch_temp)
+        # update artificia viscosity coefficients for Jameson scheme
+        self.jameson.update_artificial_viscosity(self.R * self.g * self.Ch *
+                                                 self.h)
 
-        shock_dissipation(self.h,
-                          self.R * self.g * self.Ch * self.h,
-                          self.core_nodes,
-                          self.node_north,
-                          self.node_south,
-                          self.node_east,
-                          self.node_west,
-                          self.dt_local,
-                          self.kappa2,
-                          self.kappa4,
-                          out=self.h_temp)
-
-        # shock_dissipation(self.u,
-        #                   self.R * self.g * self.Ch_link * self.h_link,
-        #                   self.horizontal_active_links,
-        #                   self.link_north,
-        #                   self.link_south,
-        #                   self.link_east,
-        #                   self.link_west,
-        #                   self.dt_local,
-        #                   self.kappa2,
-        #                   self.kappa4,
-        #                   out=self.u_temp)
-
-        # shock_dissipation(self.v,
-        #                   self.R * self.g * self.Ch_link * self.h_link,
-        #                   self.vertical_active_links,
-        #                   self.link_north,
-        #                   self.link_south,
-        #                   self.link_east,
-        #                   self.link_west,
-        #                   self.dt_local,
-        #                   self.kappa2,
-        #                   self.kappa4,
-        #                   out=self.v_temp)
+        # apply Jameson's filter
+        self.jameson.run(self.Ch, self.wet_pwet_nodes, out=self.Ch_temp)
+        self.jameson.run(self.h, self.wet_pwet_nodes, out=self.h_temp)
 
         # update gradient terms
         self.update_gradients()
