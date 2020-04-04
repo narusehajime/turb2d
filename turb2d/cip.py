@@ -461,36 +461,6 @@ def update_gradient2(f,
                                    (u[north] - u[south]) / (2 * dx)**2 +
                                    (f[north] - f[south]) *
                                    (v[north] - v[south]) / (2 * dx)**2) * dt
-    # out_dfdx[core] = dfdx[core] - (dfdx[core] * (u[east] - u[west]) /
-    #                                (2 * dx) + dfdy[core] *
-    #                                (v[east] - v[west]) / (2 * dx)) * dt
-    # out_dfdy[core] = dfdy[core] - (dfdx[core] * (u[north] - u[south]) /
-    #                                (2 * dx) + dfdy[core] *
-    #                                (v[north] - v[south]) / (2 * dx)) * dt
-
-
-def tangentf(f, out_f=None):
-    """Convert the value f to tangent transformed value
-    """
-    if out_f is None:
-        out_f = np.zeros(f.shape[0])
-
-    FAC = 0.95
-    out_f = np.tan((f - 0.5) * FAC * np.pi)
-
-    return out_f
-
-
-def atangentf(f, out_f=None):
-    """Reconstruct the value f from the tangent transformed value
-    """
-    if out_f is None:
-        out_f = np.zeros(f.shape[0])
-
-    FAC = 0.95
-    out_f = np.arctan(f) / (FAC * np.pi) + 0.5
-
-    return out_f
 
 
 class CIP2D():
@@ -609,70 +579,13 @@ class CIP2D():
         return out_f, out_dfdx, out_dfdy
 
 
-def cip_2d_advection(f,
-                     dfdx,
-                     dfdy,
-                     u,
-                     v,
-                     core,
-                     h_up,
-                     v_up,
-                     dx,
-                     dt,
-                     out_f=None,
-                     out_dfdx=None,
-                     out_dfdy=None):
-    """Direct 2D calculation of advection by CIP method
-    """
-    if out_f is None:
-        out_f = np.zeros(f.shape[0])
-    if out_dfdx is None:
-        out_dfdx = np.zeros(f.shape[0])
-    if out_dfdy is None:
-        out_dfdy = np.zeros(f.shape[0])
-
-    XX = -u[core] * dt
-    YY = -v[core] * dt
-    Ddx = np.where(u[core] > 0., 1.0, -1.0) * dx
-    Ddy = np.where(v[core] > 0., 1.0, -1.0) * dx
-    xup = h_up[core]
-    yup = v_up[core]
-    xyup = (v_up[h_up])[core]
-
-    C30 = ((dfdx[xup] + dfdx[core]) * Ddx - 2.0 *
-           (f[core] - f[xup])) / (Ddx * Ddx * Ddx)
-    C20 = (3.0 * (f[xup] - f[core]) +
-           (dfdx[xup] + 2.0 * dfdx[core]) * Ddx) / (Ddx * Ddx)
-    C03 = ((dfdy[yup] + dfdy[core]) * Ddy - 2.0 *
-           (f[core] - f[yup])) / (Ddy * Ddy * Ddy)
-    C02 = (3.0 * (f[yup] - f[core]) +
-           (dfdy[yup] + 2.0 * dfdy[core]) * Ddy) / (Ddy * Ddy)
-    tmp = f[core] - f[yup] - f[xup] + f[xyup]
-    tmq = dfdy[xup] - dfdy[core]
-    C12 = (-tmp - tmq * Ddy) / (Ddx * Ddy * Ddy)
-    C21 = (-tmp - (dfdx[yup] - dfdx[core]) * Ddx) / (Ddx * Ddx * Ddy)
-    C11 = (-tmq + C21 * Ddx * Ddx) / (Ddx)
-
-    out_f[core] = (
-        (C30 * XX + C21 * YY + C20) * XX + C11 * YY + dfdx[core]) * XX + (
-            (C03 * YY + C12 * XX + C02) * YY + dfdy[core]) * YY + f[core]
-    out_dfdx[core] = (3.0 * C30 * XX + 2.0 *
-                      (C21 * YY + C20)) * XX + (C12 * YY +
-                                                C11) * YY + dfdx[core]
-    out_dfdy[core] = (3.0 * C03 * YY + 2.0 *
-                      (C12 * XX + C02)) * YY + (C21 * XX +
-                                                C11) * XX + dfdy[core]
-
-    return out_f, out_dfdx, out_dfdy
-
-
 def rcip_2d_advection(f,
                       dfdx,
                       dfdy,
                       u,
                       v,
                       core,
-                      h_up,
+pp                      h_up,
                       v_up,
                       dx,
                       dt,
@@ -887,88 +800,8 @@ def forester_filter(
     return out_f
 
 
-def jameson_filter(
-        f,
-        p,
-        core,
-        north_id,
-        south_id,
-        east_id,
-        west_id,
-        dt,
-        kappa2,
-        kappa4,
-        out=None,
-):
-    """ adding artificial viscosity for numerical stability
-
-        Parameters
-        ------------------
-        f : ndarray, float
-            parameter for which the artificial viscosity is applied
-        h : ndarray, float
-            flow height
-        core : ndarray, int
-            indeces of core nodes or links
-        north_id : ndarray, int
-            indeces of nodes or links that locate north of core
-        south_id : ndarray, int
-            indeces of nodes or links that locate south of core
-        east_id : ndarray, int
-            indeces of nodes or links that locate east of core
-        west_id : ndarray, int
-            indeces of nodes or links that locate west of core
-    """
-    n = f.shape[0]
-
-    if out is None:
-        out = np.zeros(n)
-
-    nu_i = np.zeros(n, dtype=np.float)
-    nu_j = np.zeros(n, dtype=np.float)
-    eps_i_half2 = np.zeros(n, dtype=np.float)
-    # eps_i_half4 = np.zeros(n, dtype=np.float)
-    eps_j_half2 = np.zeros(n, dtype=np.float)
-    # eps_j_half4 = np.zeros(n, dtype=np.float)
-    d_i_half = np.zeros(n, dtype=np.float)
-    d_j_half = np.zeros(n, dtype=np.float)
-    north = north_id[core]
-    south = south_id[core]
-    east = east_id[core]
-    west = west_id[core]
-    # easteast = east_id[east]
-    # northnorth = north_id[north]
-
-    # First, artificial diffusion is applied to east-west direction
-    nu_i[core] = np.abs(p[east] - 2 * p[core] + p[west]) / \
-        (np.abs(p[east]) + 2 * np.abs(p[core]) + np.abs(p[west]) + 10**-20)
-    eps_i_half2[core] = kappa2 * np.max([nu_i[east], nu_i[core]], axis=0)
-    # eps_i_half4[core] = np.max(
-    #     [np.zeros_like(core), kappa4 - eps_i_half2[core]], axis=0)
-    # d_i_half[core] = eps_i_half2[core] * (
-    #     f[east] - f[core]) - eps_i_half4[core] * (f[easteast] - 3.0 * f[east] +
-    #                                               3.0 * f[core] - f[west])
-    d_i_half[core] = eps_i_half2[core] * (f[east] - f[core])
-
-    # Next, artificial diffusion is applied to north-south direction
-    nu_j[core] = np.abs(p[north] - 2 * p[core] + p[south]) / (
-        np.abs(p[north]) + 2 * np.abs(p[core]) + np.abs(p[south]) + 10**-20)
-    eps_j_half2[core] = kappa2 * np.max([nu_j[north], nu_j[core]], axis=0)
-    # eps_j_half4[core] = np.max(
-    #     [np.zeros_like(core), kappa4 - eps_j_half2[core]], axis=0)
-    # d_j_half[core] = eps_j_half2[core] * (f[north] - f[core]) - eps_j_half4[
-    #     core] * (f[northnorth] - 3.0 * f[north] + 3.0 * f[core] - f[south])
-    d_j_half[core] = eps_j_half2[core] * (f[north] - f[core])
-
-    # apply artificial diffusion
-    out[core] = f[core] + d_i_half[core] - d_i_half[west] + d_j_half[
-        core] - d_j_half[south]
-
-    return out
-
-
 class Jameson():
-    """ Jameson filter flor smoothing the variables
+    """ Jameson filter for smoothing the variables
         
         Parameters
         -------------------
