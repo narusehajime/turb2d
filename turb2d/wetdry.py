@@ -87,18 +87,18 @@ def find_wet_grids(tc):
     horiz_links = tc.grid.horizontal_links
     # vert_links = tc.vertical_active_links
     vert_links = tc.grid.vertical_links
-    east_nodes_at_node = tc.node_east[core]
-    west_nodes_at_node = tc.node_west[core]
-    north_nodes_at_node = tc.node_north[core]
-    south_nodes_at_node = tc.node_south[core]
-    east_link_at_node = tc.east_link_at_node[core]
-    west_link_at_node = tc.west_link_at_node[core]
-    north_link_at_node = tc.north_link_at_node[core]
-    south_link_at_node = tc.south_link_at_node[core]
-    east_nodes_at_link = tc.east_node_at_horizontal_link[horiz_links]
-    west_nodes_at_link = tc.west_node_at_horizontal_link[horiz_links]
-    north_nodes_at_link = tc.north_node_at_vertical_link[vert_links]
-    south_nodes_at_link = tc.south_node_at_vertical_link[vert_links]
+    node_east = tc.node_east
+    node_west = tc.node_west
+    node_north = tc.node_north
+    node_south = tc.node_south
+    east_link_at_node = tc.east_link_at_node
+    west_link_at_node = tc.west_link_at_node
+    north_link_at_node = tc.north_link_at_node
+    south_link_at_node = tc.south_link_at_node
+    east_nodes_at_link = tc.east_node_at_horizontal_link
+    west_nodes_at_link = tc.west_node_at_horizontal_link
+    north_nodes_at_link = tc.north_node_at_vertical_link
+    south_nodes_at_link = tc.south_node_at_vertical_link
     p_w = tc.p_w
     h_w = tc.h_w
 
@@ -107,32 +107,32 @@ def find_wet_grids(tc):
     ############################
     # tc.wet_nodes = core[np.where(p[core] > p_w)]
     # tc.wet_horizontal_links = horiz_links[np.where(
-    #     (p[west_nodes_at_link] > p_w) & (p[east_nodes_at_link] > p_w))]
+    #     (p[west_nodes_at_link[horiz_links]] > p_w) & (p[east_nodes_at_link[horiz_links]] > p_w))]
     # tc.wet_vertical_links = vert_links[np.where(
     #     (p[north_nodes_at_link] > p_w) & (p[south_nodes_at_link] > p_w))]
 
     wet_nodes = (p > p_w) & (tc.h > h_w)
     tc.wet_nodes = core[wet_nodes[core]]
-    tc.wet_horizontal_links = horiz_links[np.where(
-        (wet_nodes[west_nodes_at_link]) & (wet_nodes[east_nodes_at_link]))]
-    tc.wet_vertical_links = vert_links[np.where(
-        (wet_nodes[north_nodes_at_link]) & (wet_nodes[south_nodes_at_link]))]
+    tc.wet_horizontal_links = horiz_links[
+        (wet_nodes[west_nodes_at_link[horiz_links]])
+        & (wet_nodes[east_nodes_at_link[horiz_links]])]
+    tc.wet_vertical_links = vert_links[
+        (wet_nodes[north_nodes_at_link[vert_links]])
+        & (wet_nodes[south_nodes_at_link[vert_links]])]
 
     ######################################################
     #find partial wet nodes and links in horizontal axis #
     ######################################################
-    wet_at_east = np.where(~(wet_nodes[core])
-                           & (wet_nodes[east_nodes_at_node]))
+    wet_at_east = np.where(~(wet_nodes[core]) & (wet_nodes[node_east[core]]))
     horizontally_partial_wet_nodes_E = core[wet_at_east]
-    horizontally_wettest_nodes_E = east_nodes_at_node[wet_at_east]
-    partial_wet_horizontal_links_E = east_link_at_node[wet_at_east]
+    horizontally_wettest_nodes_E = node_east[core[wet_at_east]]
+    partial_wet_horizontal_links_E = east_link_at_node[core][wet_at_east]
     horizontal_direction_wettest_E = -1.0 * np.ones(wet_at_east[0].shape)
 
-    wet_at_west = np.where(~(wet_nodes[core])
-                           & (wet_nodes[west_nodes_at_node]))
+    wet_at_west = np.where(~(wet_nodes[core]) & (wet_nodes[node_west[core]]))
     horizontally_partial_wet_nodes_W = core[wet_at_west]
-    horizontally_wettest_nodes_W = west_nodes_at_node[wet_at_west]
-    partial_wet_horizontal_links_W = west_link_at_node[wet_at_west]
+    horizontally_wettest_nodes_W = node_west[core[wet_at_west]]
+    partial_wet_horizontal_links_W = west_link_at_node[core][wet_at_west]
     horizontal_direction_wettest_W = 1.0 * np.ones(wet_at_west[0].shape)
 
     tc.horizontally_partial_wet_nodes = np.concatenate(
@@ -148,18 +148,16 @@ def find_wet_grids(tc):
     # find partial wet nodes and links in vertical axis  #
     ######################################################
     # vertical partial wet check
-    wet_at_north = np.where(~(wet_nodes[core])
-                            & (wet_nodes[north_nodes_at_node]))
+    wet_at_north = np.where(~(wet_nodes[core]) & (wet_nodes[node_north[core]]))
     vertically_partial_wet_nodes_N = core[wet_at_north]
-    vertically_wettest_nodes_N = north_nodes_at_node[wet_at_north]
-    partial_wet_vertical_links_N = north_link_at_node[wet_at_north]
+    vertically_wettest_nodes_N = node_north[core[wet_at_north]]
+    partial_wet_vertical_links_N = north_link_at_node[core][wet_at_north]
     vertical_direction_wettest_N = -1.0 * np.ones(wet_at_north[0].shape)
 
-    wet_at_south = np.where(~(wet_nodes[core])
-                            & (wet_nodes[south_nodes_at_node]))
+    wet_at_south = np.where(~(wet_nodes[core]) & (wet_nodes[node_south[core]]))
     vertically_partial_wet_nodes_S = core[wet_at_south]
-    vertically_wettest_nodes_S = south_nodes_at_node[wet_at_south]
-    partial_wet_vertical_links_S = south_link_at_node[wet_at_south]
+    vertically_wettest_nodes_S = node_south[core[wet_at_south]]
+    partial_wet_vertical_links_S = south_link_at_node[core][wet_at_south]
     vertical_direction_wettest_S = 1.0 * np.ones(wet_at_south[0].shape)
 
     # combine north and south
@@ -194,10 +192,11 @@ def find_wet_grids(tc):
     ############################
     # find dry nodes and links #
     ############################
-    tc.dry_nodes = np.setdiff1d(core, tc.wet_pwet_nodes)
-    tc.dry_links = np.setdiff1d(
-        tc.active_links,
-        np.concatenate([tc.wet_pwet_links, tc.fixed_value_links]))
+    tc.dry_nodes = np.setdiff1d(core, tc.wet_pwet_nodes, assume_unique=True)
+    tc.dry_links = np.setdiff1d(tc.active_links,
+                                np.concatenate(
+                                    [tc.wet_pwet_links, tc.fixed_value_links]),
+                                assume_unique=True)
 
 
 def process_partial_wet_grids(
@@ -323,14 +322,14 @@ def process_partial_wet_grids(
     ################################################################
     # Calculate time development of variables at partial wet links #
     ################################################################
-    CfuU = Cf * np.sqrt(u[partial_wet_horizontal_links]**2 +
-                        v[partial_wet_horizontal_links]**2) / (
-                            h[horizontally_wettest_nodes] +
-                            h[horizontally_partial_wet_nodes]) * 2
-    CfvU = Cf * np.sqrt(u[partial_wet_vertical_links]**2 +
-                        v[partial_wet_vertical_links]**2) / (
-                            h[vertically_wettest_nodes] +
-                            h[vertically_partial_wet_nodes]) * 2
+    CfuU = Cf * np.sqrt(
+        u[partial_wet_horizontal_links] * u[partial_wet_horizontal_links] +
+        v[partial_wet_horizontal_links] * v[partial_wet_horizontal_links]
+    ) / (h[horizontally_wettest_nodes] + h[horizontally_partial_wet_nodes]) * 2
+    CfvU = Cf * np.sqrt(
+        u[partial_wet_vertical_links] * u[partial_wet_vertical_links] *
+        +v[partial_wet_vertical_links] * v[partial_wet_vertical_links]) / (
+            h[vertically_wettest_nodes] + h[vertically_partial_wet_nodes]) * 2
 
     hdw = horizontal_direction_wettest
     vdw = vertical_direction_wettest

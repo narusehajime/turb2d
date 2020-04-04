@@ -1140,8 +1140,8 @@ class SOR():
             self.update_boundary_conditions(p=out)
 
             count += 1
-            if count == self.implicit_num:
+            if count == self.max_loop:
                 print('Implicit calculation did not converge')
                 return out
 
-            return out
+        return out
