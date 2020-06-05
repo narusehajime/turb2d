@@ -624,12 +624,12 @@ class TurbidityCurrent2D(Component):
             #the end of the loop of one local time step
             self.first_step = False
 
-        # update values
-        self.update_values()
-        map_values(self, self.h, self.u, self.v, self.Ch, self.eta,
-                   self.h_link, self.u_node, self.v_node, self.Ch_link, self.U,
-                   self.U_node)
-        update_up_down_links_and_nodes(self)
+            # Calculation is terminated if global dt is not specified.
+            if dt is np.inf:
+                break
+
+            # add local dt to the timer "local elapsed time"
+            local_elapsed_time += self.dt_local
 
         # This is the end of the calculation
         # Update bed thickness and record results in the grid
