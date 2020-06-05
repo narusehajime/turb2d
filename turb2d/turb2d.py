@@ -28,9 +28,6 @@ import numpy as np
 import time
 from tqdm import tqdm
 
-# import ipdb
-# ipdb.set_trace()
-
 
 class TurbidityCurrent2D(Component):
     """Simulate a turbidity current using the CIP method.
@@ -519,7 +516,7 @@ class TurbidityCurrent2D(Component):
         return dt_local
 
     def run_one_step(self, dt=None):
-        """Generate a turbidity current across a RasterModelGrid.
+        """Generate a turbidity current across a grid.
 
         For one time step, this generates 'turbidity current' across
         a given grid by calculating flow height and concentration at each node
