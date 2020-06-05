@@ -2,7 +2,7 @@ import os
 os.environ['MKL_NUM_THREADS'] = '1'
 os.environ['OMP_NUM_THREADS'] = '1'
 from turb2d import TurbidityCurrent2D
-from turb2d import create_topography, create_init_flow_region
+from turb2d.utils import create_topography, create_init_flow_region
 import numpy as np
 
 import time

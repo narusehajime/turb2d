@@ -9,3 +9,4 @@ matplotlib
 numpy>=1.15.1
 cython
 gdal
+scipy
