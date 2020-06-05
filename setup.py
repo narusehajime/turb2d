@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-from Cython.Build import cythonize
+# from Cython.Build import cythonize
 from setuptools import setup, Extension, find_packages
 
 with open('README.rst') as f:
@@ -25,7 +25,14 @@ setup(
     author_email='naruse@kueps.kyoto-u.ac.jp',
     url='https://github.com/narusehajime/turb2d.git',
     license=license,
-    install_requires=['numpy', 'scipy', 'landlab', 'matplotlib', 'gdal', 'cython'],
+    install_requires=[
+        'numpy',
+        'scipy',
+        'landlab',
+        'matplotlib',
+        'gdal',
+        'tqdm',  # 'cython'
+    ],
     # ext_modules=cythonize([ext, ext2]),
     # ext_modules=cythonize([ext]),
     packages=find_packages(exclude=('tests', 'docs')))

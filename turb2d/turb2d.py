@@ -8,68 +8,8 @@ Parker et al. (1986).
 
 Examples
 ---------
-    # making grid
-    # size of calculation domain is 4 x 8 km with dx = 20 m
-    grid = RasterModelGrid((400, 100), spacing=10.0)
-    grid.add_zeros('flow__depth', at='node')
-    grid.add_zeros('topographic__elevation', at='node')
-    grid.add_zeros('flow__horizontal_velocity', at='link')
-    grid.add_zeros('flow__vertical_velocity', at='link')
-    grid.add_zeros('flow__sediment_concentration', at='node')
-    grid.add_zeros('bed__thickness', at='node')
-
-    # making topography
-    # set the slope
-    slope = 0.1
-    slope_basin_break = 1000
-    grid.at_node['topographic__elevation'] = (
-        grid.node_y - slope_basin_break) * slope
-
-    # set canyon
-    canyon_center = 500
-    canyon_half_width = 400
-    canyon_depth = 50
-    canyon = ((grid.node_x >= canyon_center - canyon_half_width) &
-              (grid.node_x <= canyon_center + canyon_half_width))
-    grid.at_node['topographic__elevation'][canyon] -= canyon_depth - np.abs(
-        (grid.node_x[canyon] -
-         canyon_center)) * canyon_depth / canyon_half_width
-
-    # set basin
-    basin_region = grid.at_node['topographic__elevation'] < 0
-    grid.at_node['topographic__elevation'][basin_region] = 0
-    grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
-
-    # making initial flow region
-    initial_flow_concentration = 0.02
-    initial_flow_thickness = 100
-    initial_region_radius = 100
-    initial_region_center = [500, 3500]
-    initial_flow_region = (
-        (grid.node_x - initial_region_center[0])**2 +
-        (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
-    grid.at_node['flow__depth'][initial_flow_region] = initial_flow_thickness
-    grid.at_node['flow__sediment_concentration'][
-        initial_flow_region] = initial_flow_concentration
-
-    # making turbidity current object
-    tc = TurbidityCurrent2D(
-        grid,
-        Cf=0.004,
-        alpha=0.1,
-        Ds=80 * 10**-6,
-    )
-
-    # start calculation
-    t = time.time()
-    save_grid(grid, 'tc{:04d}.grid'.format(0), clobber=True)
-    last = 100
-    for i in range(1, last + 1):
-        tc.run_one_step(dt=100.0)
-        save_grid(grid, 'tc{:04d}.grid'.format(i), clobber=True)
-        print("", end="\r")
-        print("{:.1f}% finished".format(i / last * 100), end='\r')
-    print('elapsed time: {} sec.'.format(time.time() - t))
+import turb2d
+turb2d.run()
 
 """
 from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
