@@ -612,6 +612,8 @@ class TurbidityCurrent2D(Component):
             # Calculation is terminated if global dt is not specified.
             if dt is np.inf:
                 break
+
+            # add local dt to the timer "local elapsed time"
             local_elapsed_time += self.dt_local
 
         # This is the end of the calculation
