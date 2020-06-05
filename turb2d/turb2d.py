@@ -75,6 +75,7 @@ Examples
 from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
 from .gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from .gridutils import find_boundary_links_nodes, adjust_negative_values
+from .utils import create_init_flow_region, create_topography, create_topography_from_geotiff
 from .wetdry import find_wet_grids, process_partial_wet_grids
 from .sediment_func import get_es, get_ew, get_ws
 from .cip import update_gradient, update_gradient2
@@ -85,8 +86,7 @@ from landlab.grid.structured_quad import links
 from landlab import Component, FieldError, RasterModelGrid
 import numpy as np
 import time
-from osgeo import gdal, gdalconst
-from scipy.ndimage import median_filter
+from tqdm import tqdm
 
 # import ipdb
 # ipdb.set_trace()
@@ -182,9 +182,7 @@ class TurbidityCurrent2D(Component):
                  gamma=0.35,
                  water_entrainment=True,
                  suspension=True,
-                 bedload=True,
                  sed_entrainment_func='GP1991field',
-                 scheme='CCUP',
                  **kwds):
         """Create a component of turbidity current 
 
@@ -230,17 +228,11 @@ class TurbidityCurrent2D(Component):
             Coefficient for calculating velocity of flow front 
         suspension: boolean, optional
             turn on the function for entrainment/settling of suspension
-        bedload: boolean, optional
-            turn on the function for bedload
         water_entrainment: boolean, optional
             turn on the function for ambient water entrainment
         sed_entrainment_func: string, optional
             Choose the function to be used for sediment entrainment. Default
-            is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'.
-        scheme: string, optional
-            Choose the numerical scheme for solution of non-advection terms.
-            Currently "CCUP" and "CentralDifference" are available.
-        """
+            is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'        """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
 
         # First we copy our grid
@@ -269,9 +261,7 @@ class TurbidityCurrent2D(Component):
         self.gamma = gamma
         self.water_entrainment = water_entrainment
         self.suspension = suspension
-        self.bedload = bedload
         self.sed_entrainment_func = sed_entrainment_func
-        self.scheme = scheme
 
         # Now setting up fields at nodes and links
         try:
@@ -471,7 +461,7 @@ class TurbidityCurrent2D(Component):
         self.U_node_temp = self.U_node.copy()
 
         # aritificial viscosity
-        self.q_x = np.zeros(grid.number_of_nodes)
+        self.q = np.zeros(grid.number_of_nodes)
 
         # arrays to record upcurrent and downcurrent nodes
         self.horizontal_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
@@ -614,7 +604,7 @@ class TurbidityCurrent2D(Component):
         self.C = self.grid['node']['flow__sediment_concentration']
         self.Ch = self.C * self.h
 
-        # create solvers
+        # create numerical solver objects
         self.cip2d = CIP2D(self.grid.number_of_links)
         self.sor = SOR(self.grid.number_of_nodes, self.node_east,
                        self.node_west, self.node_north, self.node_south,
@@ -838,7 +828,7 @@ class TurbidityCurrent2D(Component):
         self.update_boundary_conditions(p=self.p)
         self.p_temp[:] = self.p[:]
 
-        # set coefficients to the SOR solver
+        # set coefficients to SOR solver
         self.sor.a[wet_nodes] = -Rg * (
             1 / (2.0 * h_link[east_link_at_node[wet_nodes]]) + 1 /
             (2.0 * h_link[west_link_at_node[wet_nodes]])) / dx2 - Rg * (
@@ -914,7 +904,7 @@ class TurbidityCurrent2D(Component):
             v_node=self.v_node_temp,
         )
 
-        # water entrainment
+        # calculate water entrainment coefficients
         if self.water_entrainment is True:
             self.ew_link[self.wet_horizontal_links] = get_ew(
                 self.U[self.wet_horizontal_links],
@@ -945,6 +935,24 @@ class TurbidityCurrent2D(Component):
             u_node=self.u_node_temp,
             v_node=self.v_node_temp,
         )
+
+        # mass conservation
+        self.div[wet_pwet_nodes] = (
+            self.u_temp[east_link_at_node[wet_pwet_nodes]] -
+            self.u_temp[west_link_at_node[wet_pwet_nodes]]) / (
+                dx) + (self.v_temp[north_link_at_node[wet_pwet_nodes]] -
+                       self.v_temp[south_link_at_node[wet_pwet_nodes]]) / (dy)
+        self.h_temp[self.wet_pwet_nodes] /= 1 + self.div[wet_pwet_nodes] * dt
+        self.Ch_temp[self.wet_pwet_nodes] /= 1 + self.div[wet_pwet_nodes] * dt
+        adjust_negative_values(self.h_temp,
+                               self.Ch_temp,
+                               self.wet_pwet_nodes,
+                               self.node_east,
+                               self.node_west,
+                               self.node_north,
+                               self.node_south,
+                               out_h=self.h_temp,
+                               out_Ch=self.Ch_temp)
 
         # diffusion of momentum
         self.calc_nu_t(self.u_temp,
@@ -983,33 +991,10 @@ class TurbidityCurrent2D(Component):
             v_node=self.v_node_temp,
         )
 
-        # mass conservation
-        self.div[wet_pwet_nodes] = (
-            self.u_temp[east_link_at_node[wet_pwet_nodes]] -
-            self.u_temp[west_link_at_node[wet_pwet_nodes]]) / (
-                dx) + (self.v_temp[north_link_at_node[wet_pwet_nodes]] -
-                       self.v_temp[south_link_at_node[wet_pwet_nodes]]) / (dy)
-        self.h_temp[self.wet_pwet_nodes] /= 1 + self.div[wet_pwet_nodes] * dt
-        self.Ch_temp[self.wet_pwet_nodes] /= 1 + self.div[wet_pwet_nodes] * dt
-        adjust_negative_values(self.h_temp,
-                               self.Ch_temp,
-                               self.wet_pwet_nodes,
-                               self.node_east,
-                               self.node_west,
-                               self.node_north,
-                               self.node_south,
-                               out_h=self.h_temp,
-                               out_Ch=self.Ch_temp)
-        self.update_boundary_conditions(
-            h=self.h_temp,
-            Ch=self.Ch_temp,
-            h_link=self.h_link_temp,
-            Ch_link=self.Ch_link_temp,
-        )
-
         # calculate flow expansion by water entrainment
-        self.h_temp[self.wet_nodes] += self.ew_node[
-            self.wet_nodes] * self.U_node[self.wet_nodes] * self.dt_local
+        if self.water_entrainment is True:
+            self.h_temp[self.wet_nodes] += self.ew_node[
+                self.wet_nodes] * self.U_node[self.wet_nodes] * self.dt_local
 
         # calculate sediment deposition
         if self.suspension is True:
@@ -1025,6 +1010,11 @@ class TurbidityCurrent2D(Component):
             )
             self.S[self.active_links] = self.grid.calc_grad_at_link(
                 self.eta_temp)[self.active_links]
+
+        # map nodes to links
+        map_nodes_to_links(self, self.h_temp, self.dhdx_temp, self.dhdy_temp,
+                           self.Ch_temp, self.dChdx_temp, self.dChdy_temp,
+                           self.eta_temp, self.h_link_temp, self.Ch_link_temp)
 
         # update boundary conditions
         self.update_boundary_conditions(
@@ -1090,19 +1080,19 @@ class TurbidityCurrent2D(Component):
                           ) / dx + (v[north_link[wet_nodes]] -
                                     v[south_link[wet_nodes]]) / dy
         compress = div[wet_nodes] < 0
-        self.q_x[wet_nodes[~compress]] = 0
-        self.q_x[wet_nodes[compress]] = (
+        self.q[wet_nodes[~compress]] = 0
+        self.q[wet_nodes[compress]] = (
             2.0 * h[wet_nodes[compress]]) / Rg * nu_a * dx * (
                 -Cs[wet_nodes[compress]] * div[wet_nodes[compress]] +
                 1.5 * div[wet_nodes[compress]] * div[wet_nodes[compress]] * dx)
 
         # modify flow velocity based on artificial viscosity
         u[wet_horiz] -= 0.5 * Rg / h_link[wet_horiz] * (
-            self.q_x[east_node[wet_horiz]] -
-            self.q_x[west_node[wet_horiz]]) / dx * dt
+            self.q[east_node[wet_horiz]] -
+            self.q[west_node[wet_horiz]]) / dx * dt
         v[wet_vert] -= 0.5 * Rg / h_link[wet_vert] * (
-            self.q_x[north_node[wet_vert]] -
-            self.q_x[south_node[wet_vert]]) / dy * dt
+            self.q[north_node[wet_vert]] -
+            self.q[south_node[wet_vert]]) / dy * dt
 
     def _process_wet_dry_boundary(self):
         """Calculate processes at wet and dry boundary
@@ -1136,8 +1126,12 @@ class TurbidityCurrent2D(Component):
                                                  self.h)
 
         # apply Jameson's filter
-        self.jameson.run(self.Ch, self.wet_pwet_nodes, out=self.Ch_temp)
-        self.jameson.run(self.h, self.wet_pwet_nodes, out=self.h_temp)
+        # self.jameson.run(self.Ch, self.wet_pwet_nodes, out=self.Ch_temp)
+        # self.jameson.run(self.h, self.wet_pwet_nodes, out=self.h_temp)
+        self.jameson.run(self.Ch, self.partial_wet_nodes, out=self.Ch_temp)
+        self.jameson.run(self.h, self.partial_wet_nodes, out=self.h_temp)
+        self.jameson.run(self.Ch, self.wettest_nodes, out=self.Ch_temp)
+        self.jameson.run(self.h, self.wettest_nodes, out=self.h_temp)
 
         # update gradient terms
         self.update_gradients()
@@ -1564,135 +1558,51 @@ class TurbidityCurrent2D(Component):
                     self.eta_init[self.fixed_value_anchor_nodes])
 
 
-def create_topography(
-        length=8000,
-        width=2000,
-        spacing=20,
-        slope_outside=0.1,
-        slope_inside=0.05,
-        slope_basin_break=2000,
-        canyon_basin_break=2200,
-        canyon_center=1000,
-        canyon_half_width=100,
-        canyon='parabola',
-):
-    # making grid
-    # size of calculation domain is 4 x 8 km with dx = 20 m
-    lgrids = int(length / spacing)
-    wgrids = int(width / spacing)
-    grid = RasterModelGrid((lgrids, wgrids), xy_spacing=[spacing, spacing])
-    grid.add_zeros('flow__depth', at='node')
-    grid.add_zeros('topographic__elevation', at='node')
-    grid.add_zeros('flow__horizontal_velocity_at_node', at='node')
-    grid.add_zeros('flow__vertical_velocity_at_node', at='node')
-    grid.add_zeros('flow__horizontal_velocity', at='link')
-    grid.add_zeros('flow__vertical_velocity', at='link')
-    grid.add_zeros('flow__sediment_concentration', at='node')
-    grid.add_zeros('bed__thickness', at='node')
-
-    # making topography
-    # set the slope
-    grid.at_node['topographic__elevation'] = (
-        grid.node_y - slope_basin_break) * slope_outside
-
-    if canyon == 'parabola':
-        # set canyon
-        d0 = slope_inside * (canyon_basin_break - slope_basin_break)
-        d = slope_inside * (grid.node_y - canyon_basin_break) - d0
-        a = d0 / canyon_half_width**2
-        canyon_elev = a * (grid.node_x - canyon_center)**2 + d
-        inside = np.where(canyon_elev < grid.at_node['topographic__elevation'])
-        grid.at_node['topographic__elevation'][inside] = canyon_elev[inside]
-
-    # set basin
-    basin_height = 0
-    basin_region = grid.at_node['topographic__elevation'] < basin_height
-    grid.at_node['topographic__elevation'][basin_region] = basin_height
-    grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
-
-    return grid
-
-
-def create_init_flow_region(
-        grid,
-        initial_flow_concentration=0.02,
-        initial_flow_thickness=200,
-        initial_region_radius=200,
-        initial_region_center=[1000, 7000],
-):
-    # making initial flow region
-    initial_flow_region = (
-        (grid.node_x - initial_region_center[0])**2 +
-        (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
-    grid.at_node['flow__depth'][initial_flow_region] = initial_flow_thickness
-    grid.at_node['flow__sediment_concentration'][
-        initial_flow_region] = initial_flow_concentration
-
-
-def create_topography_from_geotiff(geotiff_filename,
-                                   xlim=None,
-                                   ylim=None,
-                                   spacing=500,
-                                   filter_size=[1, 1]):
-
-    # read a geotiff file into ndarray
-    topo_file = gdal.Open(geotiff_filename, gdalconst.GA_ReadOnly)
-    topo_data = topo_file.GetRasterBand(1).ReadAsArray()
-    if (xlim is not None) and (ylim is not None):
-        topo_data = topo_data[xlim[0]:xlim[1], ylim[0]:ylim[1]]
-
-    # Smoothing by median filter
-    topo_data = median_filter(topo_data, size=filter_size)
-
-    grid = RasterModelGrid(topo_data.shape, xy_spacing=[spacing, spacing])
-    grid.add_zeros('flow__depth', at='node')
-    grid.add_zeros('topographic__elevation', at='node')
-    grid.add_zeros('flow__horizontal_velocity', at='link')
-    grid.add_zeros('flow__vertical_velocity', at='link')
-    grid.add_zeros('flow__sediment_concentration', at='node')
-    grid.add_zeros('bed__thickness', at='node')
-
-    grid.at_node['topographic__elevation'][grid.nodes] = topo_data
-
-    return grid
-
-
-def test_ode_grad(Ch, t, tc, h, u_node, v_node, U_node, nodes):
-
-    G_eta = tc.calc_G_eta(h, u_node, v_node, Ch, U_node, nodes)
-    return G_eta
-
-
-if __name__ == '__main__':
-    """This is a script to run the model of TurbidityCurrent2D
+def run(geotiff_filename=None,
+        xlim=None,
+        ylim=None,
+        filter_size=None,
+        grid_spacing=10,
+        initial_flow_concentration=0.01,
+        initial_flow_thickness=100,
+        initial_region_radius=100,
+        initial_region_center=[1000, 4000],
+        dt=50,
+        number_of_steps=50):
     """
-    import os
-    os.environ['MKL_NUM_THREADS'] = '6'
-    os.environ['OMP_NUM_THREADS'] = '6'
-    from tqdm import tqdm
+    """
+    if geotiff_filename is None:
+        grid = create_topography(
+            length=6000,
+            width=2000,
+            spacing=grid_spacing,
+            slope_outside=0.2,  # 0.2
+            slope_inside=0.05,  # 0.02
+            slope_basin_break=1000,  #2000
+            canyon_basin_break=1200,  #2200
+            canyon_center=1000,
+            canyon_half_width=100,
+        )
 
-    grid = create_topography(
-        length=6000,
-        width=2000,
-        spacing=10,
-        slope_outside=0.2,  # 0.2
-        slope_inside=0.05,  # 0.02
-        slope_basin_break=1000,  #2000
-        canyon_basin_break=1200,  #2200
-        canyon_center=1000,
-        canyon_half_width=100,
-    )
-
-    # grid = create_topography_from_geotiff('depth500.tif',
-    #                                       xlim=[200, 800],
-    #                                       ylim=[400, 1200],
-    #                                       spacing=500,
-    #                                       filter_size=[5, 5])
+    else:
+        grid = create_topography_from_geotiff('depth500.tif',
+                                              xlim=xlim,
+                                              ylim=ylim,
+                                              spacing=grid_spacing,
+                                              filter_size=filter_size)
 
     grid.set_status_at_node_on_edges(top=grid.BC_NODE_IS_FIXED_GRADIENT,
                                      bottom=grid.BC_NODE_IS_FIXED_GRADIENT,
                                      right=grid.BC_NODE_IS_FIXED_GRADIENT,
                                      left=grid.BC_NODE_IS_FIXED_GRADIENT)
+
+    create_init_flow_region(
+        grid,
+        initial_flow_concentration=initial_flow_concentration,
+        initial_flow_thickness=initial_flow_thickness,
+        initial_region_radius=initial_region_radius,
+        initial_region_center=initial_region_center,  # 1000, 4000
+    )
 
     # grid.status_at_node[grid.nodes_at_top_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
     # grid.status_at_node[grid.nodes_at_bottom_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
@@ -1711,22 +1621,6 @@ if __name__ == '__main__':
     # grid.at_link['flow__horizontal_velocity'][inlet_link] = 0.0
     # grid.at_link['flow__vertical_velocity'][inlet_link] = -3.0
 
-    create_init_flow_region(
-        grid,
-        initial_flow_concentration=0.01,
-        initial_flow_thickness=100,
-        initial_region_radius=100,
-        initial_region_center=[1000, 4000],  # 1000, 4000
-    )
-
-    # create_init_flow_region(
-    #     grid,
-    #     initial_flow_concentration=0.01,
-    #     initial_flow_thickness=200,
-    #     initial_region_radius=30000,
-    #     initial_region_center=[100000, 125000],
-    # )
-
     # making turbidity current object
     tc = TurbidityCurrent2D(
         grid,
@@ -1742,10 +1636,8 @@ if __name__ == '__main__':
         implicit_num=100,
         implicit_threshold=1.0 * 10**-15,
         r0=1.5,
-        water_entrainment=False,
+        water_entrainment=True,
         suspension=True,
-        # scheme='CentralDifference',
-        scheme='CCUP',
     )
 
     # import ipdb
@@ -1755,12 +1647,30 @@ if __name__ == '__main__':
     t = time.time()
     tc.save_nc('tc{:04d}.nc'.format(0))
     Ch_init = np.sum(tc.C * tc.h)
-    last = 3
 
-    for i in tqdm(range(1, last + 1), disable=False):
-        tc.run_one_step(dt=50.0)
+    for i in tqdm(range(1, number_of_steps + 1), disable=False):
+        tc.run_one_step(dt=dt)
         tc.save_nc('tc{:04d}.nc'.format(i))
         if np.sum(tc.C * tc.h) / Ch_init < 0.01:
             break
-    tc.save_grid('tc{:04d}.nc'.format(i))
+    tc.save_grid('tc{:04d}.grid'.format(i))
     print('elapsed time: {} sec.'.format(time.time() - t))
+
+
+if __name__ == '__main__':
+    """This is a script to run the model of TurbidityCurrent2D
+    """
+    import os
+    os.environ['MKL_NUM_THREADS'] = '6'
+    os.environ['OMP_NUM_THREADS'] = '6'
+
+    run()
+    # run(geotiff_filename='depth500.tif',
+    #     xlim=[200, 800],
+    #     ylim=[400, 1200],
+    #     grid_spacing=500,
+    #     filter_size=[5, 5],
+    #     initial_flow_concentration=0.01,
+    #     initial_flow_thickness=200,
+    #     initial_region_radius=30000,
+    #     initial_region_center=[100000, 125000])
