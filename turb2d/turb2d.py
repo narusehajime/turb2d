@@ -1,17 +1,3 @@
-"""A component of landlab that simulates a turbidity current on 2D grids
-
-This component simulates turbidity currents using the 2-D numerical model of
-shallow-water equations over topography on the basis of 3 equation model of
-Parker et al. (1986). 
-
-.. codeauthor: : Hajime Naruse
-
-Examples
----------
-import turb2d
-turb2d.run()
-
-"""
 from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
 from .gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from .gridutils import find_boundary_links_nodes, adjust_negative_values
@@ -28,6 +14,21 @@ import numpy as np
 import time
 from tqdm import tqdm
 
+
+"""A component of landlab that simulates a turbidity current on 2D grids
+
+This component simulates turbidity currents using the 2-D numerical model of
+shallow-water equations over topography on the basis of 3 equation model of
+Parker et al. (1986). 
+
+.. codeauthor: : Hajime Naruse
+
+Examples
+---------
+import turb2d
+turb2d.run()
+
+"""
 
 class TurbidityCurrent2D(Component):
     """Simulate a turbidity current using the CIP method.
