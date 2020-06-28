@@ -13,8 +13,6 @@ from landlab import Component, FieldError, RasterModelGrid
 import numpy as np
 import time
 from tqdm import tqdm
-
-
 """A component of landlab that simulates a turbidity current on 2D grids
 
 This component simulates turbidity currents using the 2-D numerical model of
@@ -29,6 +27,7 @@ import turb2d
 turb2d.run()
 
 """
+
 
 class TurbidityCurrent2D(Component):
     """Simulate a turbidity current using the CIP method.
@@ -52,6 +51,7 @@ class TurbidityCurrent2D(Component):
         'flow__horizontal_velocity',
         'flow__vertical_velocity',
         'flow__sediment_concentration',
+        'flow__TKE',
         'topographic__elevation',
         'bed__thickness',
         'flow__surface_elevation',
@@ -62,6 +62,7 @@ class TurbidityCurrent2D(Component):
         'flow__horizontal_velocity',
         'flow__vertical_velocity',
         'flow__sediment_concentration',
+        'flow__TKE',
         'topographic__elevation',
         'bed__thickness',
         'flow__surface_elevation',
@@ -81,6 +82,7 @@ class TurbidityCurrent2D(Component):
         'flow__depth': 'node',
         'flow__horizontal_velocity': 'link',
         'flow__vertical_velocity': 'link',
+        'flow__TKE': 'link',
         'flow__sediment_concentration': 'node',
         'topographic__elevation': 'node',
         'bed__thickness': 'node',
@@ -94,6 +96,7 @@ class TurbidityCurrent2D(Component):
         'flow__vertical_velocity':
         'Vertical component of flow velocity at each link',
         'flow__sediment_concentration': 'Sediment concentration in flow',
+        'flow__TKE': 'Turbulent kinetic energy',
         'topographic__elevation': 'The land surface elevation.',
         'bed__thickness': 'The bed thickness',
         'flow__surface_elevation': 'Elevation of flow surface',
@@ -102,7 +105,7 @@ class TurbidityCurrent2D(Component):
     def __init__(self,
                  grid,
                  h_init=0.0,
-                 p_w=10**(-5),
+                 Ch_w=10**(-5),
                  h_w=0.01,
                  alpha=0.1,
                  Cf=0.004,
@@ -131,8 +134,8 @@ class TurbidityCurrent2D(Component):
         h_init: float, optional
             Thickness of initial thin layer of flow to prevent divide by zero
             errors(m).
-        p_w: float, optional
-            Water pressure (Ch^2) to judge "wet" nodes and links(m^2).
+        Ch_w: float, optional
+            Volume-per-unit-area of suspended load (Ch) to judge "wet" nodes and links(m).
         h_w: float, optional
             Minimum flow depth (h) to judge "wet" nodes and links(m).
         alpha: float, optional
@@ -186,7 +189,7 @@ class TurbidityCurrent2D(Component):
         self.g = g
         self.R = R
         self.Ds = Ds
-        self.p_w = p_w
+        self.Ch_w = Ch_w
         self.h_w = h_w
         self.nu = nu
         self.kappa = kappa
@@ -264,6 +267,15 @@ class TurbidityCurrent2D(Component):
             # Field was already set
             self.u = grid.at_link['flow__horizontal_velocity']
             self.v = grid.at_link['flow__vertical_velocity']
+
+        try:
+            self.Kh = grid.add_zeros('flow__TKE',
+                                     at='link',
+                                     units=self.__var_units['flow__TKE'])
+
+        except FieldError:
+            # Field was already set
+            self.Kh = grid.at_node['flow__TKE']
 
         try:
             self.u_node = grid.add_zeros(
@@ -1585,8 +1597,8 @@ def run(geotiff_filename=None,
         nu_a=0.75,
         Ds=80 * 10**-6,
         h_init=0.0,
-        p_w=10**(-10),
-        h_w=0.001,
+        Ch_w=10**(-5),
+        h_w=0.01,
         C_init=0.0,
         implicit_num=100,
         implicit_threshold=1.0 * 10**-15,

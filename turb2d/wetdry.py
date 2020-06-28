@@ -80,7 +80,7 @@ def find_wet_grids(tc):
     #############################
     # Copy parameters from self #
     #############################
-    p = tc.h * tc.Ch
+    Ch = tc.Ch
     core = tc.core_nodes
     # horiz_links = tc.horizontal_active_links
     horiz_links = tc.grid.horizontal_links
@@ -98,7 +98,7 @@ def find_wet_grids(tc):
     west_nodes_at_link = tc.west_node_at_horizontal_link
     north_nodes_at_link = tc.north_node_at_vertical_link
     south_nodes_at_link = tc.south_node_at_vertical_link
-    p_w = tc.p_w
+    Ch_w = tc.Ch_w
     h_w = tc.h_w
 
     ############################
@@ -110,7 +110,7 @@ def find_wet_grids(tc):
     # tc.wet_vertical_links = vert_links[np.where(
     #     (p[north_nodes_at_link] > p_w) & (p[south_nodes_at_link] > p_w))]
 
-    wet_nodes = (p > p_w) & (tc.h > h_w)
+    wet_nodes = (Ch > Ch_w) & (tc.h > h_w)
     tc.wet_nodes = core[wet_nodes[core]]
     tc.wet_horizontal_links = horiz_links[
         (wet_nodes[west_nodes_at_link[horiz_links]])
