@@ -78,7 +78,7 @@ tc = TurbidityCurrent2D(
     nu_a=0.75,
     Ds=80 * 10**-6,
     h_init=0.0,
-    p_w=10**(-10),
+    Ch_w=10**(-5),
     h_w=0.001,
     C_init=0.0,
     implicit_num=100,
@@ -87,7 +87,6 @@ tc = TurbidityCurrent2D(
     water_entrainment=False,
     suspension=True,
 )
-
 
 # start calculation
 t = time.time()

@@ -16,6 +16,7 @@ def create_topography(
         spacing=20,
         slope_outside=0.1,
         slope_inside=0.05,
+        slope_basin=0.02,
         slope_basin_break=2000,
         canyon_basin_break=2200,
         canyon_center=1000,
@@ -43,6 +44,9 @@ def create_topography(
         slope_inside: float, optional
            topographic inclination in the region inside the thalweg of 
            the canyon
+
+        slope_basin: float, optional
+           topographic inclination of the basin plain
 
         slope_basin_break: float, optional
            location of slope-basin break
@@ -98,7 +102,7 @@ def create_topography(
         grid.at_node['topographic__elevation'][inside] = canyon_elev[inside]
 
     # set basin
-    basin_height = 0
+    basin_height = (grid.node_y - slope_basin_break) * slope_basin
     basin_region = grid.at_node['topographic__elevation'] < basin_height
     grid.at_node['topographic__elevation'][basin_region] = basin_height
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
@@ -140,8 +144,10 @@ def create_init_flow_region(
         (grid.node_x - initial_region_center[0])**2 +
         (grid.node_y - initial_region_center[1])**2) < initial_region_radius**2
     grid.at_node['flow__depth'][initial_flow_region] = initial_flow_thickness
+    grid.at_node['flow__depth'][~initial_flow_region] = 0.0
     grid.at_node['flow__sediment_concentration'][
         initial_flow_region] = initial_flow_concentration
+    grid.at_node['flow__sediment_concentration'][~initial_flow_region] = 0.0
 
 
 def create_topography_from_geotiff(geotiff_filename,

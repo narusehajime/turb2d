@@ -73,6 +73,7 @@ class TurbidityCurrent2D(Component):
         'flow__horizontal_velocity': 'm/s',
         'flow__vertical_velocity': 'm/s',
         'flow__sediment_concentration': '1',
+        'flow__TKE': 'm^2/s^2',
         'topographic__elevation': 'm',
         'bed__thickness': 'm',
         'flow__surface_elevation': 'm',
@@ -105,7 +106,7 @@ class TurbidityCurrent2D(Component):
     def __init__(self,
                  grid,
                  h_init=0.0,
-                 Ch_w=10**(-5),
+                 Ch_w=10**(-4),
                  h_w=0.01,
                  alpha=0.1,
                  Cf=0.004,
@@ -124,6 +125,7 @@ class TurbidityCurrent2D(Component):
                  water_entrainment=True,
                  suspension=True,
                  sed_entrainment_func='GP1991field',
+                 model='3eq',
                  **kwds):
         """Create a component of turbidity current 
 
@@ -173,7 +175,11 @@ class TurbidityCurrent2D(Component):
             turn on the function for ambient water entrainment
         sed_entrainment_func: string, optional
             Choose the function to be used for sediment entrainment. Default
-            is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'        """
+            is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'
+        model: string, optional
+            Choose "3eq" or "4eq" for three or four equation models
+
+        """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
 
         # First we copy our grid
@@ -220,9 +226,13 @@ class TurbidityCurrent2D(Component):
                 'bed__thickness',
                 at='node',
                 units=self._var_units['bed__thickness'])
+            # Record initial topography
+            self.eta_init = self.eta.copy()
+
         except FieldError:
             # Field was already set
             self.bed_thick = self._grid.at_node['bed__thickness']
+            self.eta_init = self.eta[:] - self.bed_thick[:]
 
         try:
             self.h = grid.add_zeros('flow__depth',
@@ -238,7 +248,6 @@ class TurbidityCurrent2D(Component):
                 at='node',
                 units=self._var_units['flow__sediment_concentration'])
             self.Ch = self.C * self.h
-
         except FieldError:
             # Field was already set
             self.C = grid.at_node['flow__sediment_concentration']
@@ -271,11 +280,10 @@ class TurbidityCurrent2D(Component):
         try:
             self.Kh = grid.add_zeros('flow__TKE',
                                      at='link',
-                                     units=self.__var_units['flow__TKE'])
-
+                                     units=self._var_units['flow__TKE'])
         except FieldError:
             # Field was already set
-            self.Kh = grid.at_node['flow__TKE']
+            self.Kh = grid.at_link['flow__TKE']
 
         try:
             self.u_node = grid.add_zeros(
@@ -417,7 +425,6 @@ class TurbidityCurrent2D(Component):
 
         # topographic elevation and slope
         self.eta_temp = self.eta.copy()
-        self.eta_init = self.eta.copy()
         self.S = grid.calc_grad_at_link(self.eta)
 
         # length of flow velocity vector
@@ -493,9 +500,6 @@ class TurbidityCurrent2D(Component):
 
         # Calculate subordinate parameters
         self.ws = get_ws(self.R, self.g, self.Ds, self.nu)
-
-        # Record initial topography
-        self.eta_init[:] = self.eta[:]
 
         # Start time of simulation is at 0 s
         grid.at_grid['time__elapsed'] = 0.0
