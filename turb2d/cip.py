@@ -773,7 +773,7 @@ def forester_filter(
         west_id,
         north_id,
         south_id,
-        nu_f=1.0,
+        nu_f=0.1,
         out_f=None,
 ):
     """ Forester filter for removing negative values from Concentration and 
@@ -792,10 +792,10 @@ def forester_filter(
 
     out_f[core] += nu_f * (f[east] + f[west] + f[north] + f[south] -
                            4.0 * f[core]) / 4.0
-    # out_f[east] -= nu_f * (f[east] - f[core]) / 4.0
-    # out_f[west] -= nu_f * (f[west] - f[core]) / 4.0
-    # out_f[north] -= nu_f * (f[north] - f[core]) / 4.0
-    # out_f[south] -= nu_f * (f[south] - f[core]) / 4.0
+    out_f[east] -= nu_f * (f[east] - f[core]) / 4.0
+    out_f[west] -= nu_f * (f[west] - f[core]) / 4.0
+    out_f[north] -= nu_f * (f[north] - f[core]) / 4.0
+    out_f[south] -= nu_f * (f[south] - f[core]) / 4.0
 
     return out_f
 

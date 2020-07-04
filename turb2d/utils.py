@@ -104,7 +104,8 @@ def create_topography(
     # set basin
     basin_height = (grid.node_y - slope_basin_break) * slope_basin
     basin_region = grid.at_node['topographic__elevation'] < basin_height
-    grid.at_node['topographic__elevation'][basin_region] = basin_height
+    grid.at_node['topographic__elevation'][basin_region] = basin_height[
+        basin_region]
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
 
     return grid

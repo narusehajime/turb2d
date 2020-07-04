@@ -604,9 +604,32 @@ def adjust_negative_values(
 
     h_temp = h.copy()
     Ch_temp = Ch.copy()
-    to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
-    counter = 0
 
+    # counter = 0
+    # to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
+
+    # while len(to_fix) > 0 and counter < loop:
+    #     forester_filter(h_temp,
+    #                     to_fix,
+    #                     east_id,
+    #                     west_id,
+    #                     north_id,
+    #                     south_id,
+    #                     out_f=out_h)
+    #     forester_filter(Ch_temp,
+    #                     to_fix,
+    #                     east_id,
+    #                     west_id,
+    #                     north_id,
+    #                     south_id,
+    #                     out_f=out_Ch)
+    #     counter += 1
+    #     to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
+    #     h_temp[:] = out_h[:]
+    #     Ch_temp[:] = out_Ch[:]
+
+    counter = 0
+    to_fix = core[out_h[core] < 0]
     while len(to_fix) > 0 and counter < loop:
         forester_filter(h_temp,
                         to_fix,
@@ -615,6 +638,12 @@ def adjust_negative_values(
                         north_id,
                         south_id,
                         out_f=out_h)
+        to_fix = core[out_h[core] < 0]
+        h_temp[:] = out_h[:]
+
+    counter = 0
+    to_fix = core[out_Ch[core] < 0]
+    while len(to_fix) > 0 and counter < loop:
         forester_filter(Ch_temp,
                         to_fix,
                         east_id,
@@ -622,9 +651,7 @@ def adjust_negative_values(
                         north_id,
                         south_id,
                         out_f=out_Ch)
-        counter += 1
-        to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
-        h_temp[:] = out_h[:]
+        to_fix = core[out_Ch[core] < 0]
         Ch_temp[:] = out_Ch[:]
 
     if counter == loop:

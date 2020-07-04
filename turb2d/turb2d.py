@@ -1597,7 +1597,7 @@ def run(geotiff_filename=None,
         grid,
         Cf=0.004,
         alpha=0.4,
-        kappa=0.01,
+        kappa=0.1,  #0.01
         nu_a=0.75,
         Ds=80 * 10**-6,
         h_init=0.0,
