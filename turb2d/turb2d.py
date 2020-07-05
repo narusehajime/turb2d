@@ -188,10 +188,7 @@ class TurbidityCurrent2D(Component):
         # Copy model parameters
         self.h_init = h_init
         self.alpha = alpha
-        if type(Cf) is str:
-            self.Cf = self.grid.at_link[Cf]
-        else:
-            self.Cf = Cf
+        self.Cf = Cf
         self.g = g
         self.R = R
         self.Ds = Ds
@@ -209,6 +206,7 @@ class TurbidityCurrent2D(Component):
         self.water_entrainment = water_entrainment
         self.suspension = suspension
         self.sed_entrainment_func = sed_entrainment_func
+        self.model = model
 
         # Now setting up fields at nodes and links
         try:
@@ -312,14 +310,6 @@ class TurbidityCurrent2D(Component):
                 'flow_vertical_velocity__horizontal_gradient', at='link')
             self.dvdy = grid.add_zeros(
                 'flow_vertical_velocity__vertical_gradient', at='link')
-            self.dhdx = grid.add_zeros('flow_depth__horizontal_gradient',
-                                       at='node')
-            self.dhdy = grid.add_zeros('flow_depth__vertical_gradient',
-                                       at='node')
-            self.dChdx = grid.add_zeros(
-                'flow_sediment_volume__horizontal_gradient', at='node')
-            self.dChdy = grid.add_zeros(
-                'flow_sediment_volume__vertical_gradient', at='node')
 
         except FieldError:
             self.dudx = grid.at_link[
@@ -330,12 +320,6 @@ class TurbidityCurrent2D(Component):
                 'flow_vertical_velocity__horizontal_gradient']
             self.dvdy = grid.at_link[
                 'flow_vertical_velocity__vertical_gradient']
-            self.dhdx = grid.at_node['flow_depth__horizontal_gradient']
-            self.dhdy = grid.at_node['flow_depth__vertical_gradient']
-            self.dChdx = grid.at_node[
-                'flow_sediment_volume__horizontal_gradient']
-            self.dChdy = grid.at_node[
-                'flow_sediment_volume__vertical_gradient']
 
         try:
             self.dhdx = grid.add_zeros('flow_depth__horizontal_gradient',
@@ -355,6 +339,16 @@ class TurbidityCurrent2D(Component):
             self.dChdy = grid.at_node[
                 'flow_sediment_volume__vertical_gradient']
 
+        try:
+            self.dKhdx = grid.add_zeros('flow_TKE__horizontal_gradient',
+                                        at='link')
+            self.dKhdy = grid.add_zeros('flow_TKE__vertical_gradient',
+                                        at='link')
+
+        except FieldError:
+            self.dKhdx = grid.at_link['flow_TKE__horizontal_gradient']
+            self.dKhdy = grid.at_link['flow_TKE__vertical_gradient']
+
         # record active links
         self.active_link_ids = links.active_link_ids(self.grid.shape,
                                                      self.grid.status_at_node)
@@ -373,8 +367,13 @@ class TurbidityCurrent2D(Component):
         # self.Ch = self.C * self.h
         self.u_node = np.zeros(grid.number_of_nodes)
         self.v_node = np.zeros(grid.number_of_nodes)
+        self.Kh_node = np.zeros(grid.number_of_nodes)
         self.h_link = np.zeros(grid.number_of_links)
         self.Ch_link = np.zeros(grid.number_of_links)
+
+        # friction coefficients at grids
+        self.Cf_link = np.ones(grid.number_of_links) * self.Cf
+        self.Cf_node = np.ones(grid.number_of_links) * self.Cf
 
         # composite velocity
         self.U = np.zeros(grid.number_of_links)
@@ -405,6 +404,12 @@ class TurbidityCurrent2D(Component):
         self.v_node_temp = np.zeros(grid.number_of_nodes)
         self.dvdx_temp = np.zeros(grid.number_of_links)
         self.dvdy_temp = np.zeros(grid.number_of_links)
+
+        # temporary values for TKE
+        self.Kh_temp = np.zeros(grid.number_of_links)
+        self.Kh_node_temp = np.zeros(grid.number_of_nodes)
+        self.dKhdx_temp = np.zeros(grid.number_of_links)
+        self.dKhdy_temp = np.zeros(grid.number_of_links)
 
         # temporary value to store divergence of velocity
         self.div = np.zeros(grid.number_of_nodes)
@@ -714,6 +719,21 @@ class TurbidityCurrent2D(Component):
                        out_dfdx=self.dChdx_temp,
                        out_dfdy=self.dChdy_temp)
 
+        if self.model == '4eq':
+            self.cip2d.run(self.Kh,
+                           self.dKhdx,
+                           self.dKhdy,
+                           self.u,
+                           self.v,
+                           self.wet_pwet_links,
+                           self.horizontal_up_links,
+                           self.vertical_up_links,
+                           self.grid.dx,
+                           self.dt_local,
+                           out_f=self.Kh_temp,
+                           out_dfdx=self.dKhdx_temp,
+                           out_dfdy=self.dKhdy_temp)
+
         adjust_negative_values(self.h_temp,
                                self.Ch_temp,
                                self.wet_pwet_nodes,
@@ -893,11 +913,13 @@ class TurbidityCurrent2D(Component):
 
         # calculate friction terms using semi-implicit scheme
         self.u_temp[self.wet_horizontal_links] /= (
-            1 + (self.Cf + self.ew_link[self.wet_horizontal_links]) *
+            1 + (self.Cf_link[self.wet_horizontal_links] +
+                 self.ew_link[self.wet_horizontal_links]) *
             self.U[self.wet_horizontal_links] * self.dt_local /
             self.h_link[self.wet_horizontal_links])
         self.v_temp[self.wet_vertical_links] /= (
-            1 + (self.Cf + self.ew_link[self.wet_vertical_links]) *
+            1 + (self.Cf_link[self.wet_vertical_links] +
+                 self.ew_link[self.wet_vertical_links]) *
             self.U[self.wet_vertical_links] * self.dt_local /
             self.h_link[self.wet_vertical_links])
         self.update_boundary_conditions(
@@ -1097,12 +1119,12 @@ class TurbidityCurrent2D(Component):
                                                  self.h)
 
         # apply Jameson's filter
-        # self.jameson.run(self.Ch, self.wet_pwet_nodes, out=self.Ch_temp)
-        # self.jameson.run(self.h, self.wet_pwet_nodes, out=self.h_temp)
-        self.jameson.run(self.Ch, self.partial_wet_nodes, out=self.Ch_temp)
-        self.jameson.run(self.h, self.partial_wet_nodes, out=self.h_temp)
-        self.jameson.run(self.Ch, self.wettest_nodes, out=self.Ch_temp)
-        self.jameson.run(self.h, self.wettest_nodes, out=self.h_temp)
+        self.jameson.run(self.Ch, self.wet_pwet_nodes, out=self.Ch_temp)
+        self.jameson.run(self.h, self.wet_pwet_nodes, out=self.h_temp)
+        # self.jameson.run(self.Ch, self.partial_wet_nodes, out=self.Ch_temp)
+        # self.jameson.run(self.h, self.partial_wet_nodes, out=self.h_temp)
+        # self.jameson.run(self.Ch, self.wettest_nodes, out=self.Ch_temp)
+        # self.jameson.run(self.h, self.wettest_nodes, out=self.h_temp)
 
         # update gradient terms
         self.update_gradients()
@@ -1264,7 +1286,7 @@ class TurbidityCurrent2D(Component):
         dt = self.dt_local
         ws = self.ws
         r0 = self.r0
-        u_star = np.sqrt(self.Cf * U_node[nodes] * U_node[nodes])
+        u_star = np.sqrt(self.Cf_node[nodes] * U_node[nodes] * U_node[nodes])
         es = get_es(self.R,
                     self.g,
                     self.Ds,
