@@ -145,6 +145,7 @@ def map_values(
         U=U,
         U_node=U_node,
         Cf_node=Cf_node,
+        Kh=Kh,
     )
     map_nodes_to_links(tc,
                        h=h,
@@ -158,19 +159,22 @@ def map_values(
                        Ch_link=Ch_link)
 
 
-def map_links_to_nodes(tc,
-                       u=None,
-                       dudx=None,
-                       dudy=None,
-                       v=None,
-                       dvdx=None,
-                       dvdy=None,
-                       Cf_link=None,
-                       u_node=None,
-                       v_node=None,
-                       U=None,
-                       U_node=None,
-                       Cf_node=None):
+def map_links_to_nodes(
+        tc,
+        u=None,
+        dudx=None,
+        dudy=None,
+        v=None,
+        dvdx=None,
+        dvdy=None,
+        Cf_link=None,
+        u_node=None,
+        v_node=None,
+        U=None,
+        U_node=None,
+        Cf_node=None,
+        Kh=None,
+):
     """map parameters at links to nodes
     """
     dry_links = tc.dry_links
@@ -201,6 +205,7 @@ def map_links_to_nodes(tc,
     if dudy is not None: dvdy[dry_links] = 0
     if dvdx is not None: dudx[dry_links] = 0
     if dvdy is not None: dvdy[dry_links] = 0
+    if Kh is not None: Kh[dry_links] = 0
 
     # Map values of horizontal links to vertical links, and
     # values of vertical links to horizontal links.
@@ -236,7 +241,7 @@ def map_links_to_nodes(tc,
     #                 south_link_at_node,
     #                 dx,
     #                 out=v_node)
-    if u is not None:
+    if (u is not None) and (u_node is not None):
         map_mean_of_links_to_node(u,
                                   wet_pwet_nodes,
                                   north_link_at_node,
@@ -244,7 +249,7 @@ def map_links_to_nodes(tc,
                                   east_link_at_node,
                                   west_link_at_node,
                                   out=u_node)
-    if v is not None:
+    if (v is not None) and (v_node is not None):
         map_mean_of_links_to_node(v,
                                   wet_pwet_nodes,
                                   north_link_at_node,
@@ -252,7 +257,7 @@ def map_links_to_nodes(tc,
                                   east_link_at_node,
                                   west_link_at_node,
                                   out=v_node)
-    if U is not None:
+    if (U is not None) and (U_node is not None):
         map_mean_of_links_to_node(U,
                                   wet_pwet_nodes,
                                   north_link_at_node,
@@ -276,17 +281,19 @@ def map_links_to_nodes(tc,
     if (u_node is not None) and (u is not None):
         u_node[tc.horizontally_partial_wet_nodes] = u[
             tc.partial_wet_horizontal_links]
-    if (u_node is not None) and (u is not None):
+    if (v_node is not None) and (v is not None):
         v_node[tc.vertically_partial_wet_nodes] = v[
             tc.partial_wet_vertical_links]
 
     # update boundary conditions
-    tc.update_boundary_conditions(
-        u=u,
-        v=v,
-        u_node=u_node,
-        v_node=v_node,
-    )
+    if (u is not None) and (v is not None) and (u_node is not None) and (
+            v_node is not None):
+        tc.update_boundary_conditions(
+            u=u,
+            v=v,
+            u_node=u_node,
+            v_node=v_node,
+        )
 
 
 def map_mean_of_links_to_node(f,
@@ -330,7 +337,7 @@ def map_nodes_to_links(tc,
         tc.wet_pwet_horizontal_links]
     dx = tc.grid.dx
 
-    if h is not None:
+    if (h is not None) and (h_link is not None):
         # remove illeagal values
         adjust_negative_values(
             h,
@@ -351,7 +358,7 @@ def map_nodes_to_links(tc,
                                        west_node_at_horizontal_link,
                                        out=h_link)
 
-    if Ch is not None:
+    if (Ch is not None) and (Ch_link is not None):
         # remove illeagal values
         adjust_negative_values(
             Ch,
@@ -408,11 +415,13 @@ def map_nodes_to_links(tc,
     #                  out=Ch_link)
 
     # update boundary conditions
-    tc.update_boundary_conditions(h=h,
-                                  Ch=Ch,
-                                  h_link=h_link,
-                                  Ch_link=Ch_link,
-                                  eta=eta)
+    if (h is not None) and (Ch is not None) and (h_link is not None) and (
+            Ch_link is not None) and (eta is not None):
+        tc.update_boundary_conditions(h=h,
+                                      Ch=Ch,
+                                      h_link=h_link,
+                                      Ch_link=Ch_link,
+                                      eta=eta)
 
 
 def map_mean_of_link_nodes_to_link(f,
