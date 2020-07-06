@@ -805,85 +805,100 @@ class Jameson():
         
         Parameters
         -------------------
-        kappa : float
-            coefficent for artificial viscosity (0.2-0.001)
-
-        east : ndarray, int
-            node ids indicating east
-
-        west : ndarray, int
-            node ids indicating west
-
-        north : ndarray, int
-            node ids indicating north
-
-        south : ndarray, int
-            node ids indicating south
-
-        link_horiz : ndarray, int
-            horizontal link ids
-
-        link_vert : ndarray, int
-            vertical link ids
-
+        tc: TurbudityCurrent2D
+          Instance of TurbidityCurrent2D to obtain necessary parameters
     """
-    def __init__(self, number_of_nodes, number_of_links, east, west, north,
-                 south, link_horiz, link_vert, east_node_at_link,
-                 west_node_at_link, north_node_at_link, south_node_at_link,
-                 east_link_at_node, west_link_at_node, north_link_at_node,
-                 south_link_at_node, kappa):
+    def __init__(self, tc):
 
-        self.kappa = kappa
-        self.east = east
-        self.west = west
-        self.north = north
-        self.south = south
-        self.link_horiz = link_horiz
-        self.link_vert = link_vert
-        self.east_node_at_link = east_node_at_link
-        self.west_node_at_link = west_node_at_link
-        self.north_node_at_link = north_node_at_link
-        self.south_node_at_link = south_node_at_link
-        self.east_link_at_node = east_link_at_node
-        self.west_link_at_node = west_link_at_node
-        self.north_link_at_node = north_link_at_node
-        self.south_link_at_node = south_link_at_node
-        self.nu_x = np.zeros(number_of_nodes)
-        self.nu_y = np.zeros(number_of_nodes)
-        self.eps = np.zeros(number_of_links)
+        self.number_of_nodes = tc.grid.number_of_nodes
+        self.number_of_links = tc.grid.number_of_links
+        self.node_east = tc.node_east
+        self.node_west = tc.node_west
+        self.node_north = tc.node_north
+        self.node_south = tc.node_south
+        self.link_east = tc.link_east
+        self.link_west = tc.link_west
+        self.link_north = tc.link_north
+        self.link_south = tc.link_south
+        self.link_horiz = tc.grid.horizontal_links
+        self.link_vert = tc.grid.vertical_links
+        self.east_node_at_horizontal_link = tc.east_node_at_horizontal_link
+        self.west_node_at_horizontal_link = tc.west_node_at_horizontal_link
+        self.north_node_at_vertical_link = tc.north_node_at_vertical_link
+        self.south_node_at_vertical_link = tc.south_node_at_vertical_link
+        self.east_link_at_node = tc.east_link_at_node
+        self.west_link_at_node = tc.west_link_at_node
+        self.north_link_at_node = tc.north_link_at_node
+        self.south_link_at_node = tc.south_link_at_node
+        self.kappa = tc.kappa
+        self.kappa = tc.kappa
+        self.nu_x = np.zeros(self.number_of_nodes)
+        self.nu_y = np.zeros(self.number_of_nodes)
+        self.nu_x_link = np.zeros(self.number_of_links)
+        self.nu_y_link = np.zeros(self.number_of_links)
+        self.eps_link = np.zeros(self.number_of_links)
+        self.eps_node_horiz = np.zeros(self.number_of_nodes)
+        self.eps_node_vert = np.zeros(self.number_of_nodes)
 
-    def update_artificial_viscosity(self, p):
+    def update_artificial_viscosity(self, p, p_link):
         """ update artificial viscosity at nodes (nu) and links (eps)
 
             paramters
             -------------------
             p : ndarray, float
                 pressure at nodes
+            p_link : ndarray, float
+                pressure at links
         """
+        # artificial viscosity coefficient at links
+        self.nu_x_link[self.link_horiz] = np.abs(
+            p_link[self.link_east[self.link_horiz]] -
+            2 * p_link[self.link_horiz] +
+            p_link[self.link_west[self.link_horiz]]) / (
+                p_link[self.link_east[self.link_horiz]] +
+                2 * p_link[self.link_horiz] +
+                p_link[self.link_west[self.link_horiz]] + 10**-20)
+        self.nu_y_link[self.link_vert] = np.abs(
+            p_link[self.link_north[self.link_vert]] -
+            2 * p_link[self.link_vert] +
+            p_link[self.link_south[self.link_vert]]) / (
+                p_link[self.link_north[self.link_vert]] +
+                2 * p_link[self.link_vert] +
+                p_link[self.link_south[self.link_vert]] + 10**-20)
+
         # artificial viscosity coefficient at nodes
-        # self.nu_x[:] = np.abs(p[self.east] - 2 * p + p[self.west]) / (
-        #     p[self.east] + 2 * p + p[self.west] + 10**-20)
-        # self.nu_y[:] = np.abs(p[self.north] - 2 * p + p[self.south]) / (
-        #     p[self.north] + 2 * p + p[self.south] + 10**-20)
-        self.nu_x[:] = np.abs(p[self.east] + p[self.north] + p[self.south] +
-                              p[self.west] - 4 * p) / (
-                                  p[self.east] + p[self.west] + p[self.north] +
-                                  p[self.south] + 4 * p + 10**-20)
+        self.nu_x[:] = np.abs(p[self.node_east] + p[self.node_north] +
+                              p[self.node_south] + p[self.node_west] -
+                              4 * p) / (p[self.node_east] + p[self.node_west] +
+                                        p[self.node_north] +
+                                        p[self.node_south] + 4 * p + 10**-20)
         self.nu_y[:] = self.nu_x[:]
 
-        # artificial viscosity coefficient at links
-        self.eps[self.link_horiz] = self.kappa * np.max([
-            self.nu_x[self.east_node_at_link[self.link_horiz]],
-            self.nu_x[self.west_node_at_link[self.link_horiz]]
+        # maximum artificial viscosity coefficient at links
+        self.eps_link[self.link_horiz] = self.kappa * np.max([
+            self.nu_x[self.east_node_at_horizontal_link[self.link_horiz]],
+            self.nu_x[self.west_node_at_horizontal_link[self.link_horiz]]
         ],
-                                                        axis=0)
-        self.eps[self.link_vert] = self.kappa * np.max([
-            self.nu_y[self.north_node_at_link[self.link_vert]],
-            self.nu_y[self.south_node_at_link[self.link_vert]]
+                                                             axis=0)
+        self.eps_link[self.link_vert] = self.kappa * np.max([
+            self.nu_y[self.north_node_at_vertical_link[self.link_vert]],
+            self.nu_y[self.south_node_at_vertical_link[self.link_vert]]
         ],
-                                                       axis=0)
+                                                            axis=0)
 
-    def run(self, f, core, out=None):
+        # maximum artificial viscosity coefficient at nodes
+        self.eps_node_horiz[:] = self.kappa * np.max([
+            self.nu_x_link[self.east_link_at_node],
+            self.nu_x_link[self.west_link_at_node]
+        ],
+                                                     axis=0)
+        self.eps_node_vert[:] = self.kappa * np.max([
+            self.nu_y_link[self.north_link_at_node],
+            self.nu_y_link[self.south_link_at_node]
+        ],
+                                                    axis=0)
+
+    def run(self, f, core, at='node', out=None):
         """ run one step of the Jameson filter
 
             paramters
@@ -893,6 +908,10 @@ class Jameson():
 
             core : ndarray, int
                 grid ids to apply the filter
+
+            at : String, optional
+                'node', 'hlink', or 'vlink' for values on nodes,
+                horizontal links or vertical links
 
             out : ndarray, float
                 output
@@ -905,13 +924,31 @@ class Jameson():
         if out is None:
             out = np.zeros_like(f)
 
-        out[core] = f[core] + self.eps[self.east_link_at_node[core]] * (
-            f[self.east[core]] -
-            f[core]) - self.eps[self.west_link_at_node[core]] * (f[core] - f[
-                self.west[core]]) + self.eps[self.north_link_at_node[core]] * (
-                    f[self.north[core]] -
-                    f[core]) - self.eps[self.south_link_at_node[core]] * (
-                        f[core] - f[self.south[core]])
+        if at == 'node':
+            out[core] = f[core] + self.eps_link[
+                self.east_link_at_node[core]] * (
+                    f[self.node_east[core]] -
+                    f[core]) - self.eps_link[self.west_link_at_node[core]] * (
+                        f[core] - f[self.node_west[core]]
+                    ) + self.eps_link[self.north_link_at_node[core]] * (
+                        f[self.node_north[core]] - f[core]
+                    ) - self.eps_link[self.south_link_at_node[core]] * (
+                        f[core] - f[self.node_south[core]])
+
+        if at == 'hlink':
+            out[core] = f[core] + self.eps_node_horiz[
+                self.east_node_at_horizontal_link[core]] * (
+                    f[self.link_east[core]] - f[core]) - self.eps_node_horiz[
+                        self.west_node_at_horizontal_link[core]] * (
+                            f[core] -
+                            f[self.west_node_at_horizontal_link[core]])
+
+        if at == 'vlink':
+            out[core] = f[core] + self.eps_node_vert[
+                self.north_node_at_vertical_link[core]] * (
+                    f[self.link_north[core]] - f[core]) - self.eps_node_vert[
+                        self.south_node_at_vertical_link[core]] * (f[core] - f[
+                            self.south_node_at_vertical_link[core]])
 
         return out
 

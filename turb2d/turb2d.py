@@ -584,15 +584,7 @@ class TurbidityCurrent2D(Component):
                        self.node_west, self.node_north, self.node_south,
                        self.implicit_threshold, self.implicit_num, self.alpha,
                        self.update_boundary_conditions)
-        self.jameson = Jameson(
-            self.grid.number_of_nodes, self.grid.number_of_links,
-            self.node_east, self.node_west, self.node_north, self.node_south,
-            self.grid.horizontal_links, self.grid.vertical_links,
-            self.east_node_at_horizontal_link,
-            self.west_node_at_horizontal_link,
-            self.north_node_at_vertical_link, self.south_node_at_vertical_link,
-            self.east_link_at_node, self.west_link_at_node,
-            self.north_link_at_node, self.south_link_at_node, self.kappa)
+        self.jameson = Jameson(self)
 
         # Initialize boundary conditions and wet/dry grids
         find_boundary_links_nodes(self)
@@ -1228,12 +1220,28 @@ class TurbidityCurrent2D(Component):
         """Calculate shock dissipation phase of the model
         """
         # update artificia viscosity coefficients for Jameson scheme
-        self.jameson.update_artificial_viscosity(self.R * self.g * self.Ch *
-                                                 self.h)
+        self.jameson.update_artificial_viscosity(
+            self.R * self.g * self.Ch * self.h,
+            self.R * self.g * self.Ch_link * self.h_link)
 
         # apply Jameson's filter
-        self.jameson.run(self.Ch, self.wet_pwet_nodes, out=self.Ch_temp)
-        self.jameson.run(self.h, self.wet_pwet_nodes, out=self.h_temp)
+        self.jameson.run(self.Ch,
+                         self.wet_pwet_nodes,
+                         at='node',
+                         out=self.Ch_temp)
+        self.jameson.run(self.h,
+                         self.wet_pwet_nodes,
+                         at='node',
+                         out=self.h_temp)
+        # self.jameson.run(self.u,
+        #                  self.wet_pwet_horizontal_links,
+        #                  at='hlink',
+        #                  out=self.u_temp)
+        # self.jameson.run(self.v,
+        #                  self.wet_pwet_vertical_links,
+        #                  at='vlink',
+        #                  out=self.v_temp)
+
         # self.jameson.run(self.Ch, self.partial_wet_nodes, out=self.Ch_temp)
         # self.jameson.run(self.h, self.partial_wet_nodes, out=self.h_temp)
         # self.jameson.run(self.Ch, self.wettest_nodes, out=self.Ch_temp)
@@ -1252,6 +1260,16 @@ class TurbidityCurrent2D(Component):
                    Ch=self.Ch,
                    dChdx=self.dChdx,
                    dChdy=self.dChdy,
+                   u=self.u,
+                   dudx=self.dudx,
+                   dudy=self.dudy,
+                   u_node=self.u_node,
+                   v=self.v,
+                   dvdx=self.dvdx,
+                   dvdy=self.dvdy,
+                   v_node=self.v_node,
+                   U=self.U,
+                   U_node=self.U_node,
                    eta=self.eta,
                    h_link=self.h_link,
                    Ch_link=self.Ch_link)
