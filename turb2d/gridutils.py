@@ -104,19 +104,75 @@ def update_up_down_links_and_nodes(tc):
                                 out_down=tc.vertical_down_links)
 
 
-def map_values(tc, h, dhdx, dhdy, u, dudx, v, dvdy, Ch, dChdx, dChdy, eta,
-               h_link, u_node, v_node, Ch_link, U, U_node):
+def map_values(
+        tc,
+        h=None,
+        dhdx=None,
+        dhdy=None,
+        u=None,
+        dudx=None,
+        dudy=None,
+        v=None,
+        dvdx=None,
+        dvdy=None,
+        Ch=None,
+        dChdx=None,
+        dChdy=None,
+        eta=None,
+        h_link=None,
+        u_node=None,
+        v_node=None,
+        Ch_link=None,
+        U=None,
+        U_node=None,
+        Kh=None,
+        Cf_link=None,
+        Cf_node=None,
+):
     """map parameters at nodes to links, and those at links to nodes
     """
-    map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node)
-    map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
-                       Ch_link)
+    map_links_to_nodes(
+        tc,
+        u=u,
+        dudx=dudx,
+        dudy=dudy,
+        v=v,
+        dvdx=dvdx,
+        dvdy=dvdy,
+        Cf_link=Cf_link,
+        u_node=u_node,
+        v_node=v_node,
+        U=U,
+        U_node=U_node,
+        Cf_node=Cf_node,
+    )
+    map_nodes_to_links(tc,
+                       h=h,
+                       dhdx=dhdx,
+                       dhdy=dhdy,
+                       Ch=Ch,
+                       dChdx=dChdx,
+                       dChdy=dChdy,
+                       eta=eta,
+                       h_link=h_link,
+                       Ch_link=Ch_link)
 
 
-def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
+def map_links_to_nodes(tc,
+                       u=None,
+                       dudx=None,
+                       dudy=None,
+                       v=None,
+                       dvdx=None,
+                       dvdy=None,
+                       Cf_link=None,
+                       u_node=None,
+                       v_node=None,
+                       U=None,
+                       U_node=None,
+                       Cf_node=None):
     """map parameters at links to nodes
     """
-    dx = tc.grid.dx
     dry_links = tc.dry_links
     dry_nodes = tc.dry_nodes
     wet_pwet_nodes = tc.wet_pwet_nodes
@@ -137,27 +193,33 @@ def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
     west_link_at_node = tc.west_link_at_node[wet_pwet_nodes]
 
     # set velocity zero at dry links and nodes
-    u[dry_links] = 0
-    v[dry_links] = 0
-    u_node[dry_nodes] = 0
-    v_node[dry_nodes] = 0
-    dudx[dry_links] = 0
-    dvdy[dry_links] = 0
+    if u is not None: u[dry_links] = 0
+    if v is not None: v[dry_links] = 0
+    if u_node is not None: u_node[dry_nodes] = 0
+    if v_node is not None: v_node[dry_nodes] = 0
+    if dudx is not None: dudx[dry_links] = 0
+    if dudy is not None: dvdy[dry_links] = 0
+    if dvdx is not None: dudx[dry_links] = 0
+    if dvdy is not None: dvdy[dry_links] = 0
 
     # Map values of horizontal links to vertical links, and
     # values of vertical links to horizontal links.
     # Horizontal velocity is only updated at horizontal links,
     # and vertical velocity is updated at vertical links during
     # CIP procedures. Therefore we need to map those values each other.
-    u[wet_pwet_vertical_links] = (
-        u[horizontal_link_NE] + u[horizontal_link_NW] + u[horizontal_link_SE] +
-        u[horizontal_link_SW]) / 4.0
-    v[wet_pwet_horizontal_links] = (v[vertical_link_NE] + v[vertical_link_NW] +
-                                    v[vertical_link_SE] +
-                                    v[vertical_link_SW]) / 4.0
+    if u is not None:
+        u[wet_pwet_vertical_links] = (
+            u[horizontal_link_NE] + u[horizontal_link_NW] +
+            u[horizontal_link_SE] + u[horizontal_link_SW]) / 4.0
+    if v is not None:
+        v[wet_pwet_horizontal_links] = (
+            v[vertical_link_NE] + v[vertical_link_NW] + v[vertical_link_SE] +
+            v[vertical_link_SW]) / 4.0
 
     # Calculate composite velocity at links
-    U[wet_pwet_links] = np.sqrt(u[wet_pwet_links]**2 + v[wet_pwet_links]**2)
+    if (U is not None) and (u is not None) and (v is not None):
+        U[wet_pwet_links] = np.sqrt(u[wet_pwet_links]**2 +
+                                    v[wet_pwet_links]**2)
 
     # map link values (u, v) to nodes
     # cubic_interp_1d(u,
@@ -174,33 +236,49 @@ def map_links_to_nodes(tc, u, dudx, v, dvdy, u_node, v_node, U, U_node):
     #                 south_link_at_node,
     #                 dx,
     #                 out=v_node)
-    map_mean_of_links_to_node(u,
-                              wet_pwet_nodes,
-                              north_link_at_node,
-                              south_link_at_node,
-                              east_link_at_node,
-                              west_link_at_node,
-                              out=u_node)
-    map_mean_of_links_to_node(v,
-                              wet_pwet_nodes,
-                              north_link_at_node,
-                              south_link_at_node,
-                              east_link_at_node,
-                              west_link_at_node,
-                              out=v_node)
-    map_mean_of_links_to_node(U,
-                              wet_pwet_nodes,
-                              north_link_at_node,
-                              south_link_at_node,
-                              east_link_at_node,
-                              west_link_at_node,
-                              out=U_node)
+    if u is not None:
+        map_mean_of_links_to_node(u,
+                                  wet_pwet_nodes,
+                                  north_link_at_node,
+                                  south_link_at_node,
+                                  east_link_at_node,
+                                  west_link_at_node,
+                                  out=u_node)
+    if v is not None:
+        map_mean_of_links_to_node(v,
+                                  wet_pwet_nodes,
+                                  north_link_at_node,
+                                  south_link_at_node,
+                                  east_link_at_node,
+                                  west_link_at_node,
+                                  out=v_node)
+    if U is not None:
+        map_mean_of_links_to_node(U,
+                                  wet_pwet_nodes,
+                                  north_link_at_node,
+                                  south_link_at_node,
+                                  east_link_at_node,
+                                  west_link_at_node,
+                                  out=U_node)
+
+    if (Cf_link is not None) and (Cf_node is not None):
+        map_mean_of_links_to_node(Cf_link,
+                                  wet_pwet_nodes,
+                                  north_link_at_node,
+                                  south_link_at_node,
+                                  east_link_at_node,
+                                  west_link_at_node,
+                                  out=Cf_node)
+
     # tc.grid.map_mean_of_links_to_node(u, out=u_node)
     # tc.grid.map_mean_of_links_to_node(v, out=v_node)
     # tc.grid.map_mean_of_links_to_node(U, out=U_node)
-    u_node[tc.horizontally_partial_wet_nodes] = u[
-        tc.partial_wet_horizontal_links]
-    v_node[tc.vertically_partial_wet_nodes] = v[tc.partial_wet_vertical_links]
+    if (u_node is not None) and (u is not None):
+        u_node[tc.horizontally_partial_wet_nodes] = u[
+            tc.partial_wet_horizontal_links]
+    if (u_node is not None) and (u is not None):
+        v_node[tc.vertically_partial_wet_nodes] = v[
+            tc.partial_wet_vertical_links]
 
     # update boundary conditions
     tc.update_boundary_conditions(
@@ -229,29 +307,18 @@ def map_mean_of_links_to_node(f,
     return out
 
 
-def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
-                       Ch_link):
+def map_nodes_to_links(tc,
+                       h=None,
+                       dhdx=None,
+                       dhdy=None,
+                       Ch=None,
+                       dChdx=None,
+                       dChdy=None,
+                       eta=None,
+                       h_link=None,
+                       Ch_link=None):
     """map parameters at nodes to links
     """
-
-    # remove illeagal values
-    # h[h < tc.h_init] = tc.h_init
-    # Ch[Ch < tc.C_init * tc.h_init] = tc.C_init * tc.h_init
-    adjust_negative_values(h,
-                           Ch,
-                           tc.wet_pwet_nodes,
-                           tc.node_east,
-                           tc.node_west,
-                           tc.node_north,
-                           tc.node_south,
-                           out_h=h,
-                           out_Ch=Ch)
-    h[tc.dry_nodes] = tc.h_init
-    Ch[tc.dry_nodes] = tc.h_init * tc.C_init
-    dhdx[tc.dry_nodes] = 0
-    dhdy[tc.dry_nodes] = 0
-    dChdx[tc.dry_nodes] = 0
-    dChdy[tc.dry_nodes] = 0
 
     north_node_at_vertical_link = tc.north_node_at_vertical_link[
         tc.wet_pwet_vertical_links]
@@ -262,6 +329,53 @@ def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
     west_node_at_horizontal_link = tc.west_node_at_horizontal_link[
         tc.wet_pwet_horizontal_links]
     dx = tc.grid.dx
+
+    if h is not None:
+        # remove illeagal values
+        adjust_negative_values(
+            h,
+            tc.wet_pwet_nodes,
+            tc.node_east,
+            tc.node_west,
+            tc.node_north,
+            tc.node_south,
+            out_f=h,
+        )
+        h[tc.dry_nodes] = tc.h_init
+        map_mean_of_link_nodes_to_link(h,
+                                       tc.wet_pwet_horizontal_links,
+                                       tc.wet_pwet_vertical_links,
+                                       north_node_at_vertical_link,
+                                       south_node_at_vertical_link,
+                                       east_node_at_horizontal_link,
+                                       west_node_at_horizontal_link,
+                                       out=h_link)
+
+    if Ch is not None:
+        # remove illeagal values
+        adjust_negative_values(
+            Ch,
+            tc.wet_pwet_nodes,
+            tc.node_east,
+            tc.node_west,
+            tc.node_north,
+            tc.node_south,
+            out_f=Ch,
+        )
+        Ch[tc.dry_nodes] = tc.h_init * tc.C_init
+        map_mean_of_link_nodes_to_link(Ch,
+                                       tc.wet_pwet_horizontal_links,
+                                       tc.wet_pwet_vertical_links,
+                                       north_node_at_vertical_link,
+                                       south_node_at_vertical_link,
+                                       east_node_at_horizontal_link,
+                                       west_node_at_horizontal_link,
+                                       out=Ch_link)
+
+    if dhdx is not None: dhdx[tc.dry_nodes] = 0
+    if dhdy is not None: dhdy[tc.dry_nodes] = 0
+    if dChdx is not None: dChdx[tc.dry_nodes] = 0
+    if dChdy is not None: dChdy[tc.dry_nodes] = 0
 
     # map node values (h, C, eta) to links
     # rcubic_interp_1d(h,
@@ -292,23 +406,6 @@ def map_nodes_to_links(tc, h, dhdx, dhdy, Ch, dChdx, dChdy, eta, h_link,
     #                  south_node_at_vertical_link,
     #                  dx,
     #                  out=Ch_link)
-
-    map_mean_of_link_nodes_to_link(h,
-                                   tc.wet_pwet_horizontal_links,
-                                   tc.wet_pwet_vertical_links,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=h_link)
-    map_mean_of_link_nodes_to_link(Ch,
-                                   tc.wet_pwet_horizontal_links,
-                                   tc.wet_pwet_vertical_links,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=Ch_link)
 
     # update boundary conditions
     tc.update_boundary_conditions(h=h,
@@ -585,25 +682,20 @@ def find_boundary_links_nodes(tc):
 
 
 def adjust_negative_values(
-        h,
-        Ch,
+        f,
         core,
         east_id,
         west_id,
         north_id,
         south_id,
-        out_h=None,
-        out_Ch=None,
+        out_f=None,
         loop=1000,
 ):
 
-    if out_h is None:
-        out_h = h.copy()
-    if out_Ch is None:
-        out_Ch = Ch.copy()
+    if out_f is None:
+        out_f = f.copy()
 
-    h_temp = h.copy()
-    Ch_temp = Ch.copy()
+    f_temp = f.copy()
 
     # counter = 0
     # to_fix = core[((out_h[core] < 0) | (out_Ch[core] < 0))]
@@ -629,34 +721,20 @@ def adjust_negative_values(
     #     Ch_temp[:] = out_Ch[:]
 
     counter = 0
-    to_fix = core[out_h[core] < 0]
+    to_fix = core[out_f[core] < 0]
     while len(to_fix) > 0 and counter < loop:
-        forester_filter(h_temp,
+        forester_filter(f_temp,
                         to_fix,
                         east_id,
                         west_id,
                         north_id,
                         south_id,
-                        out_f=out_h)
-        to_fix = core[out_h[core] < 0]
-        h_temp[:] = out_h[:]
-
-    counter = 0
-    to_fix = core[out_Ch[core] < 0]
-    while len(to_fix) > 0 and counter < loop:
-        forester_filter(Ch_temp,
-                        to_fix,
-                        east_id,
-                        west_id,
-                        north_id,
-                        south_id,
-                        out_f=out_Ch)
-        to_fix = core[out_Ch[core] < 0]
-        Ch_temp[:] = out_Ch[:]
+                        out_f=out_f)
+        to_fix = core[out_f[core] < 0]
+        f_temp[:] = out_f[:]
 
     if counter == loop:
-        out_h[out_h < 0] = 0
-        out_Ch[out_Ch < 0] = 0
+        out_f[out_f < 0] = 0
         print('Forester filter failed to fix negative values')
 
-    return out_h, out_Ch
+    return out_f

@@ -597,10 +597,26 @@ class TurbidityCurrent2D(Component):
         # Initialize boundary conditions and wet/dry grids
         find_boundary_links_nodes(self)
         find_wet_grids(self)
-        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
-                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
-                   self.eta, self.h_link, self.u_node, self.v_node,
-                   self.Ch_link, self.U, self.U_node)
+        map_values(self,
+                   h=self.h,
+                   dhdx=self.dhdx,
+                   dhdy=self.dhdy,
+                   u=self.u,
+                   dudx=self.dudx,
+                   v=self.v,
+                   dvdy=self.dvdy,
+                   Ch=self.Ch,
+                   dChdx=self.dChdx,
+                   dChdy=self.dChdy,
+                   eta=self.eta,
+                   h_link=self.h_link,
+                   u_node=self.u_node,
+                   v_node=self.v_node,
+                   Ch_link=self.Ch_link,
+                   U=self.U,
+                   U_node=self.U_node,
+                   Cf_link=self.Cf_link,
+                   Cf_node=self.Cf_node)
         self.update_boundary_conditions(h=self.h,
                                         u=self.u,
                                         v=self.v,
@@ -626,10 +642,24 @@ class TurbidityCurrent2D(Component):
 
             # Find wet and partial wet grids
             find_wet_grids(self)
-            map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
-                       self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
-                       self.eta, self.h_link, self.u_node, self.v_node,
-                       self.Ch_link, self.U, self.U_node)
+            map_values(self,
+                       h=self.h,
+                       dhdx=self.dhdx,
+                       dhdy=self.dhdy,
+                       u=self.u,
+                       dudx=self.dudx,
+                       v=self.v,
+                       dvdy=self.dvdy,
+                       Ch=self.Ch,
+                       dChdx=self.dChdx,
+                       dChdy=self.dChdy,
+                       eta=self.eta,
+                       h_link=self.h_link,
+                       u_node=self.u_node,
+                       v_node=self.v_node,
+                       Ch_link=self.Ch_link,
+                       U=self.U,
+                       U_node=self.U_node)
 
             # Process partial wet grids
             self._process_wet_dry_boundary()
@@ -734,15 +764,8 @@ class TurbidityCurrent2D(Component):
                            out_dfdx=self.dKhdx_temp,
                            out_dfdy=self.dKhdy_temp)
 
-        adjust_negative_values(self.h_temp,
-                               self.Ch_temp,
-                               self.wet_pwet_nodes,
-                               self.node_east,
-                               self.node_west,
-                               self.node_north,
-                               self.node_south,
-                               out_h=self.h_temp,
-                               out_Ch=self.Ch_temp)
+        # remove illeagal values
+        self._remove_illeagal_values()
 
         # update gradient terms
         self.update_gradients2()
@@ -750,10 +773,26 @@ class TurbidityCurrent2D(Component):
         # update values after calculating advection terms
         # map node values to links, and link values to nodes.
         self.update_values()
-        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
-                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
-                   self.eta, self.h_link, self.u_node, self.v_node,
-                   self.Ch_link, self.U, self.U_node)
+        map_values(self,
+                   h=self.h,
+                   dhdx=self.dhdx,
+                   dhdy=self.dhdy,
+                   u=self.u,
+                   dudx=self.dudx,
+                   dudy=self.dudy,
+                   v=self.v,
+                   dvdx=self.dvdx,
+                   dvdy=self.dvdy,
+                   Ch=self.Ch,
+                   dChdx=self.dChdx,
+                   dChdy=self.dChdy,
+                   eta=self.eta,
+                   h_link=self.h_link,
+                   u_node=self.u_node,
+                   v_node=self.v_node,
+                   Ch_link=self.Ch_link,
+                   U=self.U,
+                   U_node=self.U_node)
         update_up_down_links_and_nodes(self)
 
     def _nonadvection_phase(self):
@@ -769,10 +808,26 @@ class TurbidityCurrent2D(Component):
 
         # update values
         self.update_values()
-        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
-                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
-                   self.eta, self.h_link, self.u_node, self.v_node,
-                   self.Ch_link, self.U, self.U_node)
+        map_values(self,
+                   h=self.h,
+                   dhdx=self.dhdx,
+                   dhdy=self.dhdy,
+                   u=self.u,
+                   dudx=self.dudx,
+                   dudy=self.dudy,
+                   v=self.v,
+                   dvdx=self.dvdx,
+                   dvdy=self.dvdy,
+                   Ch=self.Ch,
+                   dChdx=self.dChdx,
+                   dChdy=self.dChdy,
+                   eta=self.eta,
+                   h_link=self.h_link,
+                   u_node=self.u_node,
+                   v_node=self.v_node,
+                   Ch_link=self.Ch_link,
+                   U=self.U,
+                   U_node=self.U_node)
         update_up_down_links_and_nodes(self)
 
     def _CCUP(self):
@@ -780,9 +835,16 @@ class TurbidityCurrent2D(Component):
         """
 
         self.copy_values_to_temp()
-        map_nodes_to_links(self, self.h_temp, self.dhdx_temp, self.dhdy_temp,
-                           self.Ch_temp, self.dChdx_temp, self.dChdy_temp,
-                           self.eta_temp, self.h_link_temp, self.Ch_link_temp)
+        map_nodes_to_links(self,
+                           h=self.h_temp,
+                           dhdx=self.dhdx_temp,
+                           dhdy=self.dhdy_temp,
+                           Ch=self.Ch_temp,
+                           dChdx=self.dChdx_temp,
+                           dChdy=self.dChdy_temp,
+                           eta=self.eta_temp,
+                           h_link=self.h_link_temp,
+                           Ch_link=self.Ch_link_temp)
 
         # copy grid ids and other variables
         wet_nodes = self.wet_nodes
@@ -937,15 +999,9 @@ class TurbidityCurrent2D(Component):
                        self.v_temp[south_link_at_node[wet_pwet_nodes]]) / (dy)
         self.h_temp[self.wet_pwet_nodes] /= 1 + self.div[wet_pwet_nodes] * dt
         self.Ch_temp[self.wet_pwet_nodes] /= 1 + self.div[wet_pwet_nodes] * dt
-        adjust_negative_values(self.h_temp,
-                               self.Ch_temp,
-                               self.wet_pwet_nodes,
-                               self.node_east,
-                               self.node_west,
-                               self.node_north,
-                               self.node_south,
-                               out_h=self.h_temp,
-                               out_Ch=self.Ch_temp)
+
+        # remove negative values
+        self._remove_illeagal_values()
 
         # diffusion of momentum
         self.calc_nu_t(self.u_temp,
@@ -976,9 +1032,17 @@ class TurbidityCurrent2D(Component):
         )
 
         # map values
-        map_links_to_nodes(self, self.u_temp, self.dudx_temp, self.v_temp,
-                           self.dvdy_temp, self.u_node_temp, self.v_node_temp,
-                           self.U_temp, self.U_node_temp)
+        map_links_to_nodes(self,
+                           u=self.u_temp,
+                           dudx=self.dudx_temp,
+                           dudy=self.dudy_temp,
+                           v=self.v_temp,
+                           dvdx=self.dvdx_temp,
+                           dvdy=self.dvdy_temp,
+                           u_node=self.u_node_temp,
+                           v_node=self.v_node_temp,
+                           U=self.U_temp,
+                           U_node=self.U_node_temp)
         self.update_boundary_conditions(
             u_node=self.u_node_temp,
             v_node=self.v_node_temp,
@@ -1005,9 +1069,16 @@ class TurbidityCurrent2D(Component):
                 self.eta_temp)[self.active_links]
 
         # map nodes to links
-        map_nodes_to_links(self, self.h_temp, self.dhdx_temp, self.dhdy_temp,
-                           self.Ch_temp, self.dChdx_temp, self.dChdy_temp,
-                           self.eta_temp, self.h_link_temp, self.Ch_link_temp)
+        map_nodes_to_links(self,
+                           h=self.h_temp,
+                           dhdx=self.dhdx_temp,
+                           dhdy=self.dhdy_temp,
+                           Ch=self.Ch_temp,
+                           dChdx=self.dChdx_temp,
+                           dChdy=self.dChdy_temp,
+                           eta=self.eta_temp,
+                           h_link=self.h_link_temp,
+                           Ch_link=self.Ch_link_temp)
 
         # update boundary conditions
         self.update_boundary_conditions(
@@ -1087,6 +1158,33 @@ class TurbidityCurrent2D(Component):
             self.q[north_node[wet_vert]] -
             self.q[south_node[wet_vert]]) / dy * dt
 
+    def _remove_illeagal_values(self):
+        """remove illeagal values from variables that should not be negative
+        """
+
+        adjust_negative_values(self.h_temp,
+                               self.wet_pwet_nodes,
+                               self.node_east,
+                               self.node_west,
+                               self.node_north,
+                               self.node_south,
+                               out_f=self.h_temp)
+        adjust_negative_values(self.Ch_temp,
+                               self.wet_pwet_nodes,
+                               self.node_east,
+                               self.node_west,
+                               self.node_north,
+                               self.node_south,
+                               out_f=self.Ch_temp)
+        if self.model == '4eq':
+            adjust_negative_values(self.Ch_temp,
+                                   self.wet_pwet_nodes,
+                                   self.node_east,
+                                   self.node_west,
+                                   self.node_north,
+                                   self.node_south,
+                                   out_f=self.Ch_temp)
+
     def _process_wet_dry_boundary(self):
         """Calculate processes at wet and dry boundary
         """
@@ -1106,10 +1204,25 @@ class TurbidityCurrent2D(Component):
 
         # update values
         self.update_values()
-        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
-                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
-                   self.eta, self.h_link, self.u_node, self.v_node,
-                   self.Ch_link, self.U, self.U_node)
+        map_values(self,
+                   h=self.h,
+                   dhdx=self.dhdx,
+                   dhdy=self.dhdy,
+                   u=self.u,
+                   dudx=self.dudx,
+                   v=self.v,
+                   dvdx=self.dvdx,
+                   dvdy=self.dvdy,
+                   Ch=self.Ch,
+                   dChdx=self.dChdx,
+                   dChdy=self.dChdy,
+                   eta=self.eta,
+                   h_link=self.h_link,
+                   u_node=self.u_node,
+                   v_node=self.v_node,
+                   Ch_link=self.Ch_link,
+                   U=self.U,
+                   U_node=self.U_node)
 
     def _shock_dissipation_phase(self):
         """Calculate shock dissipation phase of the model
@@ -1132,11 +1245,16 @@ class TurbidityCurrent2D(Component):
         # Reset our field values with the newest flow depth and
         # discharge.
         self.update_values()
-        map_values(self, self.h, self.dhdx, self.dhdy, self.u, self.dudx,
-                   self.v, self.dvdy, self.Ch, self.dChdx, self.dChdy,
-                   self.eta, self.h_link, self.u_node, self.v_node,
-                   self.Ch_link, self.U, self.U_node)
-        update_up_down_links_and_nodes(self)
+        map_values(self,
+                   h=self.h,
+                   dhdx=self.dhdx,
+                   dhdy=self.dhdy,
+                   Ch=self.Ch,
+                   dChdx=self.dChdx,
+                   dChdy=self.dChdy,
+                   eta=self.eta,
+                   h_link=self.h_link,
+                   Ch_link=self.Ch_link)
 
     def update_gradients(self):
         """update gradient terms when main variables were changed
@@ -1320,6 +1438,10 @@ class TurbidityCurrent2D(Component):
         self.eta_temp[:] = self.eta[:]
         self.U_temp[:] = self.U[:]
         self.U_node_temp[:] = self.U_node[:]
+        if self.model == '4eq':
+            self.Kh_temp = self.Kh[:]
+            self.dKhdx_temp = self.dKhdx[:]
+            self.dKhdy_temp = self.dKhdy[:]
 
     def copy_values_to_grid(self):
         """Copy flow parameters to grid
@@ -1350,6 +1472,10 @@ class TurbidityCurrent2D(Component):
             'flow_sediment_volume__horizontal_gradient'] = self.dChdx
         self.grid.at_node[
             'flow_sediment_volume__vertical_gradient'] = self.dChdy
+        if self.model == '4eq':
+            self.grid.at_link['flow__TKE'] = self.Kh
+            self.grid.at_link['flow_TKE__horizontal_gradient'] = self.dKhdx
+            self.grid.at_link['flow_TKE__vertical_gradient'] = self.dKhdy
 
     def update_values(self):
         """Update variables from temporally variables and
@@ -1357,17 +1483,7 @@ class TurbidityCurrent2D(Component):
         """
 
         # adjust illeagal values
-        adjust_negative_values(
-            self.h_temp,
-            self.Ch_temp,
-            self.wet_pwet_nodes,
-            self.node_east,
-            self.node_west,
-            self.node_north,
-            self.node_south,
-            out_h=self.h_temp,
-            out_Ch=self.Ch_temp,
-        )
+        self._remove_illeagal_values()
 
         # copy values from temp to grid values
         self.h[:] = self.h_temp[:]
@@ -1385,17 +1501,24 @@ class TurbidityCurrent2D(Component):
         self.eta[:] = self.eta_temp[:]
         self.U[:] = self.U_temp[:]
         self.U_node[:] = self.U_node_temp[:]
+        if self.model == '4eq':
+            self.Kh[:] = self.Kh_temp[:]
+            self.dKhdx[:] = self.dKhdx_temp[:]
+            self.dKhdy[:] = self.dKhdy_temp[:]
 
         # update boundary conditions
-        self.update_boundary_conditions(h=self.h,
-                                        u=self.u,
-                                        v=self.v,
-                                        Ch=self.Ch,
-                                        h_link=self.h_link,
-                                        Ch_link=self.Ch_link,
-                                        u_node=self.u_node,
-                                        v_node=self.v_node,
-                                        eta=self.eta)
+        self.update_boundary_conditions(
+            h=self.h,
+            u=self.u,
+            v=self.v,
+            Ch=self.Ch,
+            h_link=self.h_link,
+            Ch_link=self.Ch_link,
+            u_node=self.u_node,
+            v_node=self.v_node,
+            eta=self.eta,
+            Kh=self.Kh,
+        )
 
     def calc_nu_t(self, u, v, h_link, out=None):
         """Calculate eddy viscosity for horizontal diffusion of momentum
@@ -1477,6 +1600,7 @@ class TurbidityCurrent2D(Component):
             v_node=None,
             eta=None,
             p=None,
+            Kh=None,
     ):
         """Update boundary conditions
         """
@@ -1511,6 +1635,14 @@ class TurbidityCurrent2D(Component):
                     1. / 3.) * v[self.fixed_value_anchor_links]
             v[self.fixed_value_edge_links] = np.mean(v_node[edge_nodes],
                                                      axis=1)
+
+        if Kh is not None:
+            Kh[self.fixed_grad_links] = Kh[self.fixed_grad_anchor_links]
+            Kh[self.fixed_grad_link_at_north[
+                Kh[self.fixed_grad_link_at_north] < 0]] = 0
+            Kh[self.fixed_grad_link_at_south[
+                Kh[self.fixed_grad_link_at_south] > 0]] = 0
+            Kh[self.fixed_value_links] = Kh[self.fixed_value_anchor_links]
 
         if h_link is not None:
             h_link[self.fixed_grad_links] = h_link[

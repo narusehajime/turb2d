@@ -22,6 +22,7 @@ def create_topography(
         canyon_center=1000,
         canyon_half_width=100,
         canyon='parabola',
+        noise=0.01,
 ):
     """create an artificial topography where a turbidity current flow down
        A slope and a flat basn plain are set in calculation domain, and a 
@@ -64,6 +65,8 @@ def create_topography(
         canyon: String, optional
            Style of the canyon. 'parabola' or 'V' can be chosen.
 
+        random: float, optional
+           Range of random noise to be added on generated topography
 
         Return
         -------------------------
@@ -106,6 +109,11 @@ def create_topography(
     basin_region = grid.at_node['topographic__elevation'] < basin_height
     grid.at_node['topographic__elevation'][basin_region] = basin_height[
         basin_region]
+
+    # add random value on topographic elevation (+- noise)
+    grid.at_node['topographic__elevation'] += 2.0 * noise * (
+        np.random.rand(grid.number_of_nodes) - 0.5)
+
     grid.set_closed_boundaries_at_grid_edges(False, False, False, False)
 
     return grid
