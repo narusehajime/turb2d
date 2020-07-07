@@ -887,16 +887,16 @@ class Jameson():
                                                             axis=0)
 
         # maximum artificial viscosity coefficient at nodes
-        self.eps_node_horiz[:] = 0.1 * self.kappa * np.max([
+        self.eps_node_horiz[:] = 0.01 * self.kappa * np.max([
             self.nu_x_link[self.east_link_at_node],
             self.nu_x_link[self.west_link_at_node]
         ],
-                                                           axis=0)
-        self.eps_node_vert[:] = 0.1 * self.kappa * np.max([
+                                                            axis=0)
+        self.eps_node_vert[:] = 0.01 * self.kappa * np.max([
             self.nu_y_link[self.north_link_at_node],
             self.nu_y_link[self.south_link_at_node]
         ],
-                                                          axis=0)
+                                                           axis=0)
 
     def run(self, f, core, at='node', out=None):
         """ run one step of the Jameson filter
