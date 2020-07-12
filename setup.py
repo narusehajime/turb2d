@@ -18,7 +18,7 @@ with open('LICENSE') as f:
 
 setup(
     name='turb2d',
-    version='0.1.0',
+    version='0.2.0',
     description='2D shallow water model for turbidity currents',
     long_description=readme,
     author='Hajime Naruse',
@@ -28,7 +28,7 @@ setup(
     install_requires=[
         'numpy',
         'scipy',
-        'landlab',
+        'landlab==2.0.0b6',
         'matplotlib',
         'gdal',
         'tqdm',  # 'cython'
