@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import numpy as np
-# from Cython.Build import cythonize
+from Cython.Build import cythonize
 from setuptools import setup, Extension, find_packages
 
 with open('README.rst') as f:
@@ -15,6 +15,10 @@ with open('LICENSE') as f:
 # ext2 = Extension("gridutils",
 #                  sources=["turb2d/gridutils.pyx"],
 #                  include_dirs=[np.get_include()])
+ext_neighbors_at_link = Extension("_neighbors_at_link",
+                 sources=["turb2d/_neighbors_at_link.pyx"],
+                 include_dirs=[np.get_include()])
+
 
 setup(
     name='turb2d',
@@ -26,13 +30,16 @@ setup(
     url='https://github.com/narusehajime/turb2d.git',
     license=license,
     install_requires=[
+        'cython',
         'numpy',
         'scipy',
-        'landlab==2.0.0b6',
+        'landlab==2.3.0',
         'matplotlib',
         'gdal',
-        'tqdm',  # 'cython'
+        'tqdm',
     ],
     # ext_modules=cythonize([ext, ext2]),
     # ext_modules=cythonize([ext]),
-    packages=find_packages(exclude=('tests', 'docs')))
+    ext_modules=cythonize([ext_neighbors_at_link]),
+    packages=find_packages(exclude=('tests', 'docs'))
+    )

@@ -8,7 +8,7 @@ from .cip import update_gradient, update_gradient2
 from .cip import CIP2D, Jameson, SOR
 from landlab.io.native_landlab import save_grid
 from landlab.io.netcdf import write_netcdf
-from landlab.grid.structured_quad import links
+from . import _links as links
 from landlab import Component, FieldError, RasterModelGrid
 import numpy as np
 import time
@@ -55,6 +55,8 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation',
         'bed__thickness',
         'flow__surface_elevation',
+        'bed_active_layer__fraction_grain_class',
+        'bed_sediment_volume_per_area',
     )
 
     _output_var_names = (
@@ -66,6 +68,8 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation',
         'bed__thickness',
         'flow__surface_elevation',
+        'bed_active_layer__fraction_grain_class',
+        'bed_sediment_volume_per_area',
     )
 
     _var_units = {
@@ -77,6 +81,8 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation': 'm',
         'bed__thickness': 'm',
         'flow__surface_elevation': 'm',
+        'bed_active_layer_fraction_grain_class': '1',
+        'bed_sediment_volume_per_area': 'm',
     }
 
     _var_mapping = {
@@ -88,6 +94,9 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation': 'node',
         'bed__thickness': 'node',
         'flow__surface_elevation': 'node',
+        'bed_active_layer_fraction_grain_class': 'node',
+        'bed_sediment_volume_per_area': 'node',
+
     }
 
     _var_doc = {
@@ -101,6 +110,9 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation': 'The land surface elevation.',
         'bed__thickness': 'The bed thickness',
         'flow__surface_elevation': 'Elevation of flow surface',
+        'bed_active_layer_fraction_grain_class': 'Fraction of each grain size class in active layer',
+        'bed_sediment_volume_per_area': 'Sediment volume per unit area of each grain size class',
+
     }
 
     def __init__(self,

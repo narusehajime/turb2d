@@ -1,7 +1,7 @@
 """Utility functions for landlab grids
 """
 import numpy as np
-from landlab.grid.structured_quad import links
+from . import _links as links
 from .cip import cubic_interp_1d, rcubic_interp_1d, forester_filter, update_gradient
 
 

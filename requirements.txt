@@ -4,9 +4,10 @@
 #
 #    pip-compile --output-file requirements.txt requirements.in
 #
-landlab>=1.5.2
+cython
+landlab=2.0.0b6
 matplotlib
-numpy>=1.15.1
-gdal
+numpy
+gdal=2.3.3
 scipy
 tqdm
