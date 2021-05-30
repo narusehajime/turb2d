@@ -1654,10 +1654,9 @@ class TurbidityCurrent2D(Component):
 
         # if erosion is forbidden, out_Ch_i is modified
         if self.no_erosion is True:
-            eroded_region = self.bed_change_i[:, nodes] < 0.0
-            out_Ch_i[:, nodes][eroded_region] = self.Ch_i_prev[:,
-                                                               nodes][eroded_region]
-            self.bed_change_i[:, nodes][eroded_region] = 0.0
+            eroded_region = self.bed_change_i < 0.0
+            out_Ch_i[eroded_region] = self.Ch_i_prev[eroded_region]
+            self.bed_change_i[eroded_region] = 0.0
 
         # Time development of active layer
         self.bed_active_layer[:, nodes] += 1 / self.la * (
