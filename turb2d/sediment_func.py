@@ -129,7 +129,7 @@ def _gp1991(R, g, Ds, nu, u_star, p=1.0, out=None):
     """
 
     if out is None:
-        out = np.zeros(u_star.shape)
+        out = np.zeros([len(Ds), u_star.shape])
 
     # basic parameters
     ws = get_ws(R, g, Ds, nu)

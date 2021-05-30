@@ -56,7 +56,7 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation',
         'bed__thickness',
         'flow__surface_elevation',
-        'bed__active_layer_fraction_gclass_i',
+        'bed__active_layer_fraction_i',
         'bed__sediment_volume_per_unit_area_i',
     )
 
@@ -70,7 +70,7 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation',
         'bed__thickness',
         'flow__surface_elevation',
-        'bed__active_layer__fraction_gclass_i',
+        'bed__active_layer_fraction_i',
         'bed__sediment_volume_per_unit_area_i',
     )
 
@@ -84,7 +84,7 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation': 'm',
         'bed__thickness': 'm',
         'flow__surface_elevation': 'm',
-        'bed__active_layer_fraction_gclass_i': '1',
+        'bed__active_layer_fraction_i': '1',
         'bed__sediment_volume_per_unit_area_i': 'm',
     }
 
@@ -98,7 +98,7 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation': 'node',
         'bed__thickness': 'node',
         'flow__surface_elevation': 'node',
-        'bed__active_layer_fraction_gclass_i': 'node',
+        'bed__active_layer_fraction_i': 'node',
         'bed__sediment_volume_per_unit_area_i': 'node',
     }
 
@@ -115,7 +115,7 @@ class TurbidityCurrent2D(Component):
         'topographic__elevation': 'The land surface elevation.',
         'bed__thickness': 'The bed thickness',
         'flow__surface_elevation': 'Elevation of flow surface',
-        'bed__active_layer_fraction_gclass_i': 'Fraction of '
+        'bed__active_layer_fraction_i': 'Fraction of '
             'the ith grain size class in active layer',
         'bed__sediment_volume_per_unit_area_i': 'Sediment volume per'
             ' unit area of the ith grain size class',
@@ -140,9 +140,11 @@ class TurbidityCurrent2D(Component):
                  implicit_threshold=1.0 * 10**-15,
                  C_init=0.0,
                  gamma=0.35,
+                 la=0.2,
                  water_entrainment=True,
                  suspension=True,
                  sed_entrainment_func='GP1991field',
+                 no_erosion=True,
                  model='3eq',
                  **kwds):
         """Create a component of turbidity current 
@@ -188,6 +190,8 @@ class TurbidityCurrent2D(Component):
             Minimum value of sediment concentration.
         gamma: float, optional
             Coefficient for calculating velocity of flow front 
+        la: float, optional
+            Thickness of active layer on the bed
         suspension: boolean, optional
             turn on the function for entrainment/settling of suspension
         water_entrainment: boolean, optional
@@ -195,6 +199,8 @@ class TurbidityCurrent2D(Component):
         sed_entrainment_func: string, optional
             Choose the function to be used for sediment entrainment. Default
             is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'
+        no_erosion: boolean, optional
+            If True, bed cannot be eroded
         model: string, optional
             Choose "3eq" or "4eq" for three or four equation models of Parker
             (1986)
@@ -226,11 +232,13 @@ class TurbidityCurrent2D(Component):
         self.implicit_threshold = implicit_threshold
         self.C_init = C_init
         self.gamma = gamma
+        self.la = la
         self.water_entrainment = water_entrainment
         self.suspension = suspension
         self.sed_entrainment_func = sed_entrainment_func
         self.model = model
         self.karman = 0.4
+        self.no_erosion = no_erosion
 
         # Now setting up fields at nodes and links
         try:
@@ -257,7 +265,7 @@ class TurbidityCurrent2D(Component):
 
         try:
             self.bed_thick_i = np.empty(
-                [self.number_gclass, grid.number_of_nodes])
+                [self.number_gclass, grid.number_of_nodes], dtype=float)
             for i in range(self.number_gclass):
                 self.bed_thick_i[i, :] = grid.add_zeros(
                     'bed__sediment_volume_per_unit_area_' + str(i),
@@ -267,6 +275,17 @@ class TurbidityCurrent2D(Component):
         except FieldError:
             for i in range(self.number_gclass):
                 self.bed_thick_i[i, :] = grid.at_node['bed__sediment_volume_per_unit_area_' + str(
+                    i)]
+
+        try:
+            self.bed_active_layer = np.empty(
+                [self.number_gclass, grid.number_of_nodes], dtype=float)
+            for i in range(self.number_gclass):
+                self.bed_active_layer[i, :] = grid.add_ones('bed__active_layer_fraction_' + str(
+                    i), at='node', units=self._var_units['bed__active_layer_fraction_i']) / self.number_gclass
+        except FieldError:
+            for i in range(self.number_gclass):
+                self.bed_active_layer[i, :] = grid.at_node['bed__active_layer_fraction_' + str(
                     i)]
 
         try:
@@ -497,6 +516,7 @@ class TurbidityCurrent2D(Component):
         self.bed_thick_i_temp = self.bed_thick_i.copy()
         self.S = grid.calc_grad_at_link(self.eta)
         self.bed_change_i = np.empty_like(self.bed_thick_i)
+        self.es = np.empty_like(self.bed_thick_i)
 
         # length of flow velocity vector
         self.U_temp = self.U.copy()
@@ -1315,13 +1335,13 @@ class TurbidityCurrent2D(Component):
                                    out_f=self.Ch_i_temp[i, :])
 
         if self.model == '4eq':
-            adjust_negative_values(self.Ch_temp,
+            adjust_negative_values(self.Kh_temp,
                                    self.wet_pwet_nodes,
                                    self.node_east,
                                    self.node_west,
                                    self.node_north,
                                    self.node_south,
-                                   out_f=self.Ch_temp)
+                                   out_f=self.Kh_temp)
 
     def _process_wet_dry_boundary(self):
         """Calculate processes at wet and dry boundary
@@ -1598,24 +1618,57 @@ class TurbidityCurrent2D(Component):
             out_eta = np.empty_like(eta)
         if out_bed_thick_i is None:
             out_bed_thick_i = np.empty_like(bed_thick_i)
-        nodes = self.wet_nodes
 
-        self.Ch_i_prev[:, nodes] = Ch_i[:, nodes]
+        nodes = self.wet_nodes
         dt = self.dt_local
         ws = self.ws
         r0 = self.r0
-        u_star = np.sqrt(self.Cf_node[nodes] * U_node[nodes] * U_node[nodes])
-        es = get_es(self.R,
-                    self.g,
-                    self.Ds,
-                    self.nu,
-                    u_star,
-                    function=self.sed_entrainment_func)
 
-        out_Ch_i[:, nodes] = (Ch_i[:, nodes] + ws * es * dt)
+        # copy previous values of Ch
+        self.Ch_i_prev[:, nodes] = Ch_i[:, nodes]
+
+        # Calculate shear velocity (this should be changed for 4 eq model)
+        u_star = np.sqrt(self.Cf_node[nodes] * U_node[nodes] * U_node[nodes])
+
+        # Calculate entrainment rate
+        self.es[:, nodes] = get_es(self.R,
+                                   self.g,
+                                   self.Ds,
+                                   self.nu,
+                                   u_star,
+                                   function=self.sed_entrainment_func,
+                                   )
+        self.es[:, ~nodes] = 0.0
+
+        # Calculate the change of volume of suspended sediment
+        # Settling is solved explicitly, and entrainment is
+        # solved semi-implicitly
+        out_Ch_i[:, nodes] = (
+            Ch_i[:, nodes] + ws * self.bed_active_layer[:, nodes] * self.es[:, nodes] * dt)
         out_Ch_i[:, nodes] /= (1 + ws * r0 / h[nodes] * dt)
+
+        # Obtain sedimentation rate
         self.bed_change_i[:, nodes] = self.Ch_i_prev[:,
                                                      nodes] - out_Ch_i[:, nodes]
+        self.bed_change_i[:, ~nodes] = 0.0
+
+        # if erosion is forbidden, out_Ch_i is modified
+        if self.no_erosion is True:
+            eroded_region = self.bed_change_i[:, nodes] < 0.0
+            out_Ch_i[:, nodes][eroded_region] = self.Ch_i_prev[:,
+                                                               nodes][eroded_region]
+            self.bed_change_i[:, nodes][eroded_region] = 0.0
+
+        # Time development of active layer
+        self.bed_active_layer[:, nodes] += 1 / self.la * (
+            self.bed_change_i[:, nodes] - self.bed_active_layer[:, nodes]
+            * np.sum(self.bed_change_i[:, nodes], axis=0))
+        self.bed_active_layer[:,
+                              nodes][self.bed_active_layer[:, nodes] < 0.0] = 0.0
+        self.bed_active_layer[:,
+                              nodes] /= np.sum(self.bed_active_layer[:, nodes], axis=0)
+
+        # Calculate deposition
         out_bed_thick_i[:, nodes] = bed_thick_i[:,
                                                 nodes] + self.bed_change_i[:, nodes]
         out_eta[nodes] = eta[nodes] + \
@@ -1672,6 +1725,8 @@ class TurbidityCurrent2D(Component):
                 'flow_sediment_volume__vertical_gradient_' + str(i)] = self.dChdy_i[i, :]
             self.grid.at_node['bed__sediment_volume_per_unit_area_' +
                               str(i)] = self.bed_thick_i[i, :]
+            self.grid.at_node['bed__active_layer_fraction_' +
+                              str(i)] = self.bed_active_layer[i, :]
         self.C[:] = np.sum(self.C_i, axis=0)
         self.grid.at_node['flow__sediment_concentration_total'] = self.C
         self.grid.at_node['topographic__elevation'] = self.eta
@@ -1717,7 +1772,7 @@ class TurbidityCurrent2D(Component):
         self.dChdy_i[:, :] = self.dChdy_i_temp[:, :]
         self.Ch_temp[:] = np.sum(self.Ch_i, axis=0)
         self.Ch[:] = self.Ch_temp[:]
-        self.bed_thick_i[:, :] = self.bed_thick_i[:, :]
+        self.bed_thick_i[:, :] = self.bed_thick_i_temp[:, :]
         self.eta[:] = self.eta_temp[:]
         self.U[:] = self.U_temp[:]
         self.U_node[:] = self.U_node_temp[:]
