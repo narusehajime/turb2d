@@ -115,13 +115,15 @@ def map_values(
         v=None,
         dvdx=None,
         dvdy=None,
+        Ch_i=None,
+        dChdx_i=None,
+        dChdy_i=None,
         Ch=None,
-        dChdx=None,
-        dChdy=None,
         eta=None,
         h_link=None,
         u_node=None,
         v_node=None,
+        Ch_link_i=None,
         Ch_link=None,
         U=None,
         U_node=None,
@@ -151,11 +153,13 @@ def map_values(
                        h=h,
                        dhdx=dhdx,
                        dhdy=dhdy,
+                       Ch_i=Ch_i,
+                       dChdx_i=dChdx_i,
+                       dChdy_i=dChdy_i,
                        Ch=Ch,
-                       dChdx=dChdx,
-                       dChdy=dChdy,
                        eta=eta,
                        h_link=h_link,
+                       Ch_link_i=Ch_link_i,
                        Ch_link=Ch_link)
 
 
@@ -197,15 +201,24 @@ def map_links_to_nodes(
     west_link_at_node = tc.west_link_at_node[wet_pwet_nodes]
 
     # set velocity zero at dry links and nodes
-    if u is not None: u[dry_links] = 0
-    if v is not None: v[dry_links] = 0
-    if u_node is not None: u_node[dry_nodes] = 0
-    if v_node is not None: v_node[dry_nodes] = 0
-    if dudx is not None: dudx[dry_links] = 0
-    if dudy is not None: dvdy[dry_links] = 0
-    if dvdx is not None: dudx[dry_links] = 0
-    if dvdy is not None: dvdy[dry_links] = 0
-    if Kh is not None: Kh[dry_links] = 0
+    if u is not None:
+        u[dry_links] = 0
+    if v is not None:
+        v[dry_links] = 0
+    if u_node is not None:
+        u_node[dry_nodes] = 0
+    if v_node is not None:
+        v_node[dry_nodes] = 0
+    if dudx is not None:
+        dudx[dry_links] = 0
+    if dudy is not None:
+        dvdy[dry_links] = 0
+    if dvdx is not None:
+        dudx[dry_links] = 0
+    if dvdy is not None:
+        dvdy[dry_links] = 0
+    if Kh is not None:
+        Kh[dry_links] = 0
 
     # Map values of horizontal links to vertical links, and
     # values of vertical links to horizontal links.
@@ -318,11 +331,13 @@ def map_nodes_to_links(tc,
                        h=None,
                        dhdx=None,
                        dhdy=None,
+                       Ch_i=None,
+                       dChdx_i=None,
+                       dChdy_i=None,
                        Ch=None,
-                       dChdx=None,
-                       dChdy=None,
                        eta=None,
                        h_link=None,
+                       Ch_link_i=None,
                        Ch_link=None):
     """map parameters at nodes to links
     """
@@ -338,7 +353,7 @@ def map_nodes_to_links(tc,
     dx = tc.grid.dx
 
     if (h is not None) and (h_link is not None):
-        # remove illeagal values
+        # remove negative values
         adjust_negative_values(
             h,
             tc.wet_pwet_nodes,
@@ -358,31 +373,42 @@ def map_nodes_to_links(tc,
                                        west_node_at_horizontal_link,
                                        out=h_link)
 
-    if (Ch is not None) and (Ch_link is not None):
-        # remove illeagal values
-        adjust_negative_values(
-            Ch,
-            tc.wet_pwet_nodes,
-            tc.node_east,
-            tc.node_west,
-            tc.node_north,
-            tc.node_south,
-            out_f=Ch,
-        )
-        Ch[tc.dry_nodes] = tc.h_init * tc.C_init
-        map_mean_of_link_nodes_to_link(Ch,
-                                       tc.wet_pwet_horizontal_links,
-                                       tc.wet_pwet_vertical_links,
-                                       north_node_at_vertical_link,
-                                       south_node_at_vertical_link,
-                                       east_node_at_horizontal_link,
-                                       west_node_at_horizontal_link,
-                                       out=Ch_link)
+    if (Ch_i is not None) and (Ch_link_i is not None):
+        # remove negative values
+        for i in range(Ch_i.shape[0]):
+            adjust_negative_values(
+                Ch_i[i, :],
+                tc.wet_pwet_nodes,
+                tc.node_east,
+                tc.node_west,
+                tc.node_north,
+                tc.node_south,
+                out_f=Ch_i[i, :],
+            )
+            Ch_i[:, tc.dry_nodes] = tc.h_init * tc.C_init
+            map_mean_of_link_nodes_to_link(Ch_i[i, :],
+                                           tc.wet_pwet_horizontal_links,
+                                           tc.wet_pwet_vertical_links,
+                                           north_node_at_vertical_link,
+                                           south_node_at_vertical_link,
+                                           east_node_at_horizontal_link,
+                                           west_node_at_horizontal_link,
+                                           out=Ch_link_i[i, :])
+    if (Ch_link is not None):
+        Ch_link = np.sum(Ch_link_i, axis=0)
 
-    if dhdx is not None: dhdx[tc.dry_nodes] = 0
-    if dhdy is not None: dhdy[tc.dry_nodes] = 0
-    if dChdx is not None: dChdx[tc.dry_nodes] = 0
-    if dChdy is not None: dChdy[tc.dry_nodes] = 0
+    if dhdx is not None:
+        dhdx[tc.dry_nodes] = 0
+    if dhdy is not None:
+        dhdy[tc.dry_nodes] = 0
+    if Ch_i is not None:
+        Ch_i[:, tc.dry_nodes] = 0
+    if dChdx_i is not None:
+        dChdx_i[:, tc.dry_nodes] = 0
+    if dChdy_i is not None:
+        dChdy_i[:, tc.dry_nodes] = 0
+    if Ch is not None:
+        Ch[tc.dry_nodes] = 0
 
     # map node values (h, C, eta) to links
     # rcubic_interp_1d(h,
@@ -415,12 +441,12 @@ def map_nodes_to_links(tc,
     #                  out=Ch_link)
 
     # update boundary conditions
-    if (h is not None) and (Ch is not None) and (h_link is not None) and (
-            Ch_link is not None) and (eta is not None):
+    if (h is not None) and (Ch_i is not None) and (h_link is not None) and (
+            Ch_link_i is not None) and (eta is not None):
         tc.update_boundary_conditions(h=h,
-                                      Ch=Ch,
+                                      Ch_i=Ch_i,
                                       h_link=h_link,
-                                      Ch_link=Ch_link,
+                                      Ch_link_i=Ch_link_i,
                                       eta=eta)
 
 
@@ -464,7 +490,7 @@ def find_horizontal_up_down_nodes(tc, u, out_up=None, out_down=None):
 
 
 def find_vertical_up_down_nodes(tc, u, out_up=None, out_down=None):
-    """Find indeces of nodes that locate
+    """Find indices of nodes that locate
        at vertically upcurrent and downcurrent directions
     """
 
@@ -483,7 +509,7 @@ def find_vertical_up_down_nodes(tc, u, out_up=None, out_down=None):
 
 
 def find_horizontal_up_down_links(tc, u, out_up=None, out_down=None):
-    """Find indeces of nodes that locate
+    """Find indices of nodes that locate
        at horizontally upcurrent and downcurrent directions
     """
     if out_up is None:

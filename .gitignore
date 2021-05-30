@@ -1,0 +1,8 @@
+
+build/
+
+dist/
+
+turb2d.egg-info/
+
+*.nc

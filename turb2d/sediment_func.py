@@ -5,7 +5,7 @@ Empirical functions for calculating models of sediment dynamics
 
 
 def get_ew(U, Ch, R, g, umin=0.01, out=None):
-    """ calculate entrainemnt coefficient of ambient water to a turbidity
+    """ calculate entrainment coefficient of ambient water to a turbidity
         current layer
 
         Parameters
@@ -13,14 +13,14 @@ def get_ew(U, Ch, R, g, umin=0.01, out=None):
         U : ndarray, float
            Flow velocities of a turbidity current.
         Ch : ndarray, float
-           Flow height times sediment concentration of a turbidity current. 
+           Flow height times sediment concentration of a turbidity current.
         R : float
            Submerged specific density of sediment
         g : float
            gravity acceleration
         umin: float
            minimum threshold value of velocity to calculate water entrainment
-    
+
         out : ndarray
            Outputs
 
@@ -62,7 +62,7 @@ def get_ws(R, g, Ds, nu):
 
 def get_es(R, g, Ds, nu, u_star, function='GP1991field', out=None):
     """ Calculate entrainment rate of basal sediment to suspension using
-        empirical functions proposed by Garcia and Parker (1991), 
+        empirical functions proposed by Garcia and Parker (1991),
         van Rijn (1984), or Dorrell (2018)
 
         Parameters
@@ -78,7 +78,7 @@ def get_es(R, g, Ds, nu, u_star, function='GP1991field', out=None):
         u_star : ndarray
             flow shear velocity
         function : string, optional
-            Name of emprical function to be used. 
+            Name of emprical function to be used.
 
             'GP1991exp' is a function of Garcia and Parker (1991)
              in original form. This is suitable for experimental scale.
@@ -86,7 +86,7 @@ def get_es(R, g, Ds, nu, u_star, function='GP1991field', out=None):
             'GP1991field' is Garcia and Parker (1991)'s function with
             a coefficient (0.1) to limit the entrainment rate. This is suitable
             for the natural scale.
-        
+
         out : ndarray
             Outputs (entrainment rate of basal sediment)
 
@@ -96,11 +96,11 @@ def get_es(R, g, Ds, nu, u_star, function='GP1991field', out=None):
             dimensionless entrainment rate of basal sediment into
             suspension
 
-    
+
 
     """
     if out is None:
-        out = np.zeros(u_star.shape)
+        out = np.zeros([len(Ds), len(u_star)])
 
     if function == 'GP1991field':
         _gp1991(R, g, Ds, nu, u_star, p=0.1, out=out)
@@ -142,8 +142,8 @@ def _gp1991(R, g, Ds, nu, u_star, p=1.0, out=None):
     a = 7.8 * 10**-7
     alpha = 0.6
 
-    # calculate entrainemnt rate
+    # calculate entrainment rate
     Z = sus_index * Rp**alpha
-    out[:] = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
+    out[:, :] = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
 
     return out
