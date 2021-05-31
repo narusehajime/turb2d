@@ -35,7 +35,7 @@ setup(
         "cython",
         "numpy",
         "scipy",
-        "landlab==2.3.0",
+        "landlab==2.2.0",
         "matplotlib",
         "gdal==3.2",
         "tqdm",

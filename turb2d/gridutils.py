@@ -1,6 +1,7 @@
 """Utility functions for landlab grids
 """
 import numpy as np
+
 from . import _links as links
 from .cip import cubic_interp_1d, rcubic_interp_1d, forester_filter, update_gradient
 
@@ -23,7 +24,8 @@ def set_up_neighbor_arrays(tc):
     # Find the neighbor links
     tc.active_links = tc.grid.active_links
     neighbor_links = links.neighbors_at_link(
-        tc.grid.shape, np.arange(tc.grid.number_of_links)).copy()
+        tc.grid.shape, np.arange(tc.grid.number_of_links)
+    ).copy()
     tc.link_east = neighbor_links[:, 0]
     tc.link_north = neighbor_links[:, 1]
     # This is to fix a bug in links.neighbors_at_link
@@ -37,13 +39,17 @@ def set_up_neighbor_arrays(tc):
     tc.west_link_at_node = tc.grid.links_at_node[:, 2].copy()
     tc.south_link_at_node = tc.grid.links_at_node[:, 3].copy()
     tc.east_link_at_node[tc.east_link_at_node == -1] = tc.west_link_at_node[
-        tc.east_link_at_node == -1]
+        tc.east_link_at_node == -1
+    ]
     tc.west_link_at_node[tc.west_link_at_node == -1] = tc.east_link_at_node[
-        tc.west_link_at_node == -1]
+        tc.west_link_at_node == -1
+    ]
     tc.north_link_at_node[tc.north_link_at_node == -1] = tc.south_link_at_node[
-        tc.north_link_at_node == -1]
+        tc.north_link_at_node == -1
+    ]
     tc.south_link_at_node[tc.south_link_at_node == -1] = tc.north_link_at_node[
-        tc.south_link_at_node == -1]
+        tc.south_link_at_node == -1
+    ]
     tc.west_node_at_horizontal_link = tc.grid.nodes_at_link[:, 0].copy()
     tc.east_node_at_horizontal_link = tc.grid.nodes_at_link[:, 1].copy()
     tc.south_node_at_vertical_link = tc.grid.nodes_at_link[:, 0].copy()
@@ -57,22 +63,14 @@ def set_up_neighbor_arrays(tc):
 
     # Find obliquely neighbor vertical links from horizontal links
     # and obliquely neighbor horizontal links from vertical links
-    tc.vertical_link_NE = tc.north_link_at_node[
-        tc.east_node_at_horizontal_link]
-    tc.vertical_link_SE = tc.south_link_at_node[
-        tc.east_node_at_horizontal_link]
-    tc.vertical_link_NW = tc.north_link_at_node[
-        tc.west_node_at_horizontal_link]
-    tc.vertical_link_SW = tc.south_link_at_node[
-        tc.west_node_at_horizontal_link]
-    tc.horizontal_link_NE = tc.east_link_at_node[
-        tc.north_node_at_vertical_link]
-    tc.horizontal_link_SE = tc.east_link_at_node[
-        tc.south_node_at_vertical_link]
-    tc.horizontal_link_NW = tc.west_link_at_node[
-        tc.north_node_at_vertical_link]
-    tc.horizontal_link_SW = tc.west_link_at_node[
-        tc.south_node_at_vertical_link]
+    tc.vertical_link_NE = tc.north_link_at_node[tc.east_node_at_horizontal_link]
+    tc.vertical_link_SE = tc.south_link_at_node[tc.east_node_at_horizontal_link]
+    tc.vertical_link_NW = tc.north_link_at_node[tc.west_node_at_horizontal_link]
+    tc.vertical_link_SW = tc.south_link_at_node[tc.west_node_at_horizontal_link]
+    tc.horizontal_link_NE = tc.east_link_at_node[tc.north_node_at_vertical_link]
+    tc.horizontal_link_SE = tc.east_link_at_node[tc.south_node_at_vertical_link]
+    tc.horizontal_link_NW = tc.west_link_at_node[tc.north_node_at_vertical_link]
+    tc.horizontal_link_SW = tc.west_link_at_node[tc.south_node_at_vertical_link]
 
     # Once the neighbor arrays are set up, we change the flag to True!
     tc.neighbor_flag = True
@@ -83,53 +81,49 @@ def update_up_down_links_and_nodes(tc):
        nodes and links
     """
 
-    find_horizontal_up_down_nodes(tc,
-                                  tc.u_node,
-                                  out_up=tc.horizontal_up_nodes,
-                                  out_down=tc.horizontal_down_nodes)
+    find_horizontal_up_down_nodes(
+        tc, tc.u_node, out_up=tc.horizontal_up_nodes, out_down=tc.horizontal_down_nodes
+    )
 
-    find_vertical_up_down_nodes(tc,
-                                tc.v_node,
-                                out_up=tc.vertical_up_nodes,
-                                out_down=tc.vertical_down_nodes)
+    find_vertical_up_down_nodes(
+        tc, tc.v_node, out_up=tc.vertical_up_nodes, out_down=tc.vertical_down_nodes
+    )
 
-    find_horizontal_up_down_links(tc,
-                                  tc.u,
-                                  out_up=tc.horizontal_up_links,
-                                  out_down=tc.horizontal_down_links)
+    find_horizontal_up_down_links(
+        tc, tc.u, out_up=tc.horizontal_up_links, out_down=tc.horizontal_down_links
+    )
 
-    find_vertical_up_down_links(tc,
-                                tc.v,
-                                out_up=tc.vertical_up_links,
-                                out_down=tc.vertical_down_links)
+    find_vertical_up_down_links(
+        tc, tc.v, out_up=tc.vertical_up_links, out_down=tc.vertical_down_links
+    )
 
 
 def map_values(
-        tc,
-        h=None,
-        dhdx=None,
-        dhdy=None,
-        u=None,
-        dudx=None,
-        dudy=None,
-        v=None,
-        dvdx=None,
-        dvdy=None,
-        Ch_i=None,
-        dChdx_i=None,
-        dChdy_i=None,
-        Ch=None,
-        eta=None,
-        h_link=None,
-        u_node=None,
-        v_node=None,
-        Ch_link_i=None,
-        Ch_link=None,
-        U=None,
-        U_node=None,
-        Kh=None,
-        Cf_link=None,
-        Cf_node=None,
+    tc,
+    h=None,
+    dhdx=None,
+    dhdy=None,
+    u=None,
+    dudx=None,
+    dudy=None,
+    v=None,
+    dvdx=None,
+    dvdy=None,
+    Ch_i=None,
+    dChdx_i=None,
+    dChdy_i=None,
+    Ch=None,
+    eta=None,
+    h_link=None,
+    u_node=None,
+    v_node=None,
+    Ch_link_i=None,
+    Ch_link=None,
+    U=None,
+    U_node=None,
+    Kh=None,
+    Cf_link=None,
+    Cf_node=None,
 ):
     """map parameters at nodes to links, and those at links to nodes
     """
@@ -149,35 +143,37 @@ def map_values(
         Cf_node=Cf_node,
         Kh=Kh,
     )
-    map_nodes_to_links(tc,
-                       h=h,
-                       dhdx=dhdx,
-                       dhdy=dhdy,
-                       Ch_i=Ch_i,
-                       dChdx_i=dChdx_i,
-                       dChdy_i=dChdy_i,
-                       Ch=Ch,
-                       eta=eta,
-                       h_link=h_link,
-                       Ch_link_i=Ch_link_i,
-                       Ch_link=Ch_link)
+    map_nodes_to_links(
+        tc,
+        h=h,
+        dhdx=dhdx,
+        dhdy=dhdy,
+        Ch_i=Ch_i,
+        dChdx_i=dChdx_i,
+        dChdy_i=dChdy_i,
+        Ch=Ch,
+        eta=eta,
+        h_link=h_link,
+        Ch_link_i=Ch_link_i,
+        Ch_link=Ch_link,
+    )
 
 
 def map_links_to_nodes(
-        tc,
-        u=None,
-        dudx=None,
-        dudy=None,
-        v=None,
-        dvdx=None,
-        dvdy=None,
-        Cf_link=None,
-        u_node=None,
-        v_node=None,
-        U=None,
-        U_node=None,
-        Cf_node=None,
-        Kh=None,
+    tc,
+    u=None,
+    dudx=None,
+    dudy=None,
+    v=None,
+    dvdx=None,
+    dvdy=None,
+    Cf_link=None,
+    u_node=None,
+    v_node=None,
+    U=None,
+    U_node=None,
+    Cf_node=None,
+    Kh=None,
 ):
     """map parameters at links to nodes
     """
@@ -227,17 +223,22 @@ def map_links_to_nodes(
     # CIP procedures. Therefore we need to map those values each other.
     if u is not None:
         u[wet_pwet_vertical_links] = (
-            u[horizontal_link_NE] + u[horizontal_link_NW] +
-            u[horizontal_link_SE] + u[horizontal_link_SW]) / 4.0
+            u[horizontal_link_NE]
+            + u[horizontal_link_NW]
+            + u[horizontal_link_SE]
+            + u[horizontal_link_SW]
+        ) / 4.0
     if v is not None:
         v[wet_pwet_horizontal_links] = (
-            v[vertical_link_NE] + v[vertical_link_NW] + v[vertical_link_SE] +
-            v[vertical_link_SW]) / 4.0
+            v[vertical_link_NE]
+            + v[vertical_link_NW]
+            + v[vertical_link_SE]
+            + v[vertical_link_SW]
+        ) / 4.0
 
     # Calculate composite velocity at links
     if (U is not None) and (u is not None) and (v is not None):
-        U[wet_pwet_links] = np.sqrt(u[wet_pwet_links]**2 +
-                                    v[wet_pwet_links]**2)
+        U[wet_pwet_links] = np.sqrt(u[wet_pwet_links] ** 2 + v[wet_pwet_links] ** 2)
 
     # map link values (u, v) to nodes
     # cubic_interp_1d(u,
@@ -255,101 +256,120 @@ def map_links_to_nodes(
     #                 dx,
     #                 out=v_node)
     if (u is not None) and (u_node is not None):
-        map_mean_of_links_to_node(u,
-                                  wet_pwet_nodes,
-                                  north_link_at_node,
-                                  south_link_at_node,
-                                  east_link_at_node,
-                                  west_link_at_node,
-                                  out=u_node)
+        map_mean_of_links_to_node(
+            u,
+            wet_pwet_nodes,
+            north_link_at_node,
+            south_link_at_node,
+            east_link_at_node,
+            west_link_at_node,
+            out=u_node,
+        )
     if (v is not None) and (v_node is not None):
-        map_mean_of_links_to_node(v,
-                                  wet_pwet_nodes,
-                                  north_link_at_node,
-                                  south_link_at_node,
-                                  east_link_at_node,
-                                  west_link_at_node,
-                                  out=v_node)
+        map_mean_of_links_to_node(
+            v,
+            wet_pwet_nodes,
+            north_link_at_node,
+            south_link_at_node,
+            east_link_at_node,
+            west_link_at_node,
+            out=v_node,
+        )
     if (U is not None) and (U_node is not None):
-        map_mean_of_links_to_node(U,
-                                  wet_pwet_nodes,
-                                  north_link_at_node,
-                                  south_link_at_node,
-                                  east_link_at_node,
-                                  west_link_at_node,
-                                  out=U_node)
+        map_mean_of_links_to_node(
+            U,
+            wet_pwet_nodes,
+            north_link_at_node,
+            south_link_at_node,
+            east_link_at_node,
+            west_link_at_node,
+            out=U_node,
+        )
 
     if (Cf_link is not None) and (Cf_node is not None):
-        map_mean_of_links_to_node(Cf_link,
-                                  wet_pwet_nodes,
-                                  north_link_at_node,
-                                  south_link_at_node,
-                                  east_link_at_node,
-                                  west_link_at_node,
-                                  out=Cf_node)
+        map_mean_of_links_to_node(
+            Cf_link,
+            wet_pwet_nodes,
+            north_link_at_node,
+            south_link_at_node,
+            east_link_at_node,
+            west_link_at_node,
+            out=Cf_node,
+        )
 
     # tc.grid.map_mean_of_links_to_node(u, out=u_node)
     # tc.grid.map_mean_of_links_to_node(v, out=v_node)
     # tc.grid.map_mean_of_links_to_node(U, out=U_node)
     if (u_node is not None) and (u is not None):
-        u_node[tc.horizontally_partial_wet_nodes] = u[
-            tc.partial_wet_horizontal_links]
+        u_node[tc.horizontally_partial_wet_nodes] = u[tc.partial_wet_horizontal_links]
     if (v_node is not None) and (v is not None):
-        v_node[tc.vertically_partial_wet_nodes] = v[
-            tc.partial_wet_vertical_links]
+        v_node[tc.vertically_partial_wet_nodes] = v[tc.partial_wet_vertical_links]
 
     # update boundary conditions
-    if (u is not None) and (v is not None) and (u_node is not None) and (
-            v_node is not None):
+    if (
+        (u is not None)
+        and (v is not None)
+        and (u_node is not None)
+        and (v_node is not None)
+    ):
         tc.update_boundary_conditions(
-            u=u,
-            v=v,
-            u_node=u_node,
-            v_node=v_node,
+            u=u, v=v, u_node=u_node, v_node=v_node,
         )
 
 
-def map_mean_of_links_to_node(f,
-                              core,
-                              north_link_at_node,
-                              south_link_at_node,
-                              east_link_at_node,
-                              west_link_at_node,
-                              out=None):
+def map_mean_of_links_to_node(
+    f,
+    core,
+    north_link_at_node,
+    south_link_at_node,
+    east_link_at_node,
+    west_link_at_node,
+    out=None,
+):
 
     n = f.shape[0]
     if out is None:
         out = np.zeros(n)
 
-    out[core] = (f[north_link_at_node] + f[south_link_at_node] +
-                 f[east_link_at_node] + f[west_link_at_node]) / 4.0
+    out[core] = (
+        f[north_link_at_node]
+        + f[south_link_at_node]
+        + f[east_link_at_node]
+        + f[west_link_at_node]
+    ) / 4.0
 
     return out
 
 
-def map_nodes_to_links(tc,
-                       h=None,
-                       dhdx=None,
-                       dhdy=None,
-                       Ch_i=None,
-                       dChdx_i=None,
-                       dChdy_i=None,
-                       Ch=None,
-                       eta=None,
-                       h_link=None,
-                       Ch_link_i=None,
-                       Ch_link=None):
+def map_nodes_to_links(
+    tc,
+    h=None,
+    dhdx=None,
+    dhdy=None,
+    Ch_i=None,
+    dChdx_i=None,
+    dChdy_i=None,
+    Ch=None,
+    eta=None,
+    h_link=None,
+    Ch_link_i=None,
+    Ch_link=None,
+):
     """map parameters at nodes to links
     """
 
     north_node_at_vertical_link = tc.north_node_at_vertical_link[
-        tc.wet_pwet_vertical_links]
+        tc.wet_pwet_vertical_links
+    ]
     south_node_at_vertical_link = tc.south_node_at_vertical_link[
-        tc.wet_pwet_vertical_links]
+        tc.wet_pwet_vertical_links
+    ]
     east_node_at_horizontal_link = tc.east_node_at_horizontal_link[
-        tc.wet_pwet_horizontal_links]
+        tc.wet_pwet_horizontal_links
+    ]
     west_node_at_horizontal_link = tc.west_node_at_horizontal_link[
-        tc.wet_pwet_horizontal_links]
+        tc.wet_pwet_horizontal_links
+    ]
     dx = tc.grid.dx
 
     if (h is not None) and (h_link is not None):
@@ -364,14 +384,16 @@ def map_nodes_to_links(tc,
             out_f=h,
         )
         h[tc.dry_nodes] = tc.h_init
-        map_mean_of_link_nodes_to_link(h,
-                                       tc.wet_pwet_horizontal_links,
-                                       tc.wet_pwet_vertical_links,
-                                       north_node_at_vertical_link,
-                                       south_node_at_vertical_link,
-                                       east_node_at_horizontal_link,
-                                       west_node_at_horizontal_link,
-                                       out=h_link)
+        map_mean_of_link_nodes_to_link(
+            h,
+            tc.wet_pwet_horizontal_links,
+            tc.wet_pwet_vertical_links,
+            north_node_at_vertical_link,
+            south_node_at_vertical_link,
+            east_node_at_horizontal_link,
+            west_node_at_horizontal_link,
+            out=h_link,
+        )
 
     if (Ch_i is not None) and (Ch_link_i is not None):
         # remove negative values
@@ -386,15 +408,17 @@ def map_nodes_to_links(tc,
                 out_f=Ch_i[i, :],
             )
             Ch_i[:, tc.dry_nodes] = tc.h_init * tc.C_init
-            map_mean_of_link_nodes_to_link(Ch_i[i, :],
-                                           tc.wet_pwet_horizontal_links,
-                                           tc.wet_pwet_vertical_links,
-                                           north_node_at_vertical_link,
-                                           south_node_at_vertical_link,
-                                           east_node_at_horizontal_link,
-                                           west_node_at_horizontal_link,
-                                           out=Ch_link_i[i, :])
-    if (Ch_link is not None):
+            map_mean_of_link_nodes_to_link(
+                Ch_i[i, :],
+                tc.wet_pwet_horizontal_links,
+                tc.wet_pwet_vertical_links,
+                north_node_at_vertical_link,
+                south_node_at_vertical_link,
+                east_node_at_horizontal_link,
+                west_node_at_horizontal_link,
+                out=Ch_link_i[i, :],
+            )
+    if Ch_link is not None:
         Ch_link = np.sum(Ch_link_i, axis=0)
 
     if dhdx is not None:
@@ -441,32 +465,39 @@ def map_nodes_to_links(tc,
     #                  out=Ch_link)
 
     # update boundary conditions
-    if (h is not None) and (Ch_i is not None) and (h_link is not None) and (
-            Ch_link_i is not None) and (eta is not None):
-        tc.update_boundary_conditions(h=h,
-                                      Ch_i=Ch_i,
-                                      h_link=h_link,
-                                      Ch_link_i=Ch_link_i,
-                                      eta=eta)
+    if (
+        (h is not None)
+        and (Ch_i is not None)
+        and (h_link is not None)
+        and (Ch_link_i is not None)
+        and (eta is not None)
+    ):
+        tc.update_boundary_conditions(
+            h=h, Ch_i=Ch_i, h_link=h_link, Ch_link_i=Ch_link_i, eta=eta
+        )
 
 
-def map_mean_of_link_nodes_to_link(f,
-                                   horizontal_link,
-                                   vertical_link,
-                                   north_node_at_vertical_link,
-                                   south_node_at_vertical_link,
-                                   east_node_at_horizontal_link,
-                                   west_node_at_horizontal_link,
-                                   out=None):
+def map_mean_of_link_nodes_to_link(
+    f,
+    horizontal_link,
+    vertical_link,
+    north_node_at_vertical_link,
+    south_node_at_vertical_link,
+    east_node_at_horizontal_link,
+    west_node_at_horizontal_link,
+    out=None,
+):
     """ map mean of parameters at nodes to link
     """
     if out is None:
         out = np.zeros(f.shape[0], dtype=np.int)
 
-    out[horizontal_link] = (f[east_node_at_horizontal_link] +
-                            f[west_node_at_horizontal_link]) / 2.0
-    out[vertical_link] = (f[north_node_at_vertical_link] +
-                          f[south_node_at_vertical_link]) / 2.0
+    out[horizontal_link] = (
+        f[east_node_at_horizontal_link] + f[west_node_at_horizontal_link]
+    ) / 2.0
+    out[vertical_link] = (
+        f[north_node_at_vertical_link] + f[south_node_at_vertical_link]
+    ) / 2.0
 
     return out
 
@@ -564,128 +595,175 @@ def find_boundary_links_nodes(tc):
     edge_link_east = links.right_edge_vertical_ids(grid.shape)
     edge_link_west = links.left_edge_vertical_ids(grid.shape)
     tc.bound_links = np.unique(
-        np.concatenate([
-            bound_link_north, bound_link_south, bound_link_east,
-            bound_link_west
-        ]))
+        np.concatenate(
+            [bound_link_north, bound_link_south, bound_link_east, bound_link_west]
+        )
+    )
     tc.edge_links = np.unique(
         np.concatenate(
-            [edge_link_north, edge_link_south, edge_link_east,
-             edge_link_west]))
+            [edge_link_north, edge_link_south, edge_link_east, edge_link_west]
+        )
+    )
 
     ##################################
     # fixed gradient nodes and links #
     ##################################
-    tc.fixed_grad_link_at_north = bound_link_north[grid.node_is_boundary(
-        tc.north_node_at_vertical_link[bound_link_north],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_link_at_south = bound_link_south[grid.node_is_boundary(
-        tc.south_node_at_vertical_link[bound_link_south],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_link_at_east = bound_link_east[grid.node_is_boundary(
-        tc.east_node_at_horizontal_link[bound_link_east],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_link_at_west = bound_link_west[grid.node_is_boundary(
-        tc.west_node_at_horizontal_link[bound_link_west],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_edge_link_at_north = edge_link_north[grid.node_is_boundary(
-        tc.east_node_at_horizontal_link[edge_link_north],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_edge_link_at_south = edge_link_south[grid.node_is_boundary(
-        tc.east_node_at_horizontal_link[edge_link_south],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_edge_link_at_east = edge_link_east[grid.node_is_boundary(
-        tc.north_node_at_vertical_link[edge_link_east],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_edge_link_at_west = edge_link_west[grid.node_is_boundary(
-        tc.north_node_at_vertical_link[edge_link_west],
-        boundary_flag=FIXED_GRADIENT)]
-    tc.fixed_grad_anchor_link_at_north = tc.link_south[
-        tc.fixed_grad_link_at_north]
-    tc.fixed_grad_anchor_link_at_south = tc.link_north[
-        tc.fixed_grad_link_at_south]
-    tc.fixed_grad_anchor_link_at_east = tc.link_west[
-        tc.fixed_grad_link_at_east]
-    tc.fixed_grad_anchor_link_at_west = tc.link_east[
-        tc.fixed_grad_link_at_west]
+    tc.fixed_grad_link_at_north = bound_link_north[
+        grid.node_is_boundary(
+            tc.north_node_at_vertical_link[bound_link_north],
+            boundary_flag=FIXED_GRADIENT,
+        )
+    ]
+    tc.fixed_grad_link_at_south = bound_link_south[
+        grid.node_is_boundary(
+            tc.south_node_at_vertical_link[bound_link_south],
+            boundary_flag=FIXED_GRADIENT,
+        )
+    ]
+    tc.fixed_grad_link_at_east = bound_link_east[
+        grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[bound_link_east],
+            boundary_flag=FIXED_GRADIENT,
+        )
+    ]
+    tc.fixed_grad_link_at_west = bound_link_west[
+        grid.node_is_boundary(
+            tc.west_node_at_horizontal_link[bound_link_west],
+            boundary_flag=FIXED_GRADIENT,
+        )
+    ]
+    tc.fixed_grad_edge_link_at_north = edge_link_north[
+        grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[edge_link_north],
+            boundary_flag=FIXED_GRADIENT,
+        )
+    ]
+    tc.fixed_grad_edge_link_at_south = edge_link_south[
+        grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[edge_link_south],
+            boundary_flag=FIXED_GRADIENT,
+        )
+    ]
+    tc.fixed_grad_edge_link_at_east = edge_link_east[
+        grid.node_is_boundary(
+            tc.north_node_at_vertical_link[edge_link_east], boundary_flag=FIXED_GRADIENT
+        )
+    ]
+    tc.fixed_grad_edge_link_at_west = edge_link_west[
+        grid.node_is_boundary(
+            tc.north_node_at_vertical_link[edge_link_west], boundary_flag=FIXED_GRADIENT
+        )
+    ]
+    tc.fixed_grad_anchor_link_at_north = tc.link_south[tc.fixed_grad_link_at_north]
+    tc.fixed_grad_anchor_link_at_south = tc.link_north[tc.fixed_grad_link_at_south]
+    tc.fixed_grad_anchor_link_at_east = tc.link_west[tc.fixed_grad_link_at_east]
+    tc.fixed_grad_anchor_link_at_west = tc.link_east[tc.fixed_grad_link_at_west]
     tc.fixed_grad_anchor_edge_link_at_north = tc.link_south[
-        tc.fixed_grad_edge_link_at_north]
+        tc.fixed_grad_edge_link_at_north
+    ]
     tc.fixed_grad_anchor_edge_link_at_south = tc.link_north[
-        tc.fixed_grad_edge_link_at_south]
+        tc.fixed_grad_edge_link_at_south
+    ]
     tc.fixed_grad_anchor_edge_link_at_east = tc.link_west[
-        tc.fixed_grad_edge_link_at_east]
+        tc.fixed_grad_edge_link_at_east
+    ]
     tc.fixed_grad_anchor_edge_link_at_west = tc.link_east[
-        tc.fixed_grad_edge_link_at_west]
+        tc.fixed_grad_edge_link_at_west
+    ]
 
     # Fixed gradient nodes and adjacent nodes (anchor)
     tc.fixed_grad_nodes = grid.fixed_gradient_boundary_nodes
     tc.fixed_grad_anchor_nodes = grid.fixed_gradient_boundary_node_anchor_node
 
     # Fixed gradient links and adjacent links (anchor)
-    tc.fixed_grad_links = np.concatenate([
-        tc.fixed_grad_link_at_north, tc.fixed_grad_link_at_south,
-        tc.fixed_grad_link_at_east, tc.fixed_grad_link_at_west,
-        tc.fixed_grad_edge_link_at_north, tc.fixed_grad_edge_link_at_south,
-        tc.fixed_grad_edge_link_at_east, tc.fixed_grad_edge_link_at_west
-    ])
-    tc.fixed_grad_anchor_links = np.concatenate([
-        tc.fixed_grad_anchor_link_at_north, tc.fixed_grad_anchor_link_at_south,
-        tc.fixed_grad_anchor_link_at_east, tc.fixed_grad_anchor_link_at_west,
-        tc.fixed_grad_anchor_edge_link_at_north,
-        tc.fixed_grad_anchor_edge_link_at_south,
-        tc.fixed_grad_anchor_edge_link_at_east,
-        tc.fixed_grad_anchor_edge_link_at_west
-    ])
+    tc.fixed_grad_links = np.concatenate(
+        [
+            tc.fixed_grad_link_at_north,
+            tc.fixed_grad_link_at_south,
+            tc.fixed_grad_link_at_east,
+            tc.fixed_grad_link_at_west,
+            tc.fixed_grad_edge_link_at_north,
+            tc.fixed_grad_edge_link_at_south,
+            tc.fixed_grad_edge_link_at_east,
+            tc.fixed_grad_edge_link_at_west,
+        ]
+    )
+    tc.fixed_grad_anchor_links = np.concatenate(
+        [
+            tc.fixed_grad_anchor_link_at_north,
+            tc.fixed_grad_anchor_link_at_south,
+            tc.fixed_grad_anchor_link_at_east,
+            tc.fixed_grad_anchor_link_at_west,
+            tc.fixed_grad_anchor_edge_link_at_north,
+            tc.fixed_grad_anchor_edge_link_at_south,
+            tc.fixed_grad_anchor_edge_link_at_east,
+            tc.fixed_grad_anchor_edge_link_at_west,
+        ]
+    )
 
     ###############################
     # fixed value nodes and links #
     ###############################
     fixed_value_nodes_at_north = tc.grid.nodes_at_top_edge[
-        grid.node_is_boundary(tc.grid.nodes_at_top_edge,
-                              boundary_flag=FIXED_VALUE)]
+        grid.node_is_boundary(tc.grid.nodes_at_top_edge, boundary_flag=FIXED_VALUE)
+    ]
     fixed_value_nodes_at_south = tc.grid.nodes_at_bottom_edge[
-        grid.node_is_boundary(tc.grid.nodes_at_bottom_edge,
-                              boundary_flag=FIXED_VALUE)]
+        grid.node_is_boundary(tc.grid.nodes_at_bottom_edge, boundary_flag=FIXED_VALUE)
+    ]
     fixed_value_nodes_at_east = tc.grid.nodes_at_right_edge[
-        grid.node_is_boundary(tc.grid.nodes_at_right_edge,
-                              boundary_flag=FIXED_VALUE)]
+        grid.node_is_boundary(tc.grid.nodes_at_right_edge, boundary_flag=FIXED_VALUE)
+    ]
     fixed_value_nodes_at_west = tc.grid.nodes_at_left_edge[
-        grid.node_is_boundary(tc.grid.nodes_at_left_edge,
-                              boundary_flag=FIXED_VALUE)]
-    fixed_value_anchor_nodes_at_north = tc.node_south[
-        fixed_value_nodes_at_north]
-    fixed_value_anchor_nodes_at_south = tc.node_north[
-        fixed_value_nodes_at_south]
+        grid.node_is_boundary(tc.grid.nodes_at_left_edge, boundary_flag=FIXED_VALUE)
+    ]
+    fixed_value_anchor_nodes_at_north = tc.node_south[fixed_value_nodes_at_north]
+    fixed_value_anchor_nodes_at_south = tc.node_north[fixed_value_nodes_at_south]
     fixed_value_anchor_nodes_at_east = tc.node_west[fixed_value_nodes_at_east]
     fixed_value_anchor_nodes_at_west = tc.node_east[fixed_value_nodes_at_west]
-    fixed_value_link_at_north = bound_link_north[grid.node_is_boundary(
-        tc.north_node_at_vertical_link[bound_link_north],
-        boundary_flag=FIXED_VALUE)]
-    fixed_value_link_at_south = bound_link_south[grid.node_is_boundary(
-        tc.south_node_at_vertical_link[bound_link_south],
-        boundary_flag=FIXED_VALUE)]
-    fixed_value_link_at_east = bound_link_east[grid.node_is_boundary(
-        tc.east_node_at_horizontal_link[bound_link_east],
-        boundary_flag=FIXED_VALUE)]
-    fixed_value_link_at_west = bound_link_west[grid.node_is_boundary(
-        tc.west_node_at_horizontal_link[bound_link_west],
-        boundary_flag=FIXED_VALUE)]
+    fixed_value_link_at_north = bound_link_north[
+        grid.node_is_boundary(
+            tc.north_node_at_vertical_link[bound_link_north], boundary_flag=FIXED_VALUE
+        )
+    ]
+    fixed_value_link_at_south = bound_link_south[
+        grid.node_is_boundary(
+            tc.south_node_at_vertical_link[bound_link_south], boundary_flag=FIXED_VALUE
+        )
+    ]
+    fixed_value_link_at_east = bound_link_east[
+        grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[bound_link_east], boundary_flag=FIXED_VALUE
+        )
+    ]
+    fixed_value_link_at_west = bound_link_west[
+        grid.node_is_boundary(
+            tc.west_node_at_horizontal_link[bound_link_west], boundary_flag=FIXED_VALUE
+        )
+    ]
     fixed_value_anchor_link_at_north = tc.link_south[fixed_value_link_at_north]
     fixed_value_anchor_link_at_south = tc.link_north[fixed_value_link_at_south]
     fixed_value_anchor_link_at_east = tc.link_west[fixed_value_link_at_east]
     fixed_value_anchor_link_at_west = tc.link_east[fixed_value_link_at_west]
-    fixed_value_edge_link_at_north = edge_link_north[grid.node_is_boundary(
-        tc.east_node_at_horizontal_link[edge_link_north],
-        boundary_flag=FIXED_VALUE)]
-    fixed_value_edge_link_at_south = edge_link_south[grid.node_is_boundary(
-        tc.east_node_at_horizontal_link[edge_link_south],
-        boundary_flag=FIXED_VALUE)]
-    fixed_value_edge_link_at_east = edge_link_east[grid.node_is_boundary(
-        tc.north_node_at_vertical_link[edge_link_east],
-        boundary_flag=FIXED_VALUE)]
-    fixed_value_edge_link_at_west = edge_link_west[grid.node_is_boundary(
-        tc.north_node_at_vertical_link[edge_link_west],
-        boundary_flag=FIXED_VALUE)]
+    fixed_value_edge_link_at_north = edge_link_north[
+        grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[edge_link_north], boundary_flag=FIXED_VALUE
+        )
+    ]
+    fixed_value_edge_link_at_south = edge_link_south[
+        grid.node_is_boundary(
+            tc.east_node_at_horizontal_link[edge_link_south], boundary_flag=FIXED_VALUE
+        )
+    ]
+    fixed_value_edge_link_at_east = edge_link_east[
+        grid.node_is_boundary(
+            tc.north_node_at_vertical_link[edge_link_east], boundary_flag=FIXED_VALUE
+        )
+    ]
+    fixed_value_edge_link_at_west = edge_link_west[
+        grid.node_is_boundary(
+            tc.north_node_at_vertical_link[edge_link_west], boundary_flag=FIXED_VALUE
+        )
+    ]
 
     # To avoid referreing indeces that do not exist
     tc.link_north[fixed_value_link_at_north] = fixed_value_link_at_north
@@ -694,37 +772,50 @@ def find_boundary_links_nodes(tc):
     tc.link_west[fixed_value_link_at_west] = fixed_value_link_at_west
 
     # Record fixed value nodes and links with anchor and edge links
-    tc.fixed_value_nodes = np.concatenate([
-        fixed_value_nodes_at_north, fixed_value_nodes_at_south,
-        fixed_value_nodes_at_east, fixed_value_nodes_at_west
-    ])
-    tc.fixed_value_anchor_nodes = np.concatenate([
-        fixed_value_anchor_nodes_at_north, fixed_value_anchor_nodes_at_south,
-        fixed_value_anchor_nodes_at_east, fixed_value_anchor_nodes_at_west
-    ])
-    tc.fixed_value_links = np.concatenate([
-        fixed_value_link_at_north, fixed_value_link_at_south,
-        fixed_value_link_at_east, fixed_value_link_at_west
-    ])
-    tc.fixed_value_anchor_links = np.concatenate([
-        fixed_value_anchor_link_at_north, fixed_value_anchor_link_at_south,
-        fixed_value_anchor_link_at_east, fixed_value_anchor_link_at_west
-    ])
-    tc.fixed_value_edge_links = np.concatenate([
-        fixed_value_edge_link_at_north, fixed_value_edge_link_at_south,
-        fixed_value_edge_link_at_east, fixed_value_edge_link_at_west
-    ])
+    tc.fixed_value_nodes = np.concatenate(
+        [
+            fixed_value_nodes_at_north,
+            fixed_value_nodes_at_south,
+            fixed_value_nodes_at_east,
+            fixed_value_nodes_at_west,
+        ]
+    )
+    tc.fixed_value_anchor_nodes = np.concatenate(
+        [
+            fixed_value_anchor_nodes_at_north,
+            fixed_value_anchor_nodes_at_south,
+            fixed_value_anchor_nodes_at_east,
+            fixed_value_anchor_nodes_at_west,
+        ]
+    )
+    tc.fixed_value_links = np.concatenate(
+        [
+            fixed_value_link_at_north,
+            fixed_value_link_at_south,
+            fixed_value_link_at_east,
+            fixed_value_link_at_west,
+        ]
+    )
+    tc.fixed_value_anchor_links = np.concatenate(
+        [
+            fixed_value_anchor_link_at_north,
+            fixed_value_anchor_link_at_south,
+            fixed_value_anchor_link_at_east,
+            fixed_value_anchor_link_at_west,
+        ]
+    )
+    tc.fixed_value_edge_links = np.concatenate(
+        [
+            fixed_value_edge_link_at_north,
+            fixed_value_edge_link_at_south,
+            fixed_value_edge_link_at_east,
+            fixed_value_edge_link_at_west,
+        ]
+    )
 
 
 def adjust_negative_values(
-        f,
-        core,
-        east_id,
-        west_id,
-        north_id,
-        south_id,
-        out_f=None,
-        loop=1000,
+    f, core, east_id, west_id, north_id, south_id, out_f=None, loop=1000,
 ):
 
     if out_f is None:
@@ -758,18 +849,14 @@ def adjust_negative_values(
     counter = 0
     to_fix = core[out_f[core] < 0]
     while len(to_fix) > 0 and counter < loop:
-        forester_filter(f_temp,
-                        to_fix,
-                        east_id,
-                        west_id,
-                        north_id,
-                        south_id,
-                        out_f=out_f)
+        forester_filter(
+            f_temp, to_fix, east_id, west_id, north_id, south_id, out_f=out_f
+        )
         to_fix = core[out_f[core] < 0]
         f_temp[:] = out_f[:]
 
     if counter == loop:
         out_f[out_f < 0] = 0
-        print('Forester filter failed to fix negative values')
+        print("Forester filter failed to fix negative values")
 
     return out_f

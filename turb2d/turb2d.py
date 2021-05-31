@@ -12,6 +12,7 @@ from .cip import update_gradient, update_gradient2
 from .cip import CIP2D, Jameson, SOR
 from landlab.io.native_landlab import save_grid
 from landlab.io.netcdf import write_netcdf
+
 from . import _links as links
 from landlab import Component, FieldError
 import numpy as np
@@ -209,7 +210,7 @@ class TurbidityCurrent2D(Component):
         no_erosion: boolean, optional
             If True, bed cannot be eroded
         model: string, optional
-            Choose "3eq" or "4eq" for three or four equation models of Parker
+            Choose "3eq" or "4eq" for the three or four equation model of Parker
             (1986)
         """
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
@@ -1193,25 +1194,24 @@ class TurbidityCurrent2D(Component):
             #                                                        alpha)**1.5
 
             beta = alpha ** 1.5 / self.Cf ** 0.5
+            K = self.Kh[self.wet_pwet_links] / self.h_link_temp[self.wet_pwet_links]
 
             self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
-                (self.Cf + 0.5 * self.ew_link[self.wet_pwet_links])
-                * self.U_temp[self.wet_pwet_links]
-                * self.U_temp[self.wet_pwet_links]
-                * self.U_temp[self.wet_pwet_links]
-                - beta
-                * (self.Kh[self.wet_pwet_links] / self.h_link_temp[self.wet_pwet_links])
-                ** 1.5
+                alpha * K * self.U_temp[self.wet_pwet_links]
+                + 0.5
+                * self.ew_link[self.wet_pwet_links]
+                * self.U_temp[self.wet_pwet_links] ** 3
+                - beta * K ** 1.5
                 - self.R
                 * self.g
-                * self.Ch_link[self.wet_pwet_links]
                 * (
-                    self.ws
+                    np.sum(self.Ch_link_i[:, self.wet_pwet_links] * self.ws, axis=0)
                     + 0.5
                     * self.U_temp[self.wet_pwet_links]
                     * self.ew_link[self.wet_pwet_links]
+                    * self.Ch_link[self.wet_pwet_links]
                 )
-            )  # This needs to be updated
+            )
 
             self.Kh_temp[
                 self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0]
@@ -1561,7 +1561,7 @@ class TurbidityCurrent2D(Component):
     def _shock_dissipation_phase(self):
         """Calculate shock dissipation phase of the model
         """
-        # update artificia viscosity coefficients for Jameson scheme
+        # update artificial viscosity coefficients for Jameson scheme
         self.jameson.update_artificial_viscosity(
             self.R * self.g * self.Ch * self.h,
             self.R * self.g * self.Ch_link * self.h_link,
@@ -1582,6 +1582,13 @@ class TurbidityCurrent2D(Component):
         self.jameson.run(
             self.v, self.wet_pwet_vertical_links, at="vlink", out=self.v_temp
         )
+        if self.model == "4eq":
+            self.jameson.run(
+                self.Kh, self.wet_pwet_vertical_links, at="vlink", out=self.Kh_temp
+            )
+            self.jameson.run(
+                self.Kh, self.wet_pwet_horizontal_links, at="hlink", out=self.Kh_temp
+            )
 
         # update gradient terms
         self.update_gradients()
@@ -1823,7 +1830,7 @@ class TurbidityCurrent2D(Component):
         # copy previous values of Ch
         self.Ch_i_prev[:, nodes] = Ch_i[:, nodes]
 
-        # Calculate shear velocity (this should be changed for 4 eq model)
+        # Calculate shear velocity
         u_star = np.sqrt(self.Cf_node[nodes] * U_node[nodes] * U_node[nodes])
 
         # Calculate entrainment rate
@@ -1866,7 +1873,9 @@ class TurbidityCurrent2D(Component):
                 * np.sum(self.bed_change_i[:, nodes], axis=0)
             )
         )
-        self.bed_active_layer[:, nodes][self.bed_active_layer[:, nodes] < 0.0] = 0.0
+
+        # Adjust abnormal values in the active layer
+        (self.bed_active_layer[:, nodes])[self.bed_active_layer[:, nodes] < 0.0] = 0.0
         self.bed_active_layer[:, nodes] /= np.sum(
             self.bed_active_layer[:, nodes], axis=0
         )
@@ -2193,7 +2202,7 @@ def run(
     ylim=None,
     filter_size=None,
     grid_spacing=10,
-    initial_flow_concentration=0.01,
+    initial_flow_concentration=[0.005, 0.005],
     initial_flow_thickness=100,
     initial_region_radius=100,
     initial_region_center=[1000, 4000],
@@ -2210,8 +2219,8 @@ def run(
             spacing=grid_spacing,
             slope_outside=0.2,  # 0.2
             slope_inside=0.05,  # 0.02
-            slope_basin_break=1000,  # 2000
-            canyon_basin_break=1200,  # 2200
+            slope_basin_break=2000,  # 2000
+            canyon_basin_break=2200,  # 2200
             canyon_center=1000,
             canyon_half_width=100,
         )
@@ -2264,13 +2273,13 @@ def run(
         alpha=0.4,
         kappa=0.1,  # 0.01
         nu_a=0.75,
-        Ds=80 * 10 ** -6,
+        Ds=[80 * 10 ** -6, 40 * 10 ** -6],
         h_init=0.0,
         Ch_w=10 ** (-5),
         h_w=0.01,
         C_init=0.0,
         implicit_num=100,
-        implicit_threshold=1.0 * 10 ** -15,
+        implicit_threshold=1.0 * 10 ** -10,
         r0=1.5,
         water_entrainment=True,
         suspension=True,

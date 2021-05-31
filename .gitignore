@@ -6,3 +6,7 @@ dist/
 turb2d.egg-info/
 
 *.nc
+
+*.lprof
+
+turb2d/__pycache__/
