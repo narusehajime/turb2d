@@ -168,6 +168,8 @@ def create_init_flow_region(
             initial_flow_region] = initial_flow_concentration_i[i]
         grid.at_node['flow__sediment_concentration_' +
                      str(i)][~initial_flow_region] = 0.0
+    grid.at_node['flow__sediment_concentraton_total'][initial_flow_region] = np.sum(
+        initial_flow_concentration_i)
 
 
 def create_topography_from_geotiff(geotiff_filename,

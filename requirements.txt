@@ -5,9 +5,9 @@
 #    pip-compile --output-file requirements.txt requirements.in
 #
 cython
-landlab=2.0.0b6
+landlab=2.3
 matplotlib
 numpy
-gdal=2.3.3
+gdal<=3.2
 scipy
 tqdm

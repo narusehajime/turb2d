@@ -16,8 +16,8 @@ with open('LICENSE') as f:
 #                  sources=["turb2d/gridutils.pyx"],
 #                  include_dirs=[np.get_include()])
 ext_neighbors_at_link = Extension("_neighbors_at_link",
-                 sources=["turb2d/_neighbors_at_link.pyx"],
-                 include_dirs=[np.get_include()])
+                                  sources=["turb2d/_neighbors_at_link.pyx"],
+                                  include_dirs=[np.get_include()])
 
 
 setup(
@@ -35,11 +35,11 @@ setup(
         'scipy',
         'landlab==2.3.0',
         'matplotlib',
-        'gdal',
+        'gdal==3.2',
         'tqdm',
     ],
     # ext_modules=cythonize([ext, ext2]),
     # ext_modules=cythonize([ext]),
     ext_modules=cythonize([ext_neighbors_at_link]),
     packages=find_packages(exclude=('tests', 'docs'))
-    )
+)
