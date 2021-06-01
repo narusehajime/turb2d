@@ -2218,23 +2218,23 @@ def run(
         ---------------------------
         geotiff_filename: string, optional
             Name of a file in geotiff format. If this parameter is specified,
-            digital elevation model (DEM) is loaded from the file, and simulation is conducted
-            on the topography.
+            digital elevation model (DEM) is loaded from the file, and simulation is
+             conducted on the topography.
 
         xlim: [integer, integer], optional
             Range of X axis used in calculation [xmin, xmax]. If this parameter is
-             specified, the numerical calculations are performed in the rang of 
+             specified, the numerical calculations are performed in the rang of
              x grids specified by this parameter in the DEM. If this parameter
              is not specified, whole range of DEM is used.
 
         ylim: [integer, integer], optional
             Range of Y axis used in calculation [ymin, ymax]. If this parameter is
-             specified, the numerical calculations are performed in the rang of 
+             specified, the numerical calculations are performed in the rang of
              y grids specified by this parameter in the DEM. If this parameter
              is not specified, whole range of DEM is used.
-            
+
         filter_size: integer, optional
-            Size of the median filter window. If this parameter is specified, 
+            Size of the median filter window. If this parameter is specified,
             the median filter is applied on the DEM before calculation.
 
         grid_spacing=10,

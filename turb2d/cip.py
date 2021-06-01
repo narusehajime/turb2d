@@ -713,9 +713,9 @@ def rcip_2d_advection(
 
 def cubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     """interpolate values to links or nodes by cubic function
-       
+
        Interplated values at the grid between "iplus" and "iminus" is returned.
-       
+
        Parameters
        --------------------------
        f : ndarray, float
@@ -751,9 +751,9 @@ def cubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
 
 def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
     """interpolate values to links or nodes by cubic function
-       
+
        Interplated values at the grid between "iplus" and "iminus" is returned.
-       
+
        Parameters
        --------------------------
        f : ndarray, float
@@ -804,7 +804,7 @@ def rcubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
 def forester_filter(
     f, core, east_id, west_id, north_id, south_id, nu_f=0.1, out_f=None,
 ):
-    """ Forester filter for removing negative values from Concentration and 
+    """ Forester filter for removing negative values from Concentration and
         Flow depth
     """
 
@@ -831,7 +831,7 @@ def forester_filter(
 
 class Jameson:
     """ Jameson filter for smoothing the variables
-        
+
         Parameters
         -------------------
         tc: TurbudityCurrent2D
