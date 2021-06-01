@@ -1419,14 +1419,14 @@ class TurbidityCurrent2D(Component):
             #                        out_f=self.Kh_temp)
 
             # update friction coefficient Cf
-            U_exist = self.U_temp[self.wet_pwet_links] != 0.0
+            U_exist = (self.U_temp[self.wet_pwet_links] != 0.0)
             self.Cf_link[self.wet_pwet_links[U_exist]] = (
                 alpha
                 * self.Kh_temp[self.wet_pwet_links[U_exist]]
                 / self.U_temp[self.wet_pwet_links[U_exist]]
                 / self.U_temp[self.wet_pwet_links[U_exist]]
             )
-            self.Cf_link[U_exist][self.Cf_link[U_exist] > 0.1] = 0.1
+            self.Cf_link[self.Cf_link > 0.1] = 0.1
             self.Cf_link[self.wet_pwet_links[~U_exist]] = self.Cf
 
             # update values
