@@ -32,7 +32,8 @@ def cip_2d_M_advection(
     # 1st step for horizontal advection
     D_x = -np.where(u > 0.0, 1.0, -1.0) * dx
     xi_x = -u * dt
-    cip_1d_advection(f, dfdx, u, core, h_up, dx, dt, out_f=out_f, out_dfdx=out_dfdx)
+    cip_1d_advection(f, dfdx, u, core, h_up, dx, dt,
+                     out_f=out_f, out_dfdx=out_dfdx)
     out_dfdy[core] = dfdy[core] - xi_x[core] / D_x[core] * (
         dfdy[core] - dfdy[h_up[core]]
     )
@@ -40,7 +41,8 @@ def cip_2d_M_advection(
     # 2nd step for vertical advection
     D_y = -np.where(v > 0.0, 1.0, -1.0) * dx
     xi_y = -v * dt
-    cip_1d_advection(out_f, dfdy, v, core, v_up, dx, dt, out_f=out_f, out_dfdx=out_dfdy)
+    cip_1d_advection(out_f, dfdy, v, core, v_up, dx,
+                     dt, out_f=out_f, out_dfdx=out_dfdy)
     out_dfdx[core] = out_dfdx[core] - xi_y[core] / D_y[core] * (
         out_dfdx[core] - out_dfdx[v_up[core]]
     )
@@ -80,7 +82,8 @@ def cip_1d_advection(
         + dfdx[core] * xi_x[core]
         + f[core]
     )
-    out_dfdx[core] = 3.0 * a * (xi_x[core] ** 2) + 2.0 * b * xi_x[core] + dfdx[core]
+    out_dfdx[core] = 3.0 * a * (xi_x[core] ** 2) + \
+        2.0 * b * xi_x[core] + dfdx[core]
 
     return out_f, out_dfdx
 
@@ -120,7 +123,8 @@ def cip_2d_nonadvection(
     out_f[core] = f[core] + G[core] * dt
     out_dfdx[core] = (
         dfdx[core]
-        + ((out_f[h_down] - f[h_down]) - (out_f[h_up] - f[h_up])) / (-2 * D_x[core])
+        + ((out_f[h_down] - f[h_down]) -
+           (out_f[h_up] - f[h_up])) / (-2 * D_x[core])
         - dfdx[core] * (xi_x[h_down] - xi_x[h_up]) / (2 * D_x[core])
     )
 
@@ -240,7 +244,8 @@ def rcip_1d_advection(f, dfdx, u, core, up_id, dx, dt, out_f=None, out_dfdx=None
     dz_index = (S - dfdx[core]) * (dfdx[up] - S) > 0.0
     BB[dz_index] = (
         np.abs(
-            (S[dz_index] - dfdx[core][dz_index]) / (dfdx[up][dz_index] - S[dz_index])
+            (S[dz_index] - dfdx[core][dz_index]) /
+            (dfdx[up][dz_index] - S[dz_index])
         )
         - 1.0
     ) / D[dz_index]
@@ -288,7 +293,8 @@ def rcip_2d_M_advection(
         out_dfdy = np.empty(dfdy.shape)
 
     # 1st step for horizontal advection
-    rcip_1d_advection(f, dfdx, u, core, h_up, dx, dt, out_f=out_f, out_dfdx=out_dfdx)
+    rcip_1d_advection(f, dfdx, u, core, h_up, dx, dt,
+                      out_f=out_f, out_dfdx=out_dfdx)
     D_x = -np.where(u > 0.0, 1.0, -1.0) * dx
     xi_x = -u * dt
     out_dfdy[core] = dfdy[core] - xi_x[core] / D_x[core] * (
@@ -375,7 +381,8 @@ def shock_dissipation(
 
     # apply artificial diffusion
     out[core] = (
-        f[core] + d_i_half[core] - d_i_half[west] + d_j_half[core] - d_j_half[south]
+        f[core] + d_i_half[core] - d_i_half[west] +
+        d_j_half[core] - d_j_half[south]
     )
 
     return out
@@ -537,14 +544,16 @@ class CIP2D:
         tmq = self.tmq
 
         self.C30[core] = (
-            (dfdx[xup[core]] + dfdx[core]) * Ddx[core] - 2.0 * (f[core] - f[xup[core]])
+            (dfdx[xup[core]] + dfdx[core]) *
+            Ddx[core] - 2.0 * (f[core] - f[xup[core]])
         ) / (Ddx[core] * Ddx[core] * Ddx[core])
         self.C20[core] = (
             3.0 * (f[xup[core]] - f[core])
             + (dfdx[xup[core]] + 2.0 * dfdx[core]) * Ddx[core]
         ) / (Ddx[core] * Ddx[core])
         self.C03[core] = (
-            (dfdy[yup[core]] + dfdy[core]) * Ddy[core] - 2.0 * (f[core] - f[yup[core]])
+            (dfdy[yup[core]] + dfdy[core]) *
+            Ddy[core] - 2.0 * (f[core] - f[yup[core]])
         ) / (Ddy[core] * Ddy[core] * Ddy[core])
         self.C02[core] = (
             3.0 * (f[yup[core]] - f[core])
@@ -564,14 +573,16 @@ class CIP2D:
 
         out_f[core] = (
             (
-                (self.C30[core] * XX[core] + self.C21[core] * YY[core] + self.C20[core])
+                (self.C30[core] * XX[core] + self.C21[core]
+                 * YY[core] + self.C20[core])
                 * XX[core]
                 + self.C11[core] * YY[core]
                 + dfdx[core]
             )
             * XX[core]
             + (
-                (self.C03[core] * YY[core] + self.C12[core] * XX[core] + self.C02[core])
+                (self.C03[core] * YY[core] + self.C12[core]
+                 * XX[core] + self.C02[core])
                 * YY[core]
                 + dfdy[core]
             )
@@ -643,8 +654,10 @@ def rcip_2d_advection(
     a10 = np.where(dfdx[core] * dfdx[xup] < 0, 1.0, 0.0)
     a01 = np.where(dfdy[core] * dfdy[yup] < 0, 1.0, 0.0)
 
-    b10 = (np.abs((Sx - dfdx[core]) / (dfdx[xup] - Sx + 1.0 * 10 ** -10)) - 1) / Ddx
-    b01 = (np.abs((Sy - dfdy[core]) / (dfdy[yup] - Sy + 1.0 * 10 ** -10)) - 1) / Ddy
+    b10 = (np.abs((Sx - dfdx[core]) /
+           (dfdx[xup] - Sx + 1.0 * 10 ** -10)) - 1) / Ddx
+    b01 = (np.abs((Sy - dfdy[core]) /
+           (dfdy[yup] - Sy + 1.0 * 10 ** -10)) - 1) / Ddy
 
     C00 = f[core]
     C10 = dfdx[core] + a10 * b10 * C00
@@ -652,26 +665,31 @@ def rcip_2d_advection(
 
     # C30 = ((dfdx[xup] + dfdx[core]) * Ddx - 2.0 *
     #        (f[core] - f[xup])) / (Ddx * Ddx * Ddx)
-    C30 = ((1 + a10 * b10 * Ddx) * (dfdx[xup] - Sx) + dfdx[core] - Sx) / (Ddx * Ddx)
+    C30 = ((1 + a10 * b10 * Ddx) *
+           (dfdx[xup] - Sx) + dfdx[core] - Sx) / (Ddx * Ddx)
 
     # C20 = (3.0 * (f[xup] - f[core]) +
     #        (dfdx[xup] + 2.0 * dfdx[core]) * Ddx) / (Ddx * Ddx)
-    C20 = ((1 + a10 * b10 * Ddx) * f[xup] - C00 - C10 * Ddx) / (Ddx * Ddx) - C30 * Ddx
+    C20 = ((1 + a10 * b10 * Ddx) * f[xup] -
+           C00 - C10 * Ddx) / (Ddx * Ddx) - C30 * Ddx
 
     # C03 = ((dfdy[yup] + dfdy[core]) * Ddy - 2.0 *
     #        (f[core] - f[yup])) / (Ddy * Ddy * Ddy)
-    C03 = ((1 + a01 * b01 * Ddy) * (dfdy[yup] - Sy) + dfdy[core] - Sy) / (Ddy * Ddy)
+    C03 = ((1 + a01 * b01 * Ddy) *
+           (dfdy[yup] - Sy) + dfdy[core] - Sy) / (Ddy * Ddy)
 
     # C02 = (3.0 * (f[yup] - f[core]) +
     #        (dfdy[yup] + 2.0 * dfdy[core]) * Ddy) / (Ddy * Ddy)
-    C02 = ((1 + a01 * b01 * Ddy) * f[yup] - C00 - C01 * Ddy) / (Ddy * Ddy) - C03 * Ddy
+    C02 = ((1 + a01 * b01 * Ddy) * f[yup] -
+           C00 - C01 * Ddy) / (Ddy * Ddy) - C03 * Ddy
 
     # tmp = f[core] - f[yup] - f[xup] + f[xyup]
     # tmq = dfdy[xup] - dfdy[core]
     C11 = (
         (a01 * b01 * f[xup] + (1.0 + a10 * b10 * Ddx) * dfdy[xup]) / Ddx
         + (a10 * b10 * f[yup] + (1.0 + a01 * b01 * Ddy) * dfdx[yup]) / Ddy
-        + (C00 - (1.0 + a10 * b10 * Ddx + a01 * b01 * Ddy) * f[xyup]) / Ddx / Ddy
+        + (C00 - (1.0 + a10 * b10 * Ddx + a01 * b01 * Ddy)
+           * f[xyup]) / Ddx / Ddy
         + C30 * Ddx * Ddx / Ddy
         + C03 * Ddy * Ddy / Ddx
         + C20 * Ddx / Ddy
@@ -744,7 +762,8 @@ def cubic_interp_1d(f, dfdx, core, iplus, iminus, dx, out=None):
         3.0 * (f[iminus] - f[iplus]) / (D_x ** 2)
         - (2.0 * dfdx[iplus] + dfdx[iminus]) / D_x
     )
-    out[core] = a * (xi_x ** 3) + b * (xi_x ** 2) + dfdx[iplus] * xi_x + f[iplus]
+    out[core] = a * (xi_x ** 3) + b * (xi_x ** 2) + \
+        dfdx[iplus] * xi_x + f[iplus]
 
     return out
 
@@ -937,7 +956,7 @@ class Jameson:
 
         # maximum artificial viscosity coefficient at nodes
         self.eps_node_horiz[:] = (
-            0.01
+            0.1
             * self.kappa
             * np.max(
                 [
@@ -948,7 +967,7 @@ class Jameson:
             )
         )
         self.eps_node_vert[:] = (
-            0.01
+            0.1
             * self.kappa
             * np.max(
                 [
@@ -1075,7 +1094,8 @@ class SOR:
             err = np.linalg.norm(self.w[core] - out[core]) / (
                 core_size + 1.0 * 10 ** -20
             )
-            out[core] = out[core] * (1 - self.alpha) + self.alpha * self.w[core]
+            out[core] = out[core] * (1 - self.alpha) + \
+                self.alpha * self.w[core]
             self.update_boundary_conditions(p=out)
 
             count += 1
