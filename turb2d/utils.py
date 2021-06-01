@@ -155,7 +155,7 @@ def create_init_flow_region(
             len(initial_flow_concentration), 1
         )
 
-    # prepare variables for sediment concentrations and bed sediment
+    # initialize flow parameters
     for i in range(len(initial_flow_concentration_i)):
         try:
             grid.add_zeros("flow__sediment_concentration_{}".format(i), at="node")
@@ -170,7 +170,28 @@ def create_init_flow_region(
         grid.add_zeros("flow__sediment_concentration_total", at="node")
     except FieldError:
         grid.at_node["flow__sediment_concentration_total"][:] = 0.0
+    try:
+        grid.add_zeros("flow__depth", at="node")
+    except FieldError:
+        grid.at_node["flow__depth"][:] = 0.0
+    try:
+        grid.add_zeros("flow__horizontal_velocity_at_node", at="node")
+    except FieldError:
+        grid.at_node["flow__horizontal_velocity_at_node"][:] = 0.0
+    try:
+        grid.add_zeros("flow__vertical_velocity_at_node", at="node")
+    except FieldError:
+        grid.at_node["flow__vertical_velocity_at_node"][:] = 0.0
+    try:
+        grid.add_zeros("flow__horizontal_velocity", at="link")
+    except FieldError:
+        grid.at_link["flow__horizontal_velocity"][:] = 0.0
+    try:
+        grid.add_zeros("flow__vertical_velocity", at="link")
+    except FieldError:
+        grid.at_link["flow__vertical_velocity"][:] = 0.0
 
+    # set initial flow region
     initial_flow_region = (
         (grid.node_x - initial_region_center[0]) ** 2
         + (grid.node_y - initial_region_center[1]) ** 2
