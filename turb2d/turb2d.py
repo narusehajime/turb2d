@@ -1426,7 +1426,8 @@ class TurbidityCurrent2D(Component):
                 / self.U_temp[self.wet_pwet_links[U_exist]]
                 / self.U_temp[self.wet_pwet_links[U_exist]]
             )
-            self.Cf_link[self.wet_pwet_links[~U_exist]] = 0.0
+            self.Cf_link[U_exist][self.Cf_link[U_exist] > 0.1] = 0.1
+            self.Cf_link[self.wet_pwet_links[~U_exist]] = self.Cf
 
             # update values
             map_values(self, Cf_link=self.Cf_link, Cf_node=self.Cf_node)
@@ -1541,16 +1542,16 @@ class TurbidityCurrent2D(Component):
                 out_f=self.Ch_i_temp[i, :],
             )
 
-        if self.model == "4eq":
-            adjust_negative_values(
-                self.Kh_temp,
-                self.wet_pwet_nodes,
-                self.node_east,
-                self.node_west,
-                self.node_north,
-                self.node_south,
-                out_f=self.Kh_temp,
-            )
+        # if self.model == "4eq":
+        #     adjust_negative_values(
+        #         self.Kh_temp,
+        #         self.wet_pwet_nodes,
+        #         self.node_east,
+        #         self.node_west,
+        #         self.node_north,
+        #         self.node_south,
+        #         out_f=self.Kh_temp,
+        #     )
 
     def _process_wet_dry_boundary(self):
         """Calculate processes at wet and dry boundary
