@@ -2209,8 +2209,43 @@ def run(
     dt=50,
     number_of_steps=50,
     model="3eq",
+    progress=True,
 ):
     """
+        Run the model of 2DH turbidity current
+
+        Parameters
+        ---------------------------
+        geotiff_filename: string, optional
+            Name of a file in geotiff format. If this parameter is specified,
+            digital elevation model (DEM) is loaded from the file, and simulation is conducted
+            on the topography.
+
+        xlim: [integer, integer], optional
+            Range of X axis used in calculation [xmin, xmax]. If this parameter is
+             specified, the numerical calculations are performed in the rang of 
+             x grids specified by this parameter in the DEM. If this parameter
+             is not specified, whole range of DEM is used.
+
+        ylim: [integer, integer], optional
+            Range of Y axis used in calculation [ymin, ymax]. If this parameter is
+             specified, the numerical calculations are performed in the rang of 
+             y grids specified by this parameter in the DEM. If this parameter
+             is not specified, whole range of DEM is used.
+            
+        filter_size: integer, optional
+            Size of the median filter window. If this parameter is specified, 
+            the median filter is applied on the DEM before calculation.
+
+        grid_spacing=10,
+        initial_flow_concentration=[0.005, 0.005],
+        initial_flow_thickness=100,
+        initial_region_radius=100,
+        initial_region_center=[1000, 4000],
+        dt=50,
+        number_of_steps=50,
+        model="3eq",
+        progress=True,
     """
     if geotiff_filename is None:
         grid = create_topography(
@@ -2291,7 +2326,7 @@ def run(
     tc.save_nc("tc{:04d}.nc".format(0))
     Ch_init = np.sum(tc.C * tc.h)
 
-    for i in tqdm(range(1, number_of_steps + 1), disable=False):
+    for i in tqdm(range(1, number_of_steps + 1), disable=(progress is False)):
         tc.run_one_step(dt=dt)
         tc.save_nc("tc{:04d}.nc".format(i))
         if np.sum(tc.C * tc.h) / Ch_init < 0.01:
