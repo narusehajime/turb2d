@@ -1195,84 +1195,6 @@ class TurbidityCurrent2D(Component):
             self.ew_link[self.wet_vertical_links] = 0
             self.ew_node[self.wet_nodes] = 0
 
-        if self.model == "4eq":
-
-            map_values(
-                self,
-                h=self.h_temp,
-                h_link=self.h_link_temp,
-                u=self.u_temp,
-                v=self.v_temp,
-                U=self.U_temp,
-            )
-            self.Kh_temp[
-                self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0]
-            ] = 0.0
-
-            # development of turbulent kinetic energy
-            alpha = 0.1
-            # Ri = self.R * self.g * self.Ch_link[self.wet_pwet_links] \
-            #      / self.U[self.wet_pwet_links] / self.U[self.wet_pwet_links]
-            # beta = (0.5 * self.ew_link[self.wet_pwet_links] *
-            #         (1 - Ri - 2.0 * self.Cf / alpha) + self.Cf) / (self.Cf /
-            #                                                        alpha)**1.5
-
-            beta = alpha ** 1.5 / self.Cf ** 0.5
-            # K = self.Kh[self.wet_pwet_links] / \
-            #     self.h_link_temp[self.wet_pwet_links]
-
-            # self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
-            #     alpha * K * self.U_temp[self.wet_pwet_links]
-            #     + 0.5
-            #     * self.ew_link[self.wet_pwet_links]
-            #     * self.U_temp[self.wet_pwet_links] ** 3
-            #     - beta * K ** 1.5
-
-            self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
-                (self.Cf + 0.5 * self.ew_link[self.wet_pwet_links])
-                * self.U_temp[self.wet_pwet_links]
-                * self.U_temp[self.wet_pwet_links]
-                * self.U_temp[self.wet_pwet_links]
-                - beta
-                * (self.Kh[self.wet_pwet_links] / self.h_link_temp[self.wet_pwet_links])
-                ** 1.5
-                - self.R
-                * self.g
-                * (
-                    np.sum(
-                        self.Ch_link_i[:, self.wet_pwet_links] * self.ws, axis=0)
-                    + 0.5
-                    * self.U_temp[self.wet_pwet_links]
-                    * self.ew_link[self.wet_pwet_links]
-                    * self.Ch_link[self.wet_pwet_links]
-                )
-            )
-
-            self.Kh_temp[
-                self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0]
-            ] = 0.0
-
-            # adjust_negative_values(self.Kh,
-            #                        self.wet_pwet_links,
-            #                        self.link_east,
-            #                        self.link_west,
-            #                        self.link_north,
-            #                        self.link_south,
-            #                        out_f=self.Kh_temp)
-
-            # update friction coefficient Cf
-            U_exist = self.U_temp[self.wet_pwet_links] != 0.0
-            self.Cf_link[self.wet_pwet_links[U_exist]] = (
-                alpha
-                * self.Kh_temp[self.wet_pwet_links[U_exist]]
-                / self.U_temp[self.wet_pwet_links[U_exist]]
-                / self.U_temp[self.wet_pwet_links[U_exist]]
-            )
-            self.Cf_link[self.wet_pwet_links[~U_exist]] = 0.0
-
-            # update values
-            map_values(self, Cf_link=self.Cf_link, Cf_node=self.Cf_node)
-
         # calculate friction terms using semi-implicit scheme
         self.u_temp[self.wet_horizontal_links] /= (
             1
@@ -1430,6 +1352,84 @@ class TurbidityCurrent2D(Component):
             Ch_link=self.Ch_link_temp,
             eta=self.eta_temp,
         )
+
+        if self.model == "4eq":
+
+            map_values(
+                self,
+                h=self.h_temp,
+                h_link=self.h_link_temp,
+                u=self.u_temp,
+                v=self.v_temp,
+                U=self.U_temp,
+            )
+            self.Kh_temp[
+                self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0]
+            ] = 0.0
+
+            # development of turbulent kinetic energy
+            alpha = 0.1
+            # Ri = self.R * self.g * self.Ch_link[self.wet_pwet_links] \
+            #      / self.U[self.wet_pwet_links] / self.U[self.wet_pwet_links]
+            # beta = (0.5 * self.ew_link[self.wet_pwet_links] *
+            #         (1 - Ri - 2.0 * self.Cf / alpha) + self.Cf) / (self.Cf /
+            #                                                        alpha)**1.5
+
+            beta = alpha ** 1.5 / self.Cf ** 0.5
+            # K = self.Kh[self.wet_pwet_links] / \
+            #     self.h_link_temp[self.wet_pwet_links]
+
+            # self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
+            #     alpha * K * self.U_temp[self.wet_pwet_links]
+            #     + 0.5
+            #     * self.ew_link[self.wet_pwet_links]
+            #     * self.U_temp[self.wet_pwet_links] ** 3
+            #     - beta * K ** 1.5
+
+            self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
+                (self.Cf + 0.5 * self.ew_link[self.wet_pwet_links])
+                * self.U_temp[self.wet_pwet_links]
+                * self.U_temp[self.wet_pwet_links]
+                * self.U_temp[self.wet_pwet_links]
+                - beta
+                * (self.Kh[self.wet_pwet_links] / self.h_link[self.wet_pwet_links])
+                ** 1.5
+                - self.R
+                * self.g
+                * (
+                    np.sum(
+                        self.Ch_link_i_temp[:, self.wet_pwet_links] * self.ws, axis=0)
+                    + 0.5
+                    * self.U_temp[self.wet_pwet_links]
+                    * self.ew_link[self.wet_pwet_links]
+                    * self.Ch_link_temp[self.wet_pwet_links]
+                )
+            )
+
+            self.Kh_temp[
+                self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0.0]
+            ] = 1.e-10
+
+            # adjust_negative_values(self.Kh,
+            #                        self.wet_pwet_links,
+            #                        self.link_east,
+            #                        self.link_west,
+            #                        self.link_north,
+            #                        self.link_south,
+            #                        out_f=self.Kh_temp)
+
+            # update friction coefficient Cf
+            U_exist = self.U_temp[self.wet_pwet_links] != 0.0
+            self.Cf_link[self.wet_pwet_links[U_exist]] = (
+                alpha
+                * self.Kh_temp[self.wet_pwet_links[U_exist]]
+                / self.U_temp[self.wet_pwet_links[U_exist]]
+                / self.U_temp[self.wet_pwet_links[U_exist]]
+            )
+            self.Cf_link[self.wet_pwet_links[~U_exist]] = 0.0
+
+            # update values
+            map_values(self, Cf_link=self.Cf_link, Cf_node=self.Cf_node)
 
     def _artificial_viscosity(self, h, h_link, u, v, Ch, Ch_link):
         """Apply artificial viscosity to flow velocity
