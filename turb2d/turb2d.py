@@ -1877,6 +1877,9 @@ class TurbidityCurrent2D(Component):
             out_Ch_i[eroded_region] = self.Ch_i_prev[eroded_region]
             self.bed_change_i[eroded_region] = 0.0
 
+        # Apply diffusion to avoid slope steeper than angle of repose
+        self._bed_diffusion_at_high_slope()
+
         # Time development of active layer
         # self.bed_active_layer[:, nodes] += (
         #     1
@@ -1903,48 +1906,53 @@ class TurbidityCurrent2D(Component):
         # Calculate deposition
         out_bed_thick_i[:, nodes] = bed_thick_i[:, nodes] + self.bed_change_i[:, nodes]
 
-        # apply diffusion in the region where slope is close to angle of repose
-        # diffusion_coeff_slope = 1000.0
-        # high_slope = 0.01
-        # high_slope_horizontal_links = (
-        #     np.abs(self.S[self.wet_pwet_horizontal_links]) > high_slope
-        # )
-        # east_node = self.east_node_at_horizontal_link[
-        #     self.wet_pwet_horizontal_links[high_slope_horizontal_links]
-        # ]
-        # west_node = self.west_node_at_horizontal_link[
-        #     self.wet_pwet_horizontal_links[high_slope_horizontal_links]
-        # ]
-        # horiz_change = (
-        #     diffusion_coeff_slope * eta[east_node] * self.bed_active_layer[:, east_node]
-        #     - eta[west_node] * self.bed_active_layer[:, west_node]
-        # )
-        # bed_thick_i[:, east_node] -= horiz_change
-        # bed_thick_i[:, west_node] += horiz_change
-        # high_slope_vertical_links = (
-        #     np.abs(self.S[self.wet_pwet_vertical_links]) > high_slope
-        # )
-        # north_node = self.north_node_at_vertical_link[
-        #     self.wet_pwet_vertical_links[high_slope_vertical_links]
-        # ]
-        # south_node = self.south_node_at_vertical_link[
-        #     self.wet_pwet_vertical_links[high_slope_vertical_links]
-        # ]
-        # vert_change = (
-        #     diffusion_coeff_slope
-        #     * eta[north_node]
-        #     * self.bed_active_layer[:, north_node]
-        #     - eta[south_node] * self.bed_active_layer[:, south_node]
-        # )
-        # bed_thick_i[:, north_node] -= vert_change
-        # bed_thick_i[:, south_node] += vert_change
-
         # Calculate bed elevation change
         out_eta[nodes] = (
             eta[nodes] + np.sum(self.bed_change_i[:, nodes], axis=0) / self.lambda_p
         )
 
         return out_Ch_i, out_eta, out_bed_thick_i
+
+    def _bed_diffusion_at_high_slope(self):
+        """diffusion sediment transport in the region where slope is close to angle
+             of repose
+        """
+        diffusion_coeff_slope = 1.0e-5
+        high_slope = 0.25
+
+        high_slope_horizontal_links = (
+            np.abs(self.S[self.wet_pwet_horizontal_links]) > high_slope
+        )
+        east_node = self.east_node_at_horizontal_link[
+            self.wet_pwet_horizontal_links[high_slope_horizontal_links]
+        ]
+        west_node = self.west_node_at_horizontal_link[
+            self.wet_pwet_horizontal_links[high_slope_horizontal_links]
+        ]
+        horiz_change = diffusion_coeff_slope * (
+            self.eta[east_node] * self.bed_active_layer[:, east_node]
+            - self.eta[west_node] * self.bed_active_layer[:, west_node]
+        )
+        self.bed_change_i[:, east_node] -= horiz_change
+        self.bed_change_i[:, west_node] += horiz_change
+        high_slope_vertical_links = (
+            np.abs(self.S[self.wet_pwet_vertical_links]) > high_slope
+        )
+        north_node = self.north_node_at_vertical_link[
+            self.wet_pwet_vertical_links[high_slope_vertical_links]
+        ]
+        south_node = self.south_node_at_vertical_link[
+            self.wet_pwet_vertical_links[high_slope_vertical_links]
+        ]
+        vert_change = diffusion_coeff_slope * (
+            self.eta[north_node] * self.bed_active_layer[:, north_node]
+            - self.eta[south_node] * self.bed_active_layer[:, south_node]
+        )
+        self.bed_change_i[:, north_node] -= vert_change
+        self.bed_change_i[:, south_node] += vert_change
+
+        # import ipdb
+        # ipdb.set_trace()
 
     def copy_values_to_temp(self):
         self.h_temp[:] = self.h[:]
