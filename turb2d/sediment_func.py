@@ -1,4 +1,5 @@
 import numpy as np
+
 """
 Empirical functions for calculating models of sediment dynamics
 """
@@ -35,8 +36,8 @@ def get_ew(U, Ch, R, g, umin=0.01, out=None):
 
     Ri = np.zeros(U.shape)
     flowing = np.where(U > umin)
-    Ri[flowing] = R * g * Ch[flowing] / U[flowing]**2
-    out = 0.075 / np.sqrt(1 + 718. + Ri**2.4)  # Parker et al. (1987)
+    Ri[flowing] = R * g * Ch[flowing] / U[flowing] ** 2
+    out = 0.075 / np.sqrt(1 + 718.0 + Ri ** 2.4)  # Parker et al. (1987)
 
     return out
 
@@ -52,15 +53,15 @@ def get_ws(R, g, Ds, nu):
     """
 
     # Coefficients for natural sands
-    C_1 = 18.
+    C_1 = 18.0
     C_2 = 1.0
 
-    ws = R * g * Ds**2 / (C_1 * nu + (0.75 * C_2 * R * g * Ds**3)**0.5)
+    ws = R * g * Ds ** 2 / (C_1 * nu + (0.75 * C_2 * R * g * Ds ** 3) ** 0.5)
 
     return ws
 
 
-def get_es(R, g, Ds, nu, u_star, function='GP1991field', out=None):
+def get_es(R, g, Ds, nu, u_star, function="GP1991field", out=None):
     """ Calculate entrainment rate of basal sediment to suspension using
         empirical functions proposed by Garcia and Parker (1991),
         van Rijn (1984), or Dorrell (2018)
@@ -102,9 +103,9 @@ def get_es(R, g, Ds, nu, u_star, function='GP1991field', out=None):
     if out is None:
         out = np.zeros([len(Ds), len(u_star)])
 
-    if function == 'GP1991field':
+    if function == "GP1991field":
         _gp1991(R, g, Ds, nu, u_star, p=0.1, out=out)
-    if function == 'GP1991exp':
+    if function == "GP1991exp":
         _gp1991(R, g, Ds, nu, u_star, p=1.0, out=out)
 
     return out
@@ -139,11 +140,11 @@ def _gp1991(R, g, Ds, nu, u_star, p=1.0, out=None):
     sus_index = u_star / ws
 
     # coefficients for calculation
-    a = 7.8 * 10**-7
+    a = 7.8 * 10 ** -7
     alpha = 0.6
 
     # calculate entrainment rate
-    Z = sus_index * Rp**alpha
-    out[:, :] = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
+    Z = sus_index * Rp ** alpha
+    out[:, :] = p * a * Z ** 5 / (1 + (a / 0.3) * Z ** 5)
 
     return out

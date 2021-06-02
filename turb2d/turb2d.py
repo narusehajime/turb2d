@@ -1856,7 +1856,6 @@ class TurbidityCurrent2D(Component):
             u_star,
             function=self.sed_entrainment_func,
         )
-        self.es[:, ~nodes] = 0.0
 
         # Calculate the change of volume of suspended sediment
         # Settling is solved explicitly, and entrainment is
@@ -1869,13 +1868,13 @@ class TurbidityCurrent2D(Component):
 
         # Obtain sedimentation rate
         self.bed_change_i[:, nodes] = self.Ch_i_prev[:, nodes] - out_Ch_i[:, nodes]
-        self.bed_change_i[:, ~nodes] = 0.0
+        # self.bed_change_i[:, nodes] = 0.0
 
         # if erosion is forbidden, out_Ch_i is modified
         if self.no_erosion is True:
-            eroded_region = self.bed_change_i < 0.0
-            out_Ch_i[eroded_region] = self.Ch_i_prev[eroded_region]
-            self.bed_change_i[eroded_region] = 0.0
+            eroded_region = np.sum(self.bed_change_i[:, nodes], axis=0) < 0.0
+            out_Ch_i[:, nodes[eroded_region]] = self.Ch_i_prev[:, nodes[eroded_region]]
+            self.bed_change_i[:, nodes[eroded_region]] = 0.0
 
         # Apply diffusion to avoid slope steeper than angle of repose
         self._bed_diffusion_at_high_slope()
@@ -1917,8 +1916,8 @@ class TurbidityCurrent2D(Component):
         """diffusion sediment transport in the region where slope is close to angle
              of repose
         """
-        diffusion_coeff_slope = 1.0e-5
-        high_slope = 0.25
+        diffusion_coeff_slope = 1.0e-4
+        high_slope = 0.2
 
         high_slope_horizontal_links = (
             np.abs(self.S[self.wet_pwet_horizontal_links]) > high_slope
