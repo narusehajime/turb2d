@@ -1310,24 +1310,6 @@ class TurbidityCurrent2D(Component):
                 * self.dt_local
             )
 
-        # calculate sediment deposition
-        if self.suspension is True:
-            self.calc_deposition(
-                self.h_temp,
-                self.Ch_i_temp,
-                self.u_node_temp,
-                self.v_node_temp,
-                self.eta_temp,
-                self.bed_thick_i,
-                self.U_node_temp,
-                out_Ch_i=self.Ch_i_temp,
-                out_eta=self.eta_temp,
-                out_bed_thick_i=self.bed_thick_i_temp,
-            )
-            self.S[self.active_links] = self.grid.calc_grad_at_link(self.eta_temp)[
-                self.active_links
-            ]
-
         # map nodes to links
         map_nodes_to_links(
             self,
@@ -1419,18 +1401,36 @@ class TurbidityCurrent2D(Component):
             #                        out_f=self.Kh_temp)
 
             # update friction coefficient Cf
-            U_exist = (self.U_temp[self.wet_pwet_links] != 0.0)
+            U_exist = (self.U_temp[self.wet_pwet_links] > 1.e-1)
             self.Cf_link[self.wet_pwet_links[U_exist]] = (
                 alpha
                 * self.Kh_temp[self.wet_pwet_links[U_exist]]
                 / self.U_temp[self.wet_pwet_links[U_exist]]
                 / self.U_temp[self.wet_pwet_links[U_exist]]
             )
-            self.Cf_link[self.Cf_link > 0.1] = 0.1
+            # self.Cf_link[self.Cf_link > 0.1] = 0.1
             self.Cf_link[self.wet_pwet_links[~U_exist]] = self.Cf
 
             # update values
             map_values(self, Cf_link=self.Cf_link, Cf_node=self.Cf_node)
+
+            # calculate sediment deposition
+        if self.suspension is True:
+            self.calc_deposition(
+                self.h_temp,
+                self.Ch_i_temp,
+                self.u_node_temp,
+                self.v_node_temp,
+                self.eta_temp,
+                self.bed_thick_i,
+                self.U_node_temp,
+                out_Ch_i=self.Ch_i_temp,
+                out_eta=self.eta_temp,
+                out_bed_thick_i=self.bed_thick_i_temp,
+            )
+            self.S[self.active_links] = self.grid.calc_grad_at_link(self.eta_temp)[
+                self.active_links
+            ]
 
     def _artificial_viscosity(self, h, h_link, u, v, Ch, Ch_link):
         """Apply artificial viscosity to flow velocity

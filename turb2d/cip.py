@@ -956,7 +956,7 @@ class Jameson:
 
         # maximum artificial viscosity coefficient at nodes
         self.eps_node_horiz[:] = (
-            0.1
+            0.01
             * self.kappa
             * np.max(
                 [
@@ -967,7 +967,7 @@ class Jameson:
             )
         )
         self.eps_node_vert[:] = (
-            0.1
+            0.01
             * self.kappa
             * np.max(
                 [
