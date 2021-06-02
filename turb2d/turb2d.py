@@ -1916,7 +1916,7 @@ class TurbidityCurrent2D(Component):
         """diffusion sediment transport in the region where slope is close to angle
              of repose
         """
-        diffusion_coeff_slope = 1.0e-4
+        diffusion_coeff_slope = 1.0e-5
         high_slope = 0.2
 
         high_slope_horizontal_links = (
