@@ -3,8 +3,8 @@ cimport numpy as np
 cimport cython
 
 
-DTYPE = np.int
-ctypedef np.int_t DTYPE_t
+DTYPE = np.int32
+ctypedef np.int32_t DTYPE_t
 
 
 @cython.boundscheck(False)

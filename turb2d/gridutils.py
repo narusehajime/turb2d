@@ -490,7 +490,7 @@ def map_mean_of_link_nodes_to_link(
     """ map mean of parameters at nodes to link
     """
     if out is None:
-        out = np.zeros(f.shape[0], dtype=np.int)
+        out = np.zeros(f.shape[0], dtype=np.int32)
 
     out[horizontal_link] = (
         f[east_node_at_horizontal_link] + f[west_node_at_horizontal_link]
@@ -507,9 +507,9 @@ def find_horizontal_up_down_nodes(tc, u, out_up=None, out_down=None):
        at horizontally upcurrent and downcurrent directions
     """
     if out_up is None:
-        out_up = np.empty(u.shape[0], dtype=np.int)
+        out_up = np.empty(u.shape[0], dtype=np.int32)
     if out_down is None:
-        out_down = np.empty(u.shape[0], dtype=np.int)
+        out_down = np.empty(u.shape[0], dtype=np.int32)
 
     out_up[:] = tc.node_west[:]
     out_down[:] = tc.node_east[:]
@@ -526,9 +526,9 @@ def find_vertical_up_down_nodes(tc, u, out_up=None, out_down=None):
     """
 
     if out_up is None:
-        out_up = np.empty(u.shape[0], dtype=np.int)
+        out_up = np.empty(u.shape[0], dtype=np.int32)
     if out_down is None:
-        out_down = np.empty(u.shape[0], dtype=np.int)
+        out_down = np.empty(u.shape[0], dtype=np.int32)
 
     out_up[:] = tc.node_south[:]
     out_down[:] = tc.node_north[:]
@@ -544,9 +544,9 @@ def find_horizontal_up_down_links(tc, u, out_up=None, out_down=None):
        at horizontally upcurrent and downcurrent directions
     """
     if out_up is None:
-        out_up = np.zeros(u.shape[0], dtype=np.int)
+        out_up = np.zeros(u.shape[0], dtype=np.int32)
     if out_down is None:
-        out_down = np.zeros(u.shape[0], dtype=np.int)
+        out_down = np.zeros(u.shape[0], dtype=np.int32)
 
     out_up[:] = tc.link_west[:]
     out_down[:] = tc.link_east[:]
@@ -562,9 +562,9 @@ def find_vertical_up_down_links(tc, u, out_up=None, out_down=None):
     """
 
     if out_up is None:
-        out_up = np.zeros(u.shape[0], dtype=np.int)
+        out_up = np.zeros(u.shape[0], dtype=np.int32)
     if out_down is None:
-        out_down = np.zeros(u.shape[0], dtype=np.int)
+        out_down = np.zeros(u.shape[0], dtype=np.int32)
 
     out_up[:] = tc.link_south[:]
     out_down[:] = tc.link_north[:]

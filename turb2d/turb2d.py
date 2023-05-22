@@ -561,31 +561,31 @@ class TurbidityCurrent2D(Component):
         self.q = np.zeros(grid.number_of_nodes)
 
         # arrays to record upcurrent and downcurrent nodes
-        self.horizontal_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
-        self.vertical_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
+        self.horizontal_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
+        self.vertical_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
         self.horizontal_down_nodes = np.zeros(
-            grid.number_of_nodes, dtype=np.int)
-        self.vertical_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int)
+            grid.number_of_nodes, dtype=np.int32)
+        self.vertical_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
 
-        self.horizontal_up_links = np.zeros(grid.number_of_links, dtype=np.int)
-        self.vertical_up_links = np.zeros(grid.number_of_links, dtype=np.int)
+        self.horizontal_up_links = np.zeros(grid.number_of_links, dtype=np.int32)
+        self.vertical_up_links = np.zeros(grid.number_of_links, dtype=np.int32)
         self.horizontal_down_links = np.zeros(
-            grid.number_of_links, dtype=np.int)
-        self.vertical_down_links = np.zeros(grid.number_of_links, dtype=np.int)
+            grid.number_of_links, dtype=np.int32)
+        self.vertical_down_links = np.zeros(grid.number_of_links, dtype=np.int32)
 
         # arrays to refer adjacent links and nodes
-        self.east_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
-        self.north_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
-        self.west_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
-        self.south_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int)
+        self.east_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
+        self.north_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
+        self.west_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
+        self.south_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
         self.west_node_at_horizontal_link = np.zeros(
-            grid.number_of_links, dtype=np.int)
+            grid.number_of_links, dtype=np.int32)
         self.east_node_at_horizontal_link = np.zeros(
-            grid.number_of_links, dtype=np.int)
+            grid.number_of_links, dtype=np.int32)
         self.south_node_at_vertical_link = np.zeros(
-            grid.number_of_links, dtype=np.int)
+            grid.number_of_links, dtype=np.int32)
         self.north_node_at_vertical_link = np.zeros(
-            grid.number_of_links, dtype=np.int)
+            grid.number_of_links, dtype=np.int32)
 
         # ids to process boundary conditions
         self.bound_links = None

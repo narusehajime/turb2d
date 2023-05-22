@@ -8,6 +8,6 @@ cython
 landlab=2.2
 matplotlib
 numpy
-gdal<=3.2
+gdal
 scipy
 tqdm

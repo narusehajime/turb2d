@@ -20,8 +20,8 @@ def neighbors_at_link(shape, links):
            [-1, -1, -1,  3]])
     """
     import _neighbors_at_link
-    links = np.asarray(links, dtype=int)
-    out = np.full((links.size, 4), -1, dtype=int)
+    links = np.asarray(links, dtype=np.int32)
+    out = np.full((links.size, 4), -1, dtype=np.int32)
     _neighbors_at_link.neighbors_at_link(links, shape, out)
     return out
 
@@ -625,7 +625,7 @@ def nth_vertical_link(shape, links):
     >>> nth_vertical_link(shape, (3, 4, 11))
     array([0, 1, 5])
     """
-    links = np.asarray(links, dtype=np.int)
+    links = np.asarray(links, dtype=np.int32)
     return as_id_array(
         (links // (2 * shape[1] - 1)) * shape[1]
         + links % (2 * shape[1] - 1)
@@ -737,7 +737,7 @@ def nth_horizontal_link(shape, links):
     >>> nth_horizontal_link(shape, (1, 7, 8))
     array([1, 3, 4])
     """
-    links = np.asarray(links, dtype=np.int)
+    links = np.asarray(links, dtype=np.int32)
     return as_id_array(
         (links // (2 * shape[1] - 1)) * (shape[1] - 1) + links % (2 * shape[1] - 1)
     )
