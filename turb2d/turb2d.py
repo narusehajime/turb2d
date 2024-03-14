@@ -1,6 +1,7 @@
 from .gridutils import set_up_neighbor_arrays, update_up_down_links_and_nodes
 from .gridutils import map_values, map_links_to_nodes, map_nodes_to_links
 from .gridutils import find_boundary_links_nodes, adjust_negative_values
+from .gridutils import write_netcdf
 from .utils import (
     create_init_flow_region,
     create_topography,
@@ -11,7 +12,7 @@ from .sediment_func import get_es, get_ew, get_ws
 from .cip import update_gradient, update_gradient2
 from .cip import CIP2D, Jameson, SOR
 from landlab.io.native_landlab import save_grid
-from landlab.io.netcdf import write_netcdf
+# from landlab.io.netcdf import write_netcdf, write_raster_netcdf
 
 from . import _links as links
 from landlab import Component, FieldError
@@ -1636,12 +1637,12 @@ class TurbidityCurrent2D(Component):
                 out=self.Ch_i_temp[i, :],
             )
         self.jameson.run(self.h, self.wet_pwet_nodes, at="node", out=self.h_temp)
-        self.jameson.run(
-            self.u, self.wet_pwet_horizontal_links, at="hlink", out=self.u_temp
-        )
-        self.jameson.run(
-            self.v, self.wet_pwet_vertical_links, at="vlink", out=self.v_temp
-        )
+        # self.jameson.run(
+        #    self.u, self.wet_pwet_horizontal_links, at="hlink", out=self.u_temp
+        # )
+        # self.jameson.run(
+        #     self.v, self.wet_pwet_vertical_links, at="vlink", out=self.v_temp
+        # )
 
         # if self.model == "4eq":
         #     self.jameson.run(
@@ -2157,7 +2158,7 @@ class TurbidityCurrent2D(Component):
 
         save_grid(self.grid, filename, clobber=clobber)
 
-    def save_nc(self, filename):
+    def save_nc(self, filename, time=None, format='NETCDF3_64BIT'):
         """save a grid in netCDF format
 
         This function saves grid as a netCDF file that can be loaded by
@@ -2205,7 +2206,16 @@ class TurbidityCurrent2D(Component):
             ]
         )
 
-        write_netcdf(filename, self.grid, names=variable_names, at="node")
+        write_netcdf(
+            filename,
+            self.grid,
+            names=variable_names,
+            at="node",
+            raster=True,
+            time=time,
+            format=format,
+        )
+        # write_raster_netcdf(filename, self.grid, time=time, names=variable_names, at="node", format=format)
 
     def update_boundary_conditions(
         self,
@@ -2429,12 +2439,12 @@ def run(
 
     # start calculation
     t = time.time()
-    tc.save_nc("tc{:04d}.nc".format(0))
+    tc.save_nc("tc{:04d}.nc".format(0), time=0.0)
     Ch_init = np.sum(tc.C * tc.h)
 
     for i in tqdm(range(1, number_of_steps + 1), disable=(progress is False)):
         tc.run_one_step(dt=dt)
-        tc.save_nc("tc{:04d}.nc".format(i))
+        tc.save_nc("tc{:04d}.nc".format(i), time=i*dt)
         if np.sum(tc.C * tc.h) / Ch_init < 0.01:
             break
     tc.save_grid("tc{:04d}.grid".format(i))

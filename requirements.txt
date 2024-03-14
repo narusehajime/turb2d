@@ -5,9 +5,11 @@
 #    pip-compile --output-file requirements.txt requirements.in
 #
 cython
-landlab=2.2
+landlab=2.7
 matplotlib
 numpy
 gdal
 scipy
 tqdm
+pathlib
+xarray

@@ -1,7 +1,8 @@
 """Utility functions for landlab grids
 """
 import numpy as np
-
+import xarray as xr
+import pathlib
 from . import _links as links
 from .cip import cubic_interp_1d, rcubic_interp_1d, forester_filter, update_gradient
 
@@ -815,7 +816,7 @@ def find_boundary_links_nodes(tc):
 
 
 def adjust_negative_values(
-    f, core, east_id, west_id, north_id, south_id, out_f=None, loop=1000,
+    f, core, east_id, west_id, north_id, south_id, out_f=None, loop=10,
 ):
 
     if out_f is None:
@@ -854,9 +855,177 @@ def adjust_negative_values(
         )
         to_fix = core[out_f[core] < 0]
         f_temp[:] = out_f[:]
+        counter += 1
 
     if counter == loop:
         out_f[out_f < 0] = 0
         print("Forester filter failed to fix negative values")
 
     return out_f
+
+def write_netcdf(
+    path,
+    grid,
+    attrs=None,
+    append=False,
+    format="NETCDF3_64BIT",
+    names=None,
+    at=None,
+    time=None,
+    raster=False,
+):
+    """Write landlab fields to netcdf.
+
+    Write the data and grid information for *grid* to *path* as NetCDF.
+    If the *append* keyword argument in True, append the data to an existing
+    file, if it exists. Otherwise, clobber an existing files.
+
+    Parameters
+    ----------
+    path : str
+        Path to output file.
+    grid : RasterModelGrid
+        Landlab RasterModelGrid object that holds a grid and associated values.
+    append : boolean, optional
+        Append data to an existing file, otherwise clobber the file.
+    format : {'NETCDF3_CLASSIC', 'NETCDF3_64BIT', 'NETCDF4_CLASSIC', 'NETCDF4'}
+        Format of output netcdf file.
+    attrs : dict
+        Attributes to add to netcdf file.
+    names : iterable of str, optional
+        Names of the fields to include in the netcdf file. If not provided,
+        write all fields.
+    at : {'node', 'cell'}, optional
+        The location where values are defined.
+    raster : bool, optional
+        Indicate whether spatial dimensions are written as full value arrays
+        (default) or just as coordinate dimensions.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from landlab import RasterModelGrid
+    >>> from landlab.io.netcdf import write_netcdf
+
+    Create a uniform rectilinear grid with four rows and 3 columns, and add
+    some data fields to it.
+
+    >>> rmg = RasterModelGrid((4, 3))
+    >>> rmg.at_node["topographic__elevation"] = np.arange(12.0)
+    >>> rmg.at_node["uplift_rate"] = 2.0 * np.arange(12.0)
+
+    Create a temporary directory to write the netcdf file into.
+
+    >>> import tempfile, os
+    >>> temp_dir = tempfile.mkdtemp()
+    >>> os.chdir(temp_dir)
+
+    Write the grid to a netcdf3 file but only include the *uplift_rate*
+    data in the file.
+
+    >>> write_netcdf("test.nc", rmg, format="NETCDF3_64BIT", names="uplift_rate")
+
+    Read the file back in and check its contents.
+
+    >>> from scipy.io import netcdf
+    >>> fp = netcdf.netcdf_file("test.nc", "r")
+    >>> "uplift_rate" in fp.variables
+    True
+    >>> "topographic__elevation" in fp.variables
+    False
+    >>> fp.variables["uplift_rate"][:].flatten().astype("=f8")
+    array([  0.,   2.,   4.,   6.,   8.,  10.,  12.,  14.,  16.,  18.,  20.,
+            22.])
+
+    >>> rmg.at_cell["air__temperature"] = np.arange(2.0)
+    >>> write_netcdf(
+    ...     "test-cell.nc",
+    ...     rmg,
+    ...     format="NETCDF3_64BIT",
+    ...     names="air__temperature",
+    ...     at="cell",
+    ... )
+    """
+    path = pathlib.Path(path)
+    if append and not path.exists():
+        append = False
+
+    if at not in (None, "cell", "node"):
+        raise ValueError("value location not understood")
+
+    if isinstance(names, str):
+        names = (names,)
+
+    at = at or _guess_at_location(grid, names) or "node"
+    if names is None:
+        names = grid[at].keys()
+
+    if not set(grid[at].keys()).issuperset(names):
+        raise ValueError("values must be on either cells or nodes, not both")
+
+    attrs = attrs or {}
+
+    if append:
+        dims = ("nt", "nj", "ni")
+    else:
+        dims = ("nj", "ni")
+        
+    shape = grid.shape
+    
+    if at == "cell":
+        shape = shape[0] - 2, shape[1] - 2
+
+    data = {}
+    if append:
+        with xr.open_dataset(path) as dataset:
+            time_varying_names = [
+                name for name in dataset.variables if "nt" in dataset[name].dims
+            ]
+            for name in set(time_varying_names) & set(names):
+                values = getattr(grid, "at_" + at)[name].reshape((1,) + shape)
+                data[name] = (dims, np.concatenate([dataset[name].values, values]))
+
+            if "nt" not in dataset.variables:
+                times = np.arange(len(dataset["nt"]) + 1)
+            else:
+                times = np.concatenate((dataset["nt"].values, [0.0]))
+
+        if time is None:
+            times[-1] = times[-2] + 1.0
+        else:
+            times[-1] = time
+        data["nt"] = (("nt",), times)
+
+    if at == "cell":
+        data["x_bnds"] = (
+            ("nj", "ni", "nv"),
+            grid.x_of_corner[grid.corners_at_cell].reshape(shape + (4,)),
+        )
+        data["y_bnds"] = (
+            ("nj", "ni", "nv"),
+            grid.y_of_corner[grid.corners_at_cell].reshape(shape + (4,)),
+        )
+    else:
+        if raster:
+            data["ni"] = (("ni"), grid.x_of_node.reshape(shape)[0, :])
+            data["nj"] = (("nj"), grid.y_of_node.reshape(shape)[:, 0])
+        else:
+            data["ni"] = (("nj", "ni"), grid.x_of_node.reshape(shape))
+            data["nj"] = (("nj", "ni"), grid.y_of_node.reshape(shape))
+
+    if not append:
+        if time is not None:
+            data["t"] = [time]
+        for name in names:
+            data[name] = (
+                dims,
+                # getattr(grid, "at_" + at)[name].reshape((-1,) + shape),
+                getattr(grid, "at_" + at)[name].reshape(shape),
+            )
+
+    dataset = xr.Dataset(data, attrs=attrs)
+
+    if append:
+        dataset.to_netcdf(path, mode="w", format=format, unlimited_dims=("nt",))
+    else:
+        dataset.to_netcdf(path, mode="w", format=format)
