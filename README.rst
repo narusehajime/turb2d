@@ -17,12 +17,11 @@ Usage
 
 A simple usage of this program is as follows:
 
-Example 01: Surge-like turbidity current in artificial canyon
+Example 01: Surge-like turbidity current in an artificial submarine canyon
 ---------
 from turb2d import create_topography,
 from turb2d import create_init_flow_region,
 from turb2d import TurbidityCurrent2D
-from landlab.io.netcdf import write_netcdf
 from landlab.io.native_landlab import save_grid
 
 # First, make a landlab grid with artificial topography
@@ -51,17 +50,18 @@ create_init_flow_region(
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
                         alpha=0.1,
-                        Ds=80 * 10**-6,
+                        Ds=80 * 10**-6,# single grain size case
+			# Ds = [250e-6, 125e-6, 63e-6, 32e-6],
                         )
 
 # Save the initial condition to a netcdf file which can be read by
 # paraview
-write_netcdf('tc{:04d}.nc'.format(0), grid)
+tc.save_nc('tc{:04d}.nc'.format(0))
 
 # Start Calculation for 10 seconds
 for i in range(10):
     tc.run_one_step(dt=1.0)
-    write_netcdf('tc{:04d}.nc'.format(i), grid)
+    tc.save_nc('tc{:04d}.nc'.format(i + 1))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')
 
@@ -74,7 +74,6 @@ Example 02: Use natural topography from GEOTIFF
 from turb2d import create_topography_from_geotiff
 from turb2d import create_init_flow_region
 from turb2d import TurbidityCurrent2D
-from landlab.io.netcdf import write_netcdf
 from landlab.io.native_landlab import save_grid
 
 grid = create_topography_from_geotiff('depth500.tif', spacing=500)
@@ -91,20 +90,21 @@ create_init_flow_region(
 tc = TurbidityCurrent2D(grid,
                         Cf=0.004,
                         alpha=0.1,
-                        Ds=80 * 10**-6,
+                        Ds=80 * 10**-6, # Single grain size
+			# Ds = [250e-6, 125e-6, 63e-6, 32e-6], # Multiple grain size
                         )
 
-write_netcdf('tc{:04d}.nc'.format(0), grid)
+tc.save_nc('tc{:04d}.nc'.format(0))
 
 for i in range(10):
     tc.run_one_step(dt=1.0)
-    write_netcdf('tc{:04d}.nc'.format(i), grid)
+    tc.save_nc('tc{:04d}.nc'.format(i+1))
     print("", end="\r")
     print("{:.1f}% finished".format(i / last * 100), end='\r')
 save_grid(grid, 'tc{:04d}.nc'.format(i))
 
 
 -------------------------
-Limitation and future implementation
 
-Single grain-size only. Boundary condition are always 'open' (no gradient).
+
+
