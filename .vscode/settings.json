@@ -1,0 +1,10 @@
+{
+    "esbonio.sphinx.confDir": "",
+    "grammarly.selectors": [
+        {
+            "language": "restructuredtext",
+            "scheme": "file",
+            "pattern": "README.rst"
+        }
+    ]
+}
