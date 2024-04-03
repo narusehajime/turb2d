@@ -1,14 +1,17 @@
 """This is a script to run the model of TurbidityCurrent2D
 """
+
 import os
-os.environ['MKL_NUM_THREADS'] = '6'
-os.environ['OMP_NUM_THREADS'] = '6'
+
+os.environ["MKL_NUM_THREADS"] = "6"
+os.environ["OMP_NUM_THREADS"] = "6"
 import numpy as np
 from turb2d.utils import create_topography
 from turb2d.utils import create_init_flow_region, create_topography_from_geotiff
 from landlab import RasterModelGrid
 from turb2d import TurbidityCurrent2D
 import time
+
 # from landlab import FIXED_GRADIENT_BOUNDARY, FIXED_VALUE_BOUNDARY
 
 from tqdm import tqdm
@@ -19,8 +22,8 @@ grid = create_topography(
     spacing=10,
     slope_outside=0.2,  # 0.2
     slope_inside=0.05,  # 0.02
-    slope_basin_break=2000,  #2000
-    canyon_basin_break=2200,  #2200
+    slope_basin_break=2000,  # 2000
+    canyon_basin_break=2200,  # 2200
     canyon_center=1000,
     canyon_half_width=100,
 )
@@ -31,10 +34,12 @@ grid = create_topography(
 #                                       spacing=500,
 #                                       filter_size=[5, 5])
 
-grid.set_status_at_node_on_edges(top=grid.BC_NODE_IS_FIXED_GRADIENT,
-                                 bottom=grid.BC_NODE_IS_FIXED_GRADIENT,
-                                 right=grid.BC_NODE_IS_FIXED_GRADIENT,
-                                 left=grid.BC_NODE_IS_FIXED_GRADIENT)
+grid.set_status_at_node_on_edges(
+    top=grid.BC_NODE_IS_FIXED_GRADIENT,
+    bottom=grid.BC_NODE_IS_FIXED_GRADIENT,
+    right=grid.BC_NODE_IS_FIXED_GRADIENT,
+    left=grid.BC_NODE_IS_FIXED_GRADIENT,
+)
 
 # grid.status_at_node[grid.nodes_at_top_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
 # grid.status_at_node[grid.nodes_at_bottom_edge] = grid.BC_NODE_IS_FIXED_GRADIENT
@@ -78,26 +83,28 @@ tc = TurbidityCurrent2D(
     nu_a=0.75,
     Ds=80 * 10**-6,
     h_init=0.0,
-    Ch_w=10**(-5),
+    Ch_w=10 ** (-5),
     h_w=0.001,
     C_init=0.0,
     implicit_num=100,
-    implicit_threshold=1.0 * 10**-15,
+    implicit_threshold=1.0 * 10**-12,
     r0=1.5,
-    water_entrainment=False,
+    water_entrainment=True,
+    water_detrainment=False,
+    det_factor=1.0,
     suspension=True,
 )
 
 # start calculation
 t = time.time()
-tc.save_nc('tc{:04d}.nc'.format(0))
+tc.save_nc("tc{:04d}.nc".format(0))
 Ch_init = np.sum(tc.C * tc.h)
 last = 200
 
 for i in tqdm(range(1, last + 1), disable=False):
     tc.run_one_step(dt=50.0)
-    tc.save_nc('tc{:04d}.nc'.format(i))
+    tc.save_nc("tc{:04d}.nc".format(i))
     if np.sum(tc.C * tc.h) / Ch_init < 0.01:
         break
-tc.save_grid('tc{:04d}.nc'.format(i))
-print('elapsed time: {} sec.'.format(time.time() - t))
+tc.save_grid("tc{:04d}.nc".format(i))
+print("elapsed time: {} sec.".format(time.time() - t))

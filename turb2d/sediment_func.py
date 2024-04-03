@@ -42,6 +42,47 @@ def get_ew(U, Ch, R, g, umin=0.01, out=None):
     return out
 
 
+def get_det_rate(ws, C_i, det_factor=1.0, out=None):
+    """Calculate rate of detrainment caused by sediment
+      settling
+
+      The detrainment rate at the flow interface is assumed
+      to be proportional to the sediment settling rate.
+      The default value for the proportionality factor is 1.0,
+      but Salinas et al. (2019) estimate that 3.05 is
+      an appropriate value based on DNS calculations.
+
+    Parameters
+    ----------
+    ws : ndarray, float
+       sediment settling rate
+    C_i: ndarray(2d), float
+        Sediment concentration for the ith grain size class
+    det_factor: float
+        Factor for detrainment rate. The default value is
+        1.0.
+
+    out : ndarray
+       Outputs
+
+    Returns
+    ---------
+    e_d : ndarray, float
+       Dentrainment coefficient of water (positive when
+       fluid exits the flow)
+
+    """
+
+    if out is None:
+        out = np.zeros(C_i.shape[1])
+
+    eps = 1.0e-15
+
+    out[:] = det_factor * np.sum((ws * C_i / np.sum(C_i + eps, axis=0)), axis=0)
+
+    return out
+
+
 def get_ws(R, g, Ds, nu):
     """Calculate settling velocity of sediment particles
         on the basis of Ferguson and Church (1982)

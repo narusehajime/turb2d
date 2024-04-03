@@ -8,10 +8,11 @@ from .utils import (
     create_topography_from_geotiff,
 )
 from .wetdry import find_wet_grids, process_partial_wet_grids
-from .sediment_func import get_es, get_ew, get_ws
+from .sediment_func import get_es, get_ew, get_ws, get_det_rate
 from .cip import update_gradient, update_gradient2
 from .cip import CIP2D, Jameson, SOR
 from landlab.io.native_landlab import save_grid
+
 # from landlab.io.netcdf import write_netcdf, write_raster_netcdf
 
 from . import _links as links
@@ -149,6 +150,8 @@ class TurbidityCurrent2D(Component):
         gamma=0.35,
         la=0.01,
         water_entrainment=True,
+        water_detrainment=True,
+        det_factor=1.0,
         suspension=True,
         sed_entrainment_func="GP1991field",
         no_erosion=True,
@@ -205,6 +208,8 @@ class TurbidityCurrent2D(Component):
             turn on the function for entrainment/settling of suspension
         water_entrainment: boolean, optional
             turn on the function for ambient water entrainment
+        water_detrainment: boolean, optional
+            turn on the function for ambient water detrainment
         sed_entrainment_func: string, optional
             Choose the function to be used for sediment entrainment. Default
             is 'GP1991field', and other options are: 'GP1991exp', 'vanRijn1984'
@@ -243,6 +248,8 @@ class TurbidityCurrent2D(Component):
         self.gamma = gamma
         self.la = la
         self.water_entrainment = water_entrainment
+        self.water_detrainment = water_detrainment
+        self.det_factor = det_factor
         self.suspension = suspension
         self.sed_entrainment_func = sed_entrainment_func
         self.model = model
@@ -552,32 +559,32 @@ class TurbidityCurrent2D(Component):
         self.q = np.zeros(grid.number_of_nodes)
 
         # arrays to record upcurrent and downcurrent nodes
-        self.horizontal_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
-        self.vertical_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
-        self.horizontal_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
-        self.vertical_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int32)
+        self.horizontal_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.vertical_up_nodes = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.horizontal_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.vertical_down_nodes = np.zeros(grid.number_of_nodes, dtype=np.int64)
 
-        self.horizontal_up_links = np.zeros(grid.number_of_links, dtype=np.int32)
-        self.vertical_up_links = np.zeros(grid.number_of_links, dtype=np.int32)
-        self.horizontal_down_links = np.zeros(grid.number_of_links, dtype=np.int32)
-        self.vertical_down_links = np.zeros(grid.number_of_links, dtype=np.int32)
+        self.horizontal_up_links = np.zeros(grid.number_of_links, dtype=np.int64)
+        self.vertical_up_links = np.zeros(grid.number_of_links, dtype=np.int64)
+        self.horizontal_down_links = np.zeros(grid.number_of_links, dtype=np.int64)
+        self.vertical_down_links = np.zeros(grid.number_of_links, dtype=np.int64)
 
         # arrays to refer adjacent links and nodes
-        self.east_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
-        self.north_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
-        self.west_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
-        self.south_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int32)
+        self.east_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.north_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.west_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int64)
+        self.south_link_at_node = np.zeros(grid.number_of_nodes, dtype=np.int64)
         self.west_node_at_horizontal_link = np.zeros(
-            grid.number_of_links, dtype=np.int32
+            grid.number_of_links, dtype=np.int64
         )
         self.east_node_at_horizontal_link = np.zeros(
-            grid.number_of_links, dtype=np.int32
+            grid.number_of_links, dtype=np.int64
         )
         self.south_node_at_vertical_link = np.zeros(
-            grid.number_of_links, dtype=np.int32
+            grid.number_of_links, dtype=np.int64
         )
         self.north_node_at_vertical_link = np.zeros(
-            grid.number_of_links, dtype=np.int32
+            grid.number_of_links, dtype=np.int64
         )
 
         # ids to process boundary conditions
@@ -837,8 +844,8 @@ class TurbidityCurrent2D(Component):
             self.u,
             self.v,
             self.wet_pwet_horizontal_links,
-            self.horizontal_up_links,
-            self.vertical_up_links,
+            self.horizontal_up_links.astype(np.int64),
+            self.vertical_up_links.astype(np.int64),
             self.grid.dx,
             self.dt_local,
             out_f=self.u_temp,
@@ -1065,7 +1072,7 @@ class TurbidityCurrent2D(Component):
         """solve the friction term with semi-implicit scheme"""
 
         # calculate water entrainment coefficients
-        if self.water_entrainment is True:
+        if self.water_entrainment:
             self.ew_link[self.wet_horizontal_links] = get_ew(
                 self.U[self.wet_horizontal_links],
                 self.Ch_link[self.wet_horizontal_links],
@@ -1085,6 +1092,23 @@ class TurbidityCurrent2D(Component):
             self.ew_link[self.wet_horizontal_links] = 0
             self.ew_link[self.wet_vertical_links] = 0
             self.ew_node[self.wet_nodes] = 0
+
+        if self.water_detrainment:
+            self.ew_link[self.wet_horizontal_links] -= get_det_rate(
+                self.ws,
+                self.Ch_link_i[:, self.wet_horizontal_links]
+                / self.h_link[self.wet_horizontal_links],
+                det_factor=self.det_factor,
+            )
+            self.ew_link[self.wet_vertical_links] -= get_det_rate(
+                self.ws,
+                self.Ch_link_i[:, self.wet_vertical_links]
+                / self.h_link[self.wet_vertical_links],
+                det_factor=self.det_factor,
+            )
+            self.ew_node[self.wet_nodes] -= get_det_rate(
+                self.ws, self.C_i[:, self.wet_nodes], det_factor=self.det_factor
+            )
 
         # calculate friction terms using semi-implicit scheme
         self.u_temp[self.wet_horizontal_links] /= (
@@ -2039,18 +2063,18 @@ class TurbidityCurrent2D(Component):
         self.C_i[:, all_wet_nodes] = self.Ch_i[:, all_wet_nodes] / self.h[all_wet_nodes]
         for i in range(self.number_gclass):
             self.grid.at_node["flow__sediment_concentration_" + str(i)] = self.C_i[i, :]
-            self.grid.at_node[
-                "flow_sediment_volume__horizontal_gradient_" + str(i)
-            ] = self.dChdx_i[i, :]
-            self.grid.at_node[
-                "flow_sediment_volume__vertical_gradient_" + str(i)
-            ] = self.dChdy_i[i, :]
-            self.grid.at_node[
-                "bed__sediment_volume_per_unit_area_" + str(i)
-            ] = self.bed_thick_i[i, :]
-            self.grid.at_node[
-                "bed__active_layer_fraction_" + str(i)
-            ] = self.bed_active_layer[i, :]
+            self.grid.at_node["flow_sediment_volume__horizontal_gradient_" + str(i)] = (
+                self.dChdx_i[i, :]
+            )
+            self.grid.at_node["flow_sediment_volume__vertical_gradient_" + str(i)] = (
+                self.dChdy_i[i, :]
+            )
+            self.grid.at_node["bed__sediment_volume_per_unit_area_" + str(i)] = (
+                self.bed_thick_i[i, :]
+            )
+            self.grid.at_node["bed__active_layer_fraction_" + str(i)] = (
+                self.bed_active_layer[i, :]
+            )
         self.C[:] = np.sum(self.C_i, axis=0)
         self.grid.at_node["flow__sediment_concentration_total"] = self.C
         self.grid.at_node["topographic__elevation"] = self.eta
@@ -2158,7 +2182,7 @@ class TurbidityCurrent2D(Component):
 
         save_grid(self.grid, filename, clobber=clobber)
 
-    def save_nc(self, filename, time=None, format='NETCDF3_64BIT'):
+    def save_nc(self, filename, time=None, format="NETCDF3_64BIT"):
         """save a grid in netCDF format
 
         This function saves grid as a netCDF file that can be loaded by
@@ -2444,7 +2468,7 @@ def run(
 
     for i in tqdm(range(1, number_of_steps + 1), disable=(progress is False)):
         tc.run_one_step(dt=dt)
-        tc.save_nc("tc{:04d}.nc".format(i), time=i*dt)
+        tc.save_nc("tc{:04d}.nc".format(i), time=i * dt)
         if np.sum(tc.C * tc.h) / Ch_init < 0.01:
             break
     tc.save_grid("tc{:04d}.grid".format(i))

@@ -1,5 +1,6 @@
 """Utility functions for landlab grids
 """
+
 import numpy as np
 import xarray as xr
 import pathlib
@@ -79,7 +80,7 @@ def set_up_neighbor_arrays(tc):
 
 def update_up_down_links_and_nodes(tc):
     """update location of upcurrent and downcurrent
-       nodes and links
+    nodes and links
     """
 
     find_horizontal_up_down_nodes(
@@ -126,8 +127,7 @@ def map_values(
     Cf_link=None,
     Cf_node=None,
 ):
-    """map parameters at nodes to links, and those at links to nodes
-    """
+    """map parameters at nodes to links, and those at links to nodes"""
     map_links_to_nodes(
         tc,
         u=u,
@@ -176,8 +176,7 @@ def map_links_to_nodes(
     Cf_node=None,
     Kh=None,
 ):
-    """map parameters at links to nodes
-    """
+    """map parameters at links to nodes"""
     dry_links = tc.dry_links
     dry_nodes = tc.dry_nodes
     wet_pwet_nodes = tc.wet_pwet_nodes
@@ -314,7 +313,10 @@ def map_links_to_nodes(
         and (v_node is not None)
     ):
         tc.update_boundary_conditions(
-            u=u, v=v, u_node=u_node, v_node=v_node,
+            u=u,
+            v=v,
+            u_node=u_node,
+            v_node=v_node,
         )
 
 
@@ -356,8 +358,7 @@ def map_nodes_to_links(
     Ch_link_i=None,
     Ch_link=None,
 ):
-    """map parameters at nodes to links
-    """
+    """map parameters at nodes to links"""
 
     north_node_at_vertical_link = tc.north_node_at_vertical_link[
         tc.wet_pwet_vertical_links
@@ -488,10 +489,9 @@ def map_mean_of_link_nodes_to_link(
     west_node_at_horizontal_link,
     out=None,
 ):
-    """ map mean of parameters at nodes to link
-    """
+    """map mean of parameters at nodes to link"""
     if out is None:
-        out = np.zeros(f.shape[0], dtype=np.int32)
+        out = np.zeros(f.shape[0], dtype=np.int64)
 
     out[horizontal_link] = (
         f[east_node_at_horizontal_link] + f[west_node_at_horizontal_link]
@@ -505,12 +505,12 @@ def map_mean_of_link_nodes_to_link(
 
 def find_horizontal_up_down_nodes(tc, u, out_up=None, out_down=None):
     """Find indeces of nodes that locate
-       at horizontally upcurrent and downcurrent directions
+    at horizontally upcurrent and downcurrent directions
     """
     if out_up is None:
-        out_up = np.empty(u.shape[0], dtype=np.int32)
+        out_up = np.empty(u.shape[0], dtype=np.int64)
     if out_down is None:
-        out_down = np.empty(u.shape[0], dtype=np.int32)
+        out_down = np.empty(u.shape[0], dtype=np.int64)
 
     out_up[:] = tc.node_west[:]
     out_down[:] = tc.node_east[:]
@@ -523,13 +523,13 @@ def find_horizontal_up_down_nodes(tc, u, out_up=None, out_down=None):
 
 def find_vertical_up_down_nodes(tc, u, out_up=None, out_down=None):
     """Find indices of nodes that locate
-       at vertically upcurrent and downcurrent directions
+    at vertically upcurrent and downcurrent directions
     """
 
     if out_up is None:
-        out_up = np.empty(u.shape[0], dtype=np.int32)
+        out_up = np.empty(u.shape[0], dtype=np.int64)
     if out_down is None:
-        out_down = np.empty(u.shape[0], dtype=np.int32)
+        out_down = np.empty(u.shape[0], dtype=np.int64)
 
     out_up[:] = tc.node_south[:]
     out_down[:] = tc.node_north[:]
@@ -542,30 +542,31 @@ def find_vertical_up_down_nodes(tc, u, out_up=None, out_down=None):
 
 def find_horizontal_up_down_links(tc, u, out_up=None, out_down=None):
     """Find indices of nodes that locate
-       at horizontally upcurrent and downcurrent directions
+    at horizontally upcurrent and downcurrent directions
     """
     if out_up is None:
-        out_up = np.zeros(u.shape[0], dtype=np.int32)
+        out_up = np.zeros(u.shape[0], dtype=np.int64)
     if out_down is None:
-        out_down = np.zeros(u.shape[0], dtype=np.int32)
+        out_down = np.zeros(u.shape[0], dtype=np.int64)
 
     out_up[:] = tc.link_west[:]
     out_down[:] = tc.link_east[:]
     negative_u_index = np.where(u < 0)[0]
     out_up[negative_u_index] = tc.link_east[negative_u_index]
     out_down[negative_u_index] = tc.link_west[negative_u_index]
+
     return out_up, out_down
 
 
 def find_vertical_up_down_links(tc, u, out_up=None, out_down=None):
     """Find indeces of nodes that locate
-       at vertically upcurrent and downcurrent directions
+    at vertically upcurrent and downcurrent directions
     """
 
     if out_up is None:
-        out_up = np.zeros(u.shape[0], dtype=np.int32)
+        out_up = np.zeros(u.shape[0], dtype=np.int64)
     if out_down is None:
-        out_down = np.zeros(u.shape[0], dtype=np.int32)
+        out_down = np.zeros(u.shape[0], dtype=np.int64)
 
     out_up[:] = tc.link_south[:]
     out_down[:] = tc.link_north[:]
@@ -577,8 +578,7 @@ def find_vertical_up_down_links(tc, u, out_up=None, out_down=None):
 
 
 def find_boundary_links_nodes(tc):
-    """find and record boundary links and nodes
-    """
+    """find and record boundary links and nodes"""
     grid = tc.grid
 
     # Boundary Types
@@ -816,7 +816,14 @@ def find_boundary_links_nodes(tc):
 
 
 def adjust_negative_values(
-    f, core, east_id, west_id, north_id, south_id, out_f=None, loop=10,
+    f,
+    core,
+    east_id,
+    west_id,
+    north_id,
+    south_id,
+    out_f=None,
+    loop=10,
 ):
 
     if out_f is None:
@@ -859,9 +866,10 @@ def adjust_negative_values(
 
     if counter == loop:
         out_f[out_f < 0] = 0
-        print("Forester filter failed to fix negative values")
+        # print("Forester filter failed to fix negative values")
 
     return out_f
+
 
 def write_netcdf(
     path,
@@ -969,9 +977,9 @@ def write_netcdf(
         dims = ("nt", "nj", "ni")
     else:
         dims = ("nj", "ni")
-        
+
     shape = grid.shape
-    
+
     if at == "cell":
         shape = shape[0] - 2, shape[1] - 2
 

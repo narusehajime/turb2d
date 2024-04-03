@@ -9,18 +9,11 @@ with open("README.rst") as f:
 with open("LICENSE") as f:
     license = f.read()
 
-# ext = Extension("cip",
-#                 sources=["turb2d/cip.pyx"],
-#                 include_dirs=[np.get_include()])
-# ext2 = Extension("gridutils",
-#                  sources=["turb2d/gridutils.pyx"],
-#                  include_dirs=[np.get_include()])
 ext_neighbors_at_link = Extension(
     "_neighbors_at_link",
     sources=["turb2d/_neighbors_at_link.pyx"],
     include_dirs=[np.get_include()],
 )
-
 
 setup(
     name="turb2d",
@@ -40,8 +33,6 @@ setup(
         "gdal",
         "tqdm",
     ],
-    # ext_modules=cythonize([ext, ext2]),
-    # ext_modules=cythonize([ext]),
     ext_modules=cythonize([ext_neighbors_at_link]),
     packages=find_packages(exclude=("tests", "docs")),
 )
