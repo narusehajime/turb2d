@@ -1119,7 +1119,7 @@ class TurbidityCurrent2D(Component):
                     + self.ew_link[self.wet_horizontal_links]
                 )
                 * self.U[self.wet_horizontal_links]
-                + det_rate_u
+                - det_rate_u
             )
             * self.dt_local
             / self.h_link[self.wet_horizontal_links]
@@ -1132,7 +1132,7 @@ class TurbidityCurrent2D(Component):
                     + self.ew_link[self.wet_vertical_links]
                 )
                 * self.U[self.wet_vertical_links]
-                + det_rate_v
+                - det_rate_v
             )
             * self.dt_local
             / self.h_link[self.wet_vertical_links]
