@@ -1094,43 +1094,50 @@ class TurbidityCurrent2D(Component):
             self.ew_node[self.wet_nodes] = 0
 
         if self.water_detrainment:
-            self.ew_link[self.wet_horizontal_links] -= get_det_rate(
+            det_rate_u = get_det_rate(
                 self.ws,
-                self.Ch_link_i[:, self.wet_horizontal_links]
-                / self.h_link[self.wet_horizontal_links],
+                self.Ch_link_i[:, self.wet_horizontal_links],
+                self.h_link[self.wet_horizontal_links],
                 det_factor=self.det_factor,
             )
-            self.ew_link[self.wet_vertical_links] -= get_det_rate(
+            det_rate_v = get_det_rate(
                 self.ws,
-                self.Ch_link_i[:, self.wet_vertical_links]
-                / self.h_link[self.wet_vertical_links],
+                self.Ch_link_i[:, self.wet_vertical_links],
+                self.h_link[self.wet_vertical_links],
                 det_factor=self.det_factor,
             )
-            self.ew_node[self.wet_nodes] -= get_det_rate(
-                self.ws, self.C_i[:, self.wet_nodes], det_factor=self.det_factor
-            )
+        else:
+            det_rate_u = 0.0
+            det_rate_v = 0.0
 
         # calculate friction terms using semi-implicit scheme
         self.u_temp[self.wet_horizontal_links] /= (
             1
             + (
-                self.Cf_link[self.wet_horizontal_links]
-                + self.ew_link[self.wet_horizontal_links]
+                (
+                    self.Cf_link[self.wet_horizontal_links]
+                    + self.ew_link[self.wet_horizontal_links]
+                )
+                * self.U[self.wet_horizontal_links]
+                + det_rate_u
             )
-            * self.U[self.wet_horizontal_links]
             * self.dt_local
             / self.h_link[self.wet_horizontal_links]
         )
         self.v_temp[self.wet_vertical_links] /= (
             1
             + (
-                self.Cf_link[self.wet_vertical_links]
-                + self.ew_link[self.wet_vertical_links]
+                (
+                    self.Cf_link[self.wet_vertical_links]
+                    + self.ew_link[self.wet_vertical_links]
+                )
+                * self.U[self.wet_vertical_links]
+                + det_rate_v
             )
-            * self.U[self.wet_vertical_links]
             * self.dt_local
             / self.h_link[self.wet_vertical_links]
         )
+
         self.update_boundary_conditions(
             u=self.u_temp,
             v=self.v_temp,
@@ -1174,6 +1181,17 @@ class TurbidityCurrent2D(Component):
                 * self.U_node[self.wet_nodes]
                 * self.dt_local
             )
+
+        # calculate flow contraction by water detrainment
+        if self.water_detrainment is True:
+            self.h_temp[self.wet_nodes] -= (
+                get_det_rate(
+                    self.ws,
+                    self.Ch_i[:, self.wet_nodes],
+                    self.h[self.wet_nodes],
+                    self.det_factor,
+                )
+            ) * self.dt_local
 
         # map nodes to links
         map_nodes_to_links(

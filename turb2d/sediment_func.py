@@ -42,7 +42,7 @@ def get_ew(U, Ch, R, g, umin=0.01, out=None):
     return out
 
 
-def get_det_rate(ws, C_i, det_factor=1.0, out=None):
+def get_det_rate(ws, Ch_i, h, det_factor=1.0, out=None):
     """Calculate rate of detrainment caused by sediment
       settling
 
@@ -74,11 +74,12 @@ def get_det_rate(ws, C_i, det_factor=1.0, out=None):
     """
 
     if out is None:
-        out = np.zeros(C_i.shape[1])
+        out = np.zeros(h.shape)
 
     eps = 1.0e-15
+    C_i = Ch_i / h + eps
 
-    out[:] = det_factor * np.sum((ws * C_i / np.sum(C_i + eps, axis=0)), axis=0)
+    out[:] = det_factor * np.sum((ws * C_i / np.sum(C_i, axis=0)), axis=0)
 
     return out
 
