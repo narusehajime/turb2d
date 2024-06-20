@@ -337,10 +337,8 @@ def process_partial_wet_grids(
     CfvU = (
         Cf
         * np.sqrt(
-            u[partial_wet_vertical_links]
-            * u[partial_wet_vertical_links]
-            * +v[partial_wet_vertical_links]
-            * v[partial_wet_vertical_links]
+            u[partial_wet_vertical_links] * u[partial_wet_vertical_links]
+            + v[partial_wet_vertical_links] * v[partial_wet_vertical_links]
         )
         / (h[vertically_wettest_nodes] + h[vertically_partial_wet_nodes])
         * 2
