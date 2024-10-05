@@ -17,22 +17,15 @@ ext_neighbors_at_link = Extension(
 
 setup(
     name="turb2d",
-    version="0.3.0",
+    version="0.4.0",
     description="2D shallow water model for turbidity currents",
     long_description=readme,
+    long_description_content_type="text/x-rst",  # Specify the type if you are using reStructuredText
     author="Hajime Naruse",
     author_email="naruse@kueps.kyoto-u.ac.jp",
     url="https://github.com/narusehajime/turb2d.git",
     license=license,
-    install_requires=[
-        "cython",
-        "numpy",
-        "scipy",
-        "landlab==2.4.1",
-        "matplotlib",
-        "gdal==3.6.4",
-        "tqdm",
-    ],
     ext_modules=cythonize([ext_neighbors_at_link]),
     packages=find_packages(exclude=("tests", "docs")),
 )
+

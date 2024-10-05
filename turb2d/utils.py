@@ -6,9 +6,9 @@
 
 from landlab import RasterModelGrid
 import numpy as np
-from osgeo import gdal, gdalconst
-from scipy.ndimage import median_filter
+from scipy.ndimage import median_filter, zoom
 from landlab import FieldError
+import rasterio
 
 
 def create_topography(
@@ -211,14 +211,15 @@ def create_init_flow_region(
 
 
 def create_topography_from_geotiff(
-    geotiff_filename, xlim=None, ylim=None, spacing=500, filter_size=[1, 1]
+    geotiff_filename, xlim=None, ylim=None, spacing=None, filter_size=[1, 1]
 ):
     """create a landlab grid file from a geotiff file
 
     Parameters
     -----------------------
     geotiff_filename: String
-       name of a geotiff-format file to import
+       Name of a geotiff-format file to import.
+       DEM coordinates must be in a projected coordinate system (e.g. UTM).
 
     xlim: list, optional
        list [xmin, xmax] to specify x coordinates of a region of interest
@@ -229,7 +230,12 @@ def create_topography_from_geotiff(
           in a geotiff file to import
 
     spacing: float, optional
-       grid spacing
+       grid spacing.
+       Normally, the grid interval is automatically read from the geotif file,
+       so there is no need to specify this parameter. However, if you do
+       specify it, an interpolation process will be carried out to convert
+       the DEM data to match the specified value. This process can take a long
+       time.
 
     filter_size: list, optional
        [x, y] size of a window used in a median filter.
@@ -243,20 +249,265 @@ def create_topography_from_geotiff(
     """
 
     # read a geotiff file into ndarray
-    topo_file = gdal.Open(geotiff_filename, gdalconst.GA_ReadOnly)
-    topo_data = topo_file.GetRasterBand(1).ReadAsArray()
+    with rasterio.open(geotiff_filename) as src:
+        topo_data = src.read(1)[::-1, :]
+        profile = src.profile
+        width = profile["width"]
+        height = profile["height"]
+        transform = src.transform
+        dx = transform[0]
+        min_x, max_y = transform * (0, 0)
+        max_x, min_y = transform * (width, height)
+        xy_of_lower_left = (min_x, min_y)
+
+    # print(topo_data.shape)
     if (xlim is not None) and (ylim is not None):
         topo_data = topo_data[xlim[0] : xlim[1], ylim[0] : ylim[1]]
 
     # Smoothing by median filter
     topo_data = median_filter(topo_data, size=filter_size)
 
-    grid = RasterModelGrid(topo_data.shape, xy_spacing=[spacing, spacing])
+    # change grid size if the parameter spacing is specified
+    if spacing is not None and spacing != dx:
+        zoom_factor = dx / spacing
+        topo_data = zoom(topo_data, zoom_factor)
+        dx = spacing
+
+    grid = RasterModelGrid(
+        topo_data.shape, xy_spacing=[dx, dx], xy_of_lower_left=xy_of_lower_left
+    )
     grid.add_zeros("flow__depth", at="node")
     grid.add_zeros("topographic__elevation", at="node")
     grid.add_zeros("flow__horizontal_velocity", at="link")
     grid.add_zeros("flow__vertical_velocity", at="link")
     grid.add_zeros("bed__thickness", at="node")
     grid.at_node["topographic__elevation"][grid.nodes] = topo_data
+    grid.add_zeros("flow__horizontal_velocity_at_node", at="node")
+    grid.add_zeros("flow__vertical_velocity_at_node", at="node")
 
     return grid
+
+
+def create_init_flow_region_surge(
+    grid,
+    initial_flow_concentration=0.02,
+    initial_flow_thickness=200,
+    initial_region_radius=200,
+    initial_region_center=[1000, 7000],
+    shallow_region_source=None,
+):
+    """making initial flow region in a grid, assuming lock-exchange type initiation
+    of a turbidity current. Plan-view morphology of a suspended cloud is a circle,
+
+    Parameters
+    ----------------------
+    grid: RasterModelGrid
+       a landlab grid object
+
+    initial_flow_concentration: float, optional
+       initial flow concentration
+
+    initial_flow_thickness: float, optional
+       initial flow thickness
+
+    initial_region_radius: float, optional
+       radius of initial flow region
+
+    initial_region_center: list, optional
+       [x, y] coordinates of center of initial flow region
+    """
+    # check number of grain size classes
+    if type(initial_flow_concentration) is float:
+        initial_flow_concentration_i = np.array([initial_flow_concentration])
+    else:
+        initial_flow_concentration_i = np.array(initial_flow_concentration).reshape(
+            len(initial_flow_concentration), 1
+        )
+
+    # initialize flow parameters
+    for i in range(len(initial_flow_concentration_i)):
+        try:
+            grid.add_zeros("flow__sediment_concentration_{}".format(i), at="node")
+        except FieldError:
+            grid.at_node["flow__sediment_concentration_{}".format(i)][:] = 0.0
+        try:
+            grid.add_zeros("bed__sediment_volume_per_unit_area_{}".format(i), at="node")
+        except FieldError:
+            grid.at_node["bed__sediment_volume_per_unit_area_{}".format(i)][:] = 0.0
+
+    try:
+        grid.add_zeros("flow__sediment_concentration_total", at="node")
+    except FieldError:
+        grid.at_node["flow__sediment_concentration_total"][:] = 0.0
+    try:
+        grid.add_zeros("flow__depth", at="node")
+    except FieldError:
+        grid.at_node["flow__depth"][:] = 0.0
+    try:
+        grid.add_zeros("flow__horizontal_velocity_at_node", at="node")
+    except FieldError:
+        grid.at_node["flow__horizontal_velocity_at_node"][:] = 0.0
+    try:
+        grid.add_zeros("flow__vertical_velocity_at_node", at="node")
+    except FieldError:
+        grid.at_node["flow__vertical_velocity_at_node"][:] = 0.0
+    try:
+        grid.add_zeros("flow__horizontal_velocity", at="link")
+    except FieldError:
+        grid.at_link["flow__horizontal_velocity"][:] = 0.0
+    try:
+        grid.add_zeros("flow__vertical_velocity", at="link")
+    except FieldError:
+        grid.at_link["flow__vertical_velocity"][:] = 0.0
+
+    # check circular initial flow region (initial_flow_radius = float) or rectangular (initial_flow_radius = [x_half_length, y_half_length])
+    if type(initial_region_radius) is float:
+        initial_flow_region = (
+            (grid.node_x - initial_region_center[0]) ** 2
+            + (grid.node_y - initial_region_center[1]) ** 2
+        ) < initial_region_radius**2
+    else:
+        initial_flow_region = (
+            (grid.node_x - initial_region_center[0]) ** 2
+            < initial_region_radius[0] ** 2
+        ) & (
+            (grid.node_y - initial_region_center[1]) ** 2
+            < initial_region_radius[1] ** 2
+        )
+
+    if shallow_region_source is not None:
+        initial_flow_region = (
+            grid.at_node["topographic__elevation"] > shallow_region_source
+        ) & (grid.at_node["topographic__elevation"] < 0)
+
+    # set initial flow region
+    grid.at_node["flow__depth"][initial_flow_region] = initial_flow_thickness
+    if shallow_region_source is not None:
+        very_shallow_region = (
+            -grid.at_node["topographic__elevation"] < initial_flow_thickness
+        ) & (grid.at_node["topographic__elevation"] < 0.0)
+        grid.at_node["flow__depth"][very_shallow_region] = -grid.at_node[
+            "topographic__elevation"
+        ][very_shallow_region]
+
+    grid.at_node["flow__depth"][~initial_flow_region] = 0.0
+    for i in range(len(initial_flow_concentration_i)):
+        grid.at_node["flow__sediment_concentration_{}".format(i)][
+            initial_flow_region
+        ] = initial_flow_concentration_i[i]
+        grid.at_node["flow__sediment_concentration_{}".format(i)][
+            ~initial_flow_region
+        ] = 0.0
+    grid.at_node["flow__sediment_concentration_total"][initial_flow_region] = np.sum(
+        initial_flow_concentration_i
+    )
+
+
+def create_init_flow_region_cont(
+    grid,
+    node_y_0,
+    node_y_1,
+    node_x_1,
+    flow_sediment_concentration=0.005,
+    flow_depth=30.0,
+    flow_vertical_velocity=4.0,
+    flow_horizontal_velocity=0.0,
+):
+    """making initial flow region in a grid, assuming continuous type initiation
+    of a turbidity current. Plan-view morphology of a suspended cloud is a rectangle,
+
+    Parameters
+    ----------------------
+    grid: RasterModelGrid
+       a landlab grid object
+
+    node_y_0: int
+       uppermost grid of initiation area
+
+    node_y_1: int
+       lowermost grid of initiation area
+
+    node_x_1: int
+       rightmost grid of initiation area
+
+    flow_sediment_concentration: float, optional
+       initial flow concentration
+
+    flow_depth: float, optional
+       initial flow thickness
+
+    flow_vertical_velocity; float, optional
+       initial flow velocity in vertical direction
+
+    flow_horizontal_velocity; float, optional
+       initial flow velocity in horizontal direction
+    """
+
+    # check number of grain size classes
+    if type(flow_sediment_concentration) is float:
+        flow_sediment_concentration_i = np.array([flow_sediment_concentration])
+    else:
+        flow_sediment_concentration_i = np.array(flow_sediment_concentration).reshape(
+            len(flow_sediment_concentration), 1
+        )
+
+    # initialize flow parameters
+    for i in range(len(flow_sediment_concentration_i)):
+        try:
+            grid.add_zeros("flow__sediment_concentration_{}".format(i), at="node")
+        except FieldError:
+            grid.at_node["flow__sediment_concentration_{}".format(i)][:] = 0.0
+        try:
+            grid.add_zeros("bed__sediment_volume_per_unit_area_{}".format(i), at="node")
+        except FieldError:
+            grid.at_node["bed__sediment_volume_per_unit_area_{}".format(i)][:] = 0.0
+
+    try:
+        grid.add_zeros("flow__sediment_concentration_total", at="node")
+    except FieldError:
+        grid.at_node["flow__sediment_concentration_total"][:] = 0.0
+    try:
+        grid.add_zeros("flow__depth", at="node")
+    except FieldError:
+        grid.at_node["flow__depth"][:] = 0.0
+    try:
+        grid.add_zeros("flow__horizontal_velocity_at_node", at="node")
+    except FieldError:
+        grid.at_node["flow__horizontal_velocity_at_node"][:] = 0.0
+    try:
+        grid.add_zeros("flow__vertical_velocity_at_node", at="node")
+    except FieldError:
+        grid.at_node["flow__vertical_velocity_at_node"][:] = 0.0
+    try:
+        grid.add_zeros("flow__horizontal_velocity", at="link")
+    except FieldError:
+        grid.at_link["flow__horizontal_velocity"][:] = 0.0
+    try:
+        grid.add_zeros("flow__vertical_velocity", at="link")
+    except FieldError:
+        grid.at_link["flow__vertical_velocity"][:] = 0.0
+
+    # set inlet region
+    inlet = np.where(
+        (grid.y_of_node > node_y_0)
+        & (grid.y_of_node < node_y_1)
+        & (grid.x_of_node < node_x_1)
+    )
+    inlet_link = np.where(
+        (grid.midpoint_of_link[:, 1] > node_y_0)
+        & (grid.midpoint_of_link[:, 1] < node_y_1)
+        & (grid.midpoint_of_link[:, 0] < node_x_1)
+    )
+
+    grid.at_node["flow__depth"][inlet] = flow_depth
+    grid.at_node["flow__horizontal_velocity_at_node"][inlet] = flow_horizontal_velocity
+    grid.at_node["flow__vertical_velocity_at_node"][inlet] = -flow_vertical_velocity
+    grid.at_link["flow__horizontal_velocity"][inlet_link] = flow_horizontal_velocity
+    grid.at_link["flow__vertical_velocity"][inlet_link] = -flow_vertical_velocity
+    for i in range(len(flow_sediment_concentration_i)):
+        grid.at_node["flow__sediment_concentration_{}".format(i)][inlet] = (
+            flow_sediment_concentration_i[i]
+        )
+    grid.at_node["flow__sediment_concentration_total"][inlet] = np.sum(
+        flow_sediment_concentration_i
+    )

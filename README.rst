@@ -12,10 +12,9 @@ Step 1. Execute the following command in the downloaded turb2d directory (the di
 
 pip install .
 
-If you run this command, the installation of GDAL package will often fail. You can use pip to install the appropriate version of GDAL for your environment before installing turb2d, or you can use Anaconda to install GDAL. If you use conda, you may be able to install GDAL
-may be installed with the following command.
+or
 
-conda install -c conda-forge gdal=3.6.2
+python setup.py install
 
 Step 2. If the installation of turb2d is successful, you can run run_turb2d_script.py to try out the calculations. 
 

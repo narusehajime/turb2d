@@ -68,7 +68,7 @@ def get_det_rate(ws, Ch_i, h, det_factor=1.0, out=None):
     Returns
     ---------
     e_d : ndarray, float
-       Dentrainment coefficient of water (positive when
+       Detrainment coefficient of water (positive when
        fluid exits the flow)
 
     """
