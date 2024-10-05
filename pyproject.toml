@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools", "wheel", "cython", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "turb2d"
+version = "0.4.0"
+description = "2D shallow water model for turbidity currents"
+readme = "README.rst"
+authors = [{name = "Hajime Naruse", email = "naruse@kueps.kyoto-u.ac.jp"}]
+license = {text = "MIT"}
+dependencies = [
+	     "cython==0.29.33",
+	     "landlab==2.8.0",
+	     "rasterio==1.4.1",
+	     "matplotlib==3.7.1",
+	     "numpy<=1.24",
+	     "scipy==1.10.1",
+	     "tqdm==4.65.0",
+	     "pathlib==1.0.1",
+	     "xarray==2023.5.0",
+]
+requires-python = "==3.11.*"
