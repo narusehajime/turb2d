@@ -8,7 +8,7 @@ from .utils import (
     create_topography_from_geotiff,
 )
 from .wetdry import find_wet_grids, process_partial_wet_grids
-from .sediment_func import get_es, get_ew, get_ws, get_det_rate
+from .sediment_func import get_es, get_ew, get_ws, get_det_rate, get_bedload
 from .cip import update_gradient, update_gradient2
 from .cip import CIP2D, Jameson, SOR
 from landlab.io.native_landlab import save_grid
@@ -20,6 +20,8 @@ from landlab import Component, FieldError
 import numpy as np
 import time
 from tqdm import tqdm
+import ipdb
+ipdb.set_trace()
 
 """A component of landlab that simulates a turbidity current on 2D grids
 
@@ -129,34 +131,35 @@ class TurbidityCurrent2D(Component):
     }
 
     def __init__(
-        self,
-        grid,
-        h_init=0.0,
-        Ch_w=10 ** (-4),
-        h_w=0.01,
-        alpha=0.1,
-        Cf=0.004,
-        g=9.81,
-        R=1.65,
-        Ds=100 * 10**-6,
-        lambda_p=0.4,
-        r0=1.5,
-        nu=1.010 * 10**-6,
-        kappa=0.01,
-        nu_a=0.8,
-        implicit_num=100,
-        implicit_threshold=1.0 * 10**-15,
-        C_init=0.0,
-        gamma=0.35,
-        la=0.01,
-        water_entrainment=True,
-        water_detrainment=True,
-        det_factor=1.0,
-        suspension=True,
-        sed_entrainment_func="GP1991field",
-        no_erosion=True,
-        model="3eq",
-        **kwds
+            self,
+            grid,
+            h_init=0.0,
+            Ch_w=10 ** (-4),
+            h_w=0.01,
+            alpha=0.1,
+            Cf=0.004,
+            g=9.81,
+            R=1.65,
+            Ds=100 * 10**-6,
+            lambda_p=0.4,
+            r0=1.5,
+            nu=1.010 * 10**-6,
+            kappa=0.01,
+            nu_a=0.8,
+            implicit_num=100,
+            implicit_threshold=1.0 * 10**-15,
+            C_init=0.0,
+            gamma=0.35,
+            la=0.01,
+            water_entrainment=True,
+            water_detrainment=True,
+            det_factor=1.0,
+            suspension=True,
+            bedload_transport=True,
+            sed_entrainment_func="GP1991field",
+            no_erosion=True,
+            model="3eq",
+            **kwds
     ):
         """Create a component of turbidity current
 
@@ -206,6 +209,8 @@ class TurbidityCurrent2D(Component):
             Thickness of active layer on the bed
         suspension: boolean, optional
             turn on the function for entrainment/settling of suspension
+        bedload_transport: boolean, optional
+            turn on the funciton for bedload deposition/erosion
         water_entrainment: boolean, optional
             turn on the function for ambient water entrainment
         water_detrainment: boolean, optional
@@ -251,6 +256,7 @@ class TurbidityCurrent2D(Component):
         self.water_detrainment = water_detrainment
         self.det_factor = det_factor
         self.suspension = suspension
+        self.bedload_transport = bedload_transport
         self.sed_entrainment_func = sed_entrainment_func
         self.model = model
         self.karman = 0.4
@@ -496,7 +502,6 @@ class TurbidityCurrent2D(Component):
         # water and sediment entrainment rates
         self.ew_node = np.zeros(grid.number_of_nodes)
         self.ew_link = np.zeros(grid.number_of_links)
-        self.es = np.zeros(grid.number_of_nodes)
 
         # diffusion coefficient of velocity
         self.nu_t = np.zeros(grid.number_of_links)
@@ -550,6 +555,9 @@ class TurbidityCurrent2D(Component):
         self.S = grid.calc_grad_at_link(self.eta)
         self.bed_change_i = np.zeros_like(self.bed_thick_i)
         self.es = np.zeros_like(self.bed_thick_i)
+        self.bedload_total = np.zeros_like(self.bed_thick_i)
+        self.bedload_x = np.zeros_like(self.bed_thick_i)
+        self.bedload_y = np.zeros_like(self.bed_thick_i)
 
         # length of flow velocity vector
         self.U_temp = self.U.copy()
@@ -1928,6 +1936,11 @@ class TurbidityCurrent2D(Component):
         dt = self.dt_local
         ws = self.ws
         r0 = self.r0
+        node_east = self.node_east[nodes]
+        node_west = self.node_west[nodes]
+        node_north = self.node_north[nodes]
+        node_south = self.node_south[nodes]
+        dx = self.grid.dx
 
         # copy previous values of Ch
         self.Ch_i_prev[:, nodes] = Ch_i[:, nodes]
@@ -1956,7 +1969,6 @@ class TurbidityCurrent2D(Component):
 
         # Obtain sedimentation rate
         self.bed_change_i[:, nodes] = self.Ch_i_prev[:, nodes] - out_Ch_i[:, nodes]
-        # self.bed_change_i[:, nodes] = 0.0
 
         # if erosion is forbidden, out_Ch_i is modified
         if self.no_erosion is True:
@@ -1964,28 +1976,28 @@ class TurbidityCurrent2D(Component):
             out_Ch_i[:, nodes[eroded_region]] = self.Ch_i_prev[:, nodes[eroded_region]]
             self.bed_change_i[:, nodes[eroded_region]] = 0.0
 
+
+        # bedload transport
+        if self.bedload_transport == True:
+           self.bedload_total[:, nodes] = get_bedload(u_star, self.Ds, R=self.R, g=self.g, function="MPM")
+           self.bedload_total[:, nodes] *= self.bed_active_layer[:, nodes]
+           self.bedload_x[:, nodes] = u_node[nodes] / U_node[nodes] * self.bedload_total[:, nodes]
+           self.bedload_y[:, nodes] = v_node[nodes] / U_node[nodes] * self.bedload_total[:, nodes]
+           self.bed_change_i[:, nodes] += dt / dx / 2.0 * (
+               self.bedload_x[:, node_east] - self.bedload_x[:, node_west]
+               + self.bedload_y[:, node_north] - self.bedload_y[:, node_south])
+            
+
         # Apply diffusion to avoid slope steeper than angle of repose
         self._bed_diffusion_at_high_slope()
 
         # Time development of active layer
-        # self.bed_active_layer[:, nodes] += (
-        #     1
-        #     / self.la
-        #     * (
-        #         self.bed_change_i[:, nodes]
-        #         - self.bed_active_layer[:, nodes]
-        #         * np.sum(self.bed_change_i[:, nodes], axis=0)
-        #     )
-        # )
         self.bed_active_layer[:, nodes] += 1 / self.la * self.bed_change_i[:, nodes]
         self.bed_active_layer[:, nodes] /= 1 + 1 / self.la * np.sum(
             self.bed_change_i[:, nodes], axis=0
         )  # semi-implicit
 
         # Adjust abnormal values in the active layer
-        # (self.bed_active_layer[:, nodes])[
-        #     self.bed_active_layer[:, nodes] < 0.0
-        # ] = 1.0e-10
         self.bed_active_layer[:, nodes] /= np.sum(
             self.bed_active_layer[:, nodes], axis=0
         )
@@ -2004,8 +2016,14 @@ class TurbidityCurrent2D(Component):
         """diffusion sediment transport in the region where slope is close to angle
         of repose
         """
-        diffusion_coeff_slope = 1.0e-5
-        high_slope = 0.2
+        diffusion_coeff = 1.0e-3
+
+        # for numerical stabililty
+        stable_diffusion_coeff = self.grid.dx ** 2 / 4.0 / self.dt_local * 0.1
+        if diffusion_coeff > stable_diffusion_coeff:
+            diffusion_coeff = stable_diffusion_coeff
+        
+        high_slope = 0.3
 
         high_slope_horizontal_links = (
             np.abs(self.S[self.wet_pwet_horizontal_links]) > high_slope
@@ -2016,12 +2034,13 @@ class TurbidityCurrent2D(Component):
         west_node = self.west_node_at_horizontal_link[
             self.wet_pwet_horizontal_links[high_slope_horizontal_links]
         ]
-        horiz_change = diffusion_coeff_slope * (
+        horiz_change = diffusion_coeff * self.dt_local / self.grid.dx * (
             self.eta[east_node] * self.bed_active_layer[:, east_node]
             - self.eta[west_node] * self.bed_active_layer[:, west_node]
-        )
+        ) 
         self.bed_change_i[:, east_node] -= horiz_change
         self.bed_change_i[:, west_node] += horiz_change
+        
         high_slope_vertical_links = (
             np.abs(self.S[self.wet_pwet_vertical_links]) > high_slope
         )
@@ -2031,7 +2050,7 @@ class TurbidityCurrent2D(Component):
         south_node = self.south_node_at_vertical_link[
             self.wet_pwet_vertical_links[high_slope_vertical_links]
         ]
-        vert_change = diffusion_coeff_slope * (
+        vert_change = diffusion_coeff * self.dt_local / self.grid.dx  * (
             self.eta[north_node] * self.bed_active_layer[:, north_node]
             - self.eta[south_node] * self.bed_active_layer[:, south_node]
         )

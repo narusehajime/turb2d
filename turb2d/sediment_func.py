@@ -172,7 +172,7 @@ def _gp1991(R, g, Ds, nu, u_star, p=1.0, out=None):
     """
 
     if out is None:
-        out = np.zeros([len(Ds), u_star.shape])
+        out = np.zeros([len(Ds), len(u_star)])
 
     # basic parameters
     ws = get_ws(R, g, Ds, nu)
@@ -188,5 +188,105 @@ def _gp1991(R, g, Ds, nu, u_star, p=1.0, out=None):
     # calculate entrainment rate
     Z = sus_index * Rp**alpha
     out[:, :] = p * a * Z**5 / (1 + (a / 0.3) * Z**5)
+
+    return out
+
+def get_bedload(u_star, Ds, R=1.65, g=9.81, function="MPM", out=None):
+    """Get bedload discharge from empirical formulation
+
+       Parameters
+       ------------------------------
+       u_star: 1d ndarray
+          friction velocity
+
+       Ds: 1d ndarray
+          grain diameters
+
+       R: float, optional
+          Submerged specific density of sediment particles.
+          Default is 1.65
+
+       g: float, optional
+          gravity acceleration.
+          Default is 9.81
+
+       function: str, optional
+          Function name for prediting bedload discharge
+          Default is "MPM". Other options are:
+          "WP2006": Wong and Parker (2006)
+
+       out: 1d ndarray
+          Outputs (1d array of sediment bedload discharge)
+
+       Returns
+       ---------------
+       out : ndarray
+         1d array of sediment bedload discharge
+       
+    """
+
+    if out is None:
+        out = np.zeros([len(Ds), len(u_star)])
+
+    if function == "MPM":
+        _MPM(u_star, Ds, R, g, a=8.0, b=1.5, out=out)
+    elif function == "WP2006":
+        _MPM(u_star, Ds, R, g, a=4.93, b=1.6, out=out)
+    else:
+        _MPM(u_star, Ds, R, g, a=8.0, b=1.5, out=out)
+
+    return out
+
+def _MPM(u_star, Ds, R=1.65, g=9.81, a=8.0, b=1.5, out=None):
+    """Bedload prediction by Meyer=Peter and
+       Muller (1948)-type equations
+
+       Parameters
+       ------------------------------
+       u_star: 1d ndarray
+          friction velocity
+
+       Ds: 1d ndarray
+          grain diameters
+
+       R: float, optional
+          Submerged specific density of sediment particles.
+          Default is 1.65
+
+       g: float, optional
+          gravity acceleration.
+          Default is 9.81
+
+       a: float, optional
+          coefficient used in the MPM equation
+          Default is 8.0
+
+       b: float, optional
+          exponent used in the MPM-type equation
+          
+       out: 1d ndarray
+          Outputs (1d array of sediment bedload discharge)
+
+       Returns
+       ---------------
+       out : ndarray
+         1d array of sediment bedload discharge
+       
+    """
+
+    if out is None:
+        out = np.zeros([len(Ds), u_star.shape])
+
+    tau_c = 0.047
+
+    tau_star_c = u_star * u_star / (R * g * Ds) - tau_c
+
+    tau_star_c = np.where(
+        tau_star_c > 0.0,
+        tau_star_c,
+        0.0
+    )
+
+    out[:, :] = a * tau_star_c ** b * np.sqrt(R * g * Ds ** 3)
 
     return out
