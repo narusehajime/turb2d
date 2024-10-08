@@ -1964,7 +1964,7 @@ class TurbidityCurrent2D(Component):
             Ch_i[:, nodes]
             + ws * self.bed_active_layer[:, nodes] * self.es[:, nodes] * dt
         )
-        out_Ch_i[:, nodes] /= 1 + ws * r0 / h[nodes] * dt
+        out_Ch_i[:, nodes] /= 1 + ws * r0 / (h[nodes] + 1.0e-7) * dt
 
         # Obtain sedimentation rate
         self.bed_change_i[:, nodes] = self.Ch_i_prev[:, nodes] - out_Ch_i[:, nodes]
@@ -1980,8 +1980,8 @@ class TurbidityCurrent2D(Component):
         if self.bedload_transport == True:
            self.bedload_total[:, nodes] = get_bedload(u_star, self.Ds, R=self.R, g=self.g, function="MPM")
            self.bedload_total[:, nodes] *= self.bed_active_layer[:, nodes]
-           self.bedload_x[:, nodes] = u_node[nodes] / U_node[nodes] * self.bedload_total[:, nodes]
-           self.bedload_y[:, nodes] = v_node[nodes] / U_node[nodes] * self.bedload_total[:, nodes]
+           self.bedload_x[:, nodes] = u_node[nodes] / (U_node[nodes] + 1.0e-7) * self.bedload_total[:, nodes]
+           self.bedload_y[:, nodes] = v_node[nodes] / (U_node[nodes] + 1.0e-7) * self.bedload_total[:, nodes]
            self.bed_change_i[:, nodes] += dt / dx / 2.0 * (
                self.bedload_x[:, node_east] - self.bedload_x[:, node_west]
                + self.bedload_y[:, node_north] - self.bedload_y[:, node_south])
