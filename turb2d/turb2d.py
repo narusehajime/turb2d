@@ -20,8 +20,7 @@ from landlab import Component, FieldError
 import numpy as np
 import time
 from tqdm import tqdm
-import ipdb
-ipdb.set_trace()
+
 
 """A component of landlab that simulates a turbidity current on 2D grids
 
