@@ -224,8 +224,6 @@ class TurbidityCurrent2D(Component):
             Choose "3eq" or "4eq" for the three or four equation model of Parker
             (1986)
         """
-        super(TurbidityCurrent2D, self).__init__(grid, **kwds)
-
         # First we copy our grid
         self._grid = grid
 
@@ -262,6 +260,10 @@ class TurbidityCurrent2D(Component):
         self.karman = 0.4
         self.no_erosion = no_erosion
         self.dt_local_limit = dt_local_limit
+
+        # Perform the parent class initializer
+        super(TurbidityCurrent2D, self).__init__(grid, **kwds)
+
 
         # Now setting up fields at nodes and links
         try:
@@ -2031,16 +2033,16 @@ class TurbidityCurrent2D(Component):
         self._bed_diffusion_at_high_slope()
 
         # Time development of active layer
-        self.bed_active_layer[:, nodes] += 1 / self.la * self.bed_change_i[:, nodes]
+        self.bed_active_layer[:, nodes] += 1.0 / self.la * (
+            self.bed_change_i[:, nodes]
+            - np.sum(self.bed_change_i[:, nodes], axis=0)
+        )
+        # remove negative values
         self.bed_active_layer[:, nodes] = np.where(
             self.bed_active_layer[:, nodes] < 0.0,
             1.0e-7,
             self.bed_active_layer[:, nodes]
-        ) # remove negative values
-        self.bed_active_layer[:, nodes] /= 1 + 1 / self.la * np.sum(
-            self.bed_change_i[:, nodes], axis=0
-        )  # semi-implicit
-
+        ) 
         # Adjust abnormal values in the active layer
         self.bed_active_layer[:, nodes] /= np.sum(
             self.bed_active_layer[:, nodes], axis=0
@@ -2061,13 +2063,14 @@ class TurbidityCurrent2D(Component):
         of repose
         """
         diffusion_coeff = 1.0e-3
+        high_slope = 0.6
 
         # for numerical stabililty
         stable_diffusion_coeff = self.grid.dx ** 2 / 4.0 / self.dt_local * 0.1
         if diffusion_coeff > stable_diffusion_coeff:
             diffusion_coeff = stable_diffusion_coeff
         
-        high_slope = 0.3
+
 
         high_slope_horizontal_links = (
             np.abs(self.S[self.wet_pwet_horizontal_links]) > high_slope
@@ -2078,12 +2081,18 @@ class TurbidityCurrent2D(Component):
         west_node = self.west_node_at_horizontal_link[
             self.wet_pwet_horizontal_links[high_slope_horizontal_links]
         ]
-        horiz_change = diffusion_coeff * self.dt_local / self.grid.dx * (
-            self.eta[east_node] * self.bed_active_layer[:, east_node]
-            - self.eta[west_node] * self.bed_active_layer[:, west_node]
+        horiz_change = (
+            diffusion_coeff
+            * self.dt_local
+            / self.grid.dx
+            * self.S[self.wet_pwet_horizontal_links[high_slope_horizontal_links]]
         ) 
-        self.bed_change_i[:, east_node] -= horiz_change
-        self.bed_change_i[:, west_node] += horiz_change
+        self.bed_change_i[:, east_node] -= (
+            horiz_change * self.bed_active_layer[:, east_node]
+        )
+        self.bed_change_i[:, west_node] += (
+            horiz_change * self.bed_active_layer[:, west_node]
+        )
         
         high_slope_vertical_links = (
             np.abs(self.S[self.wet_pwet_vertical_links]) > high_slope
@@ -2094,15 +2103,18 @@ class TurbidityCurrent2D(Component):
         south_node = self.south_node_at_vertical_link[
             self.wet_pwet_vertical_links[high_slope_vertical_links]
         ]
-        vert_change = diffusion_coeff * self.dt_local / self.grid.dx  * (
-            self.eta[north_node] * self.bed_active_layer[:, north_node]
-            - self.eta[south_node] * self.bed_active_layer[:, south_node]
-        )
-        self.bed_change_i[:, north_node] -= vert_change
-        self.bed_change_i[:, south_node] += vert_change
-
-        # import ipdb
-        # ipdb.set_trace()
+        vert_change = (
+            diffusion_coeff
+            * self.dt_local
+            / self.grid.dx
+            * self.S[self.wet_pwet_vertical_links[high_slope_vertical_links]]
+            )
+        self.bed_change_i[:, north_node] -= (
+            vert_change * self.bed_active_layer[:, north_node]
+            )
+        self.bed_change_i[:, south_node] += (
+            vert_change * self.bed_active_layer[:, south_node]
+            )
 
     def copy_values_to_temp(self):
         self.h_temp[:] = self.h[:]

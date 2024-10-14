@@ -60,7 +60,7 @@ grid.set_status_at_node_on_edges(
 
 create_init_flow_region(
     grid,
-    initial_flow_concentration=0.01,
+    initial_flow_concentration=[0.005, 0.005],
     initial_flow_thickness=100,
     initial_region_radius=100,
     initial_region_center=[1000, 4000],  # 1000, 4000
@@ -81,7 +81,7 @@ tc = TurbidityCurrent2D(
     alpha=0.4,
     kappa=0.05,
     nu_a=0.75,
-    Ds=80 * 10**-6,
+    Ds=[80 * 10**-6, 40 * 10**-6],
     h_init=0.0,
     Ch_w=10 ** (-5),
     h_w=0.001,
@@ -93,6 +93,8 @@ tc = TurbidityCurrent2D(
     water_detrainment=False,
     det_factor=1.0,
     suspension=True,
+    bedload_transport=True,
+    model="4eq",
 )
 
 # start calculation
