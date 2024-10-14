@@ -146,7 +146,7 @@ class TurbidityCurrent2D(Component):
             kappa=0.01,
             nu_a=0.8,
             implicit_num=100,
-            implicit_threshold=1.0 * 10**-15,
+            implicit_threshold=1.0 * 10**-12,
             C_init=0.0,
             gamma=0.35,
             la=0.01,
@@ -158,6 +158,7 @@ class TurbidityCurrent2D(Component):
             sed_entrainment_func="GP1991field",
             no_erosion=True,
             model="3eq",
+            dt_local_limit=5.0,
             **kwds
     ):
         """Create a component of turbidity current
@@ -260,6 +261,7 @@ class TurbidityCurrent2D(Component):
         self.model = model
         self.karman = 0.4
         self.no_erosion = no_erosion
+        self.dt_local_limit = dt_local_limit
 
         # Now setting up fields at nodes and links
         try:
@@ -665,6 +667,8 @@ class TurbidityCurrent2D(Component):
                 )
             )
         )
+        if dt_local > self.dt_local_limit:
+            dt_local = self.dt_local_limit
 
         if self.first_step is True:
             dt_local *= 0.1
@@ -1466,6 +1470,24 @@ class TurbidityCurrent2D(Component):
         #     * self.U_temp[self.wet_pwet_links] ** 3
         #     - beta * K ** 1.5
 
+        # self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
+        #     (self.Cf + 0.5 * self.ew_link[self.wet_pwet_links])
+        #    * self.U_temp[self.wet_pwet_links]
+        #    * self.U_temp[self.wet_pwet_links]
+        #    * self.U_temp[self.wet_pwet_links]
+        #    - beta
+        #    * (self.Kh[self.wet_pwet_links] / self.h_link[self.wet_pwet_links]) ** 1.5
+        #    - self.R
+        #    * self.g
+        #    * (
+        #        np.sum(self.Ch_link_i_temp[:, self.wet_pwet_links] * self.ws, axis=0)
+        #        + 0.5
+        #        * self.U_temp[self.wet_pwet_links]
+        #        * self.ew_link[self.wet_pwet_links]
+        #        * self.Ch_link_temp[self.wet_pwet_links]
+        #    )
+        # )
+
         self.Kh_temp[self.wet_pwet_links] += self.dt_local * (
             (self.Cf + 0.5 * self.ew_link[self.wet_pwet_links])
             * self.U_temp[self.wet_pwet_links]
@@ -1484,8 +1506,15 @@ class TurbidityCurrent2D(Component):
             )
         )
 
+        self.Kh_temp[self.partial_wet_horizontal_links] = 0.0
+        self.Kh_temp[self.partial_wet_vertical_links] = 0.0
+        
         # remove negative values
-        self.Kh_temp[self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0.0]] = 0.0
+        self.Kh_temp[self.wet_pwet_links] = np.where(
+            self.Kh_temp[self.wet_pwet_links] < 0.0,
+            0.0,
+            self.Kh_temp[self.wet_pwet_links]
+        )
 
         # adjust_negative_values(self.Kh,
         #                        self.wet_pwet_links,
@@ -1500,11 +1529,12 @@ class TurbidityCurrent2D(Component):
         self.Cf_link[self.wet_pwet_links[U_exist]] = (
             alpha
             * self.Kh_temp[self.wet_pwet_links[U_exist]]
+            / (self.h_link[self.wet_pwet_links[U_exist]] + 1.0e-7)
             / self.U_temp[self.wet_pwet_links[U_exist]]
             / self.U_temp[self.wet_pwet_links[U_exist]]
-        )
+        ) 
         # self.Cf_link[self.Cf_link > 0.1] = 0.1
-        self.Cf_link[self.wet_pwet_links[~U_exist]] = 0.0
+        self.Cf_link[self.wet_pwet_links[~U_exist]] = self.Cf
         map_values(self, Cf_link=self.Cf_link, Cf_node=self.Cf_node)
 
     def _artificial_viscosity(self, h, h_link, u, v, Ch, Ch_link):
@@ -1978,10 +2008,20 @@ class TurbidityCurrent2D(Component):
 
         # bedload transport
         if self.bedload_transport == True:
-           self.bedload_total[:, nodes] = get_bedload(u_star, self.Ds, R=self.R, g=self.g, function="MPM")
+           self.bedload_total[:, nodes] = get_bedload(
+               u_star,
+               self.Ds,
+               R=self.R,
+               g=self.g,
+               function="MPM"
+           )
            self.bedload_total[:, nodes] *= self.bed_active_layer[:, nodes]
-           self.bedload_x[:, nodes] = u_node[nodes] / (U_node[nodes] + 1.0e-7) * self.bedload_total[:, nodes]
-           self.bedload_y[:, nodes] = v_node[nodes] / (U_node[nodes] + 1.0e-7) * self.bedload_total[:, nodes]
+           self.bedload_x[:, nodes] = (
+               u_node[nodes] / (U_node[nodes] + 1.0e-7) * self.bedload_total[:, nodes]
+           )
+           self.bedload_y[:, nodes] = (
+               v_node[nodes] / (U_node[nodes] + 1.0e-7) * self.bedload_total[:, nodes]
+           )
            self.bed_change_i[:, nodes] += dt / dx / 2.0 * (
                self.bedload_x[:, node_east] - self.bedload_x[:, node_west]
                + self.bedload_y[:, node_north] - self.bedload_y[:, node_south])
@@ -1992,6 +2032,11 @@ class TurbidityCurrent2D(Component):
 
         # Time development of active layer
         self.bed_active_layer[:, nodes] += 1 / self.la * self.bed_change_i[:, nodes]
+        self.bed_active_layer[:, nodes] = np.where(
+            self.bed_active_layer[:, nodes] < 0.0,
+            1.0e-7,
+            self.bed_active_layer[:, nodes]
+        ) # remove negative values
         self.bed_active_layer[:, nodes] /= 1 + 1 / self.la * np.sum(
             self.bed_change_i[:, nodes], axis=0
         )  # semi-implicit
