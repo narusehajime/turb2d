@@ -93,7 +93,7 @@ tc = TurbidityCurrent2D(
     water_detrainment=False,
     det_factor=1.0,
     suspension=True,
-    bedload_transport=True,
+    bedload_transport=False,
     model="4eq",
 )
 

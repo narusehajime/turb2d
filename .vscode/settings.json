@@ -6,5 +6,6 @@
             "scheme": "file",
             "pattern": "README.rst"
         }
-    ]
+    ],
+    "makefile.configureOnOpen": false
 }

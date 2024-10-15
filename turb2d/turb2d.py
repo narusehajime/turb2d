@@ -260,6 +260,7 @@ class TurbidityCurrent2D(Component):
         self.karman = 0.4
         self.no_erosion = no_erosion
         self.dt_local_limit = dt_local_limit
+        self.alpha_TKE = kwds.pop("alpha_TKE", 0.1)
 
         # Perform the parent class initializer
         super(TurbidityCurrent2D, self).__init__(grid, **kwds)
@@ -1006,6 +1007,8 @@ class TurbidityCurrent2D(Component):
         # for 4 equation model
         if self.model == "4eq":
             self._calculate_turbulent_kinetic_energy()
+            self._TKE_diffusion()
+            self._update_friction_coefficient(self.U_temp, self.Kh_temp)
 
         # Solve deposition/erosion
         if self.suspension:
@@ -1310,6 +1313,70 @@ class TurbidityCurrent2D(Component):
             v_node=self.v_node_temp,
         )
 
+    def _TKE_diffusion(self):
+        """solve diffusion terms of TKE"""
+
+        # copy grid ids and other variables
+        wet_pwet_h_links = self.wet_pwet_horizontal_links
+        wet_pwet_v_links = self.wet_pwet_vertical_links
+        link_east = self.link_east
+        link_west = self.link_west
+        link_north = self.link_north
+        link_south = self.link_south
+
+        dx = self.grid.dx
+        dy = self.grid.dy
+        dt = self.dt_local
+        dx2 = dx * dx
+        dy2 = dy * dy
+
+        # diffusion of TKE
+        self.calc_nu_t(self.u_temp, self.v_temp, self.h_link_temp, out=self.nu_t)
+        self.Kh_temp[wet_pwet_h_links] += (
+            self.nu_t[wet_pwet_h_links]
+            * dt
+            * (
+                (
+                    self.Kh_temp[link_east[wet_pwet_h_links]]
+                    - 2 * self.Kh_temp[wet_pwet_h_links]
+                    + self.Kh_temp[link_west[wet_pwet_h_links]]
+                )
+                + (
+                    self.Kh_temp[link_north[wet_pwet_h_links]]
+                    - 2 * self.Kh_temp[wet_pwet_h_links]
+                    + self.Kh_temp[link_south[wet_pwet_h_links]]
+                )
+            )
+            / dx2
+        )
+        self.Kh_temp[wet_pwet_v_links] += (
+            self.nu_t[wet_pwet_v_links]
+            * dt
+            * (
+                (
+                    self.Kh_temp[link_east[wet_pwet_v_links]]
+                    - 2 * self.Kh_temp[wet_pwet_v_links]
+                    + self.Kh_temp[link_west[wet_pwet_v_links]]
+                )
+                + (
+                    self.Kh_temp[link_north[wet_pwet_v_links]]
+                    - 2 * self.Kh_temp[wet_pwet_v_links]
+                    + self.Kh_temp[link_south[wet_pwet_v_links]]
+                )
+            )
+            / dy2
+        )
+        self.update_boundary_conditions(
+            Kh=self.Kh_temp
+        )
+
+        # map values
+        map_links_to_nodes(
+            self,
+            Kh=self.Kh_temp,
+        )
+
+
     def _CCUP(self):
         """solve the pressure term by CCUP method"""
 
@@ -1454,7 +1521,7 @@ class TurbidityCurrent2D(Component):
         self.Kh_temp[self.wet_pwet_links[self.Kh_temp[self.wet_pwet_links] < 0]] = 0.0
 
         # development of turbulent kinetic energy
-        alpha = 0.1
+        alpha = self.alpha_TKE
         # Ri = self.R * self.g * self.Ch_link[self.wet_pwet_links] \
         #      / self.U[self.wet_pwet_links] / self.U[self.wet_pwet_links]
         # beta = (0.5 * self.ew_link[self.wet_pwet_links] *
@@ -1526,18 +1593,22 @@ class TurbidityCurrent2D(Component):
         #                        self.link_south,
         #                        out_f=self.Kh_temp)
 
+    def _update_friction_coefficient(self, U, Kh):
+        
         # update friction coefficient Cf_link and Cf_nodes
-        U_exist = self.U_temp[self.wet_pwet_links] > 1.0e-10
+        U_exist = U[self.wet_pwet_links] > 1.0e-10
         self.Cf_link[self.wet_pwet_links[U_exist]] = (
-            alpha
-            * self.Kh_temp[self.wet_pwet_links[U_exist]]
+            self.alpha_TKE
+            * Kh[self.wet_pwet_links[U_exist]]
             / (self.h_link[self.wet_pwet_links[U_exist]] + 1.0e-7)
-            / self.U_temp[self.wet_pwet_links[U_exist]]
-            / self.U_temp[self.wet_pwet_links[U_exist]]
+            / U[self.wet_pwet_links[U_exist]]
+            / U[self.wet_pwet_links[U_exist]]
         ) 
         # self.Cf_link[self.Cf_link > 0.1] = 0.1
         self.Cf_link[self.wet_pwet_links[~U_exist]] = self.Cf
         map_values(self, Cf_link=self.Cf_link, Cf_node=self.Cf_node)
+
+
 
     def _artificial_viscosity(self, h, h_link, u, v, Ch, Ch_link):
         """Apply artificial viscosity to flow velocity
